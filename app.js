@@ -55,10 +55,13 @@ function getJSON(url) {
 let currentUser = null;
 
 async function handleGoogleLogin() {
+  const redirectUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
+  console.log('Próba logowania z przekierowaniem do:', redirectUrl);
+
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.href.split('#')[0],
+      redirectTo: redirectUrl,
     },
   });
   if (error) {
