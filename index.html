@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Read Tracker – kto przeczyta więcej stron?</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Read Tracker – kto przeczyta więcej stron?</h1>
+
+  <!-- Login modal -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <h2>Podaj swoje imię</h2>
+      <input id="username" type="text" placeholder="Twoje imię" />
+      <button id="save-username">Zapisz</button>
+    </div>
+  </div>
+
+  <form id="read-form">
+    <label>
+      Liczba stron:
+      <input type="number" id="pages" min="1" required />
+    </label>
+    <label>
+      Mnożnik:
+      <select id="multiplier">
+        <option value="1">1x</option>
+        <option value="1.5">1.5x Angielski</option>
+        <option value="1.5">1.5x Naukowa</option>
+        <option value="2">2x Inne</option>
+      </select>
+    </label>
+    <button type="submit">Dodaj</button>
+  </form>
+
+  <h2>Leaderboard</h2>
+  <table id="leaderboard">
+    <thead>
+      <tr>
+        <th>Imię</th>
+        <th>Punkty (strony × mnożnik)</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script src="app.js"></script>
+</body>
+</html>
