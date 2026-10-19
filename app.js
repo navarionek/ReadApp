@@ -81,18 +81,21 @@ function updateUI(user) {
   const userInfo = document.getElementById('user-info');
   const displayName = document.getElementById('display-name');
   const readForm = document.getElementById('read-form');
+  const historySection = document.getElementById('history-section');
 
   if (user) {
     currentUser = user;
     loginModal.style.display = 'none';
     userInfo.style.display = 'block';
     readForm.style.display = 'block';
+    if (historySection) historySection.style.display = 'block';
     displayName.textContent = user.user_metadata.full_name || user.email;
   } else {
     currentUser = null;
     loginModal.style.display = 'flex';
     userInfo.style.display = 'none';
     readForm.style.display = 'none';
+    if (historySection) historySection.style.display = 'none';
     displayName.textContent = '';
   }
 }
@@ -110,6 +113,7 @@ function showError(msg) {
 
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
+  const title = document.getElementById('title').value;
   const pages = parseInt(document.getElementById('pages').value, 10);
   const multiplier = parseFloat(document.getElementById('multiplier').value);
 
@@ -121,8 +125,9 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const username = currentUser.user_metadata.full_name || currentUser.email;
 
   try {
-    await postJSON(READS_ENDPOINT, { username, pages, multiplier });
+    await postJSON(READS_ENDPOINT, { username, pages, multiplier, title });
     await loadLeaderboard();      // refresh table
+    await loadHistory();          // refresh history
     e.target.reset();
     if (document.getElementById('error-message')) {
       document.getElementById('error-message').style.display = 'none';
@@ -161,6 +166,26 @@ async function loadLeaderboard() {
   }
 }
 
+/* ----------------- History loader ----------------- */
+async function loadHistory() {
+  try {
+    const rows = await getJSON(`${READS_ENDPOINT}&select=title,pages,created_at&order=created_at.desc&limit=20`);
+    const tbody = document.querySelector('#history-body');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (rows) {
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const date = new Date(r.created_at).toLocaleDateString();
+        tr.innerHTML = `<td>${r.title || '-'}</td><td>${r.pages}</td><td>${date}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  } catch (err) {
+    console.error('Error loading history:', err);
+  }
+}
+
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
@@ -172,6 +197,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('Auth state changed:', event, session);
     updateUI(session?.user || null);
     loadLeaderboard();
+    loadHistory();
   });
 
   // Initial load
