@@ -80,7 +80,7 @@ function updateUI(user) {
   const loginModal = document.getElementById('login-modal');
   const userInfo = document.getElementById('user-info');
   const displayName = document.getElementById('display-name');
-  const readForm = document.getElementById('read-form');
+  const formSection = document.getElementById('form-section');
   const historySection = document.getElementById('history-section');
   const leaderboardSection = document.getElementById('leaderboard-section');
 
@@ -88,17 +88,21 @@ function updateUI(user) {
     currentUser = user;
     loginModal.style.display = 'none';
     userInfo.style.display = 'block';
-    readForm.style.display = 'block';
+    if (formSection) formSection.style.display = 'block';
     if (historySection) historySection.style.display = 'block';
     if (leaderboardSection) leaderboardSection.style.display = 'block';
+    const statsBar = document.getElementById('stats-bar');
+    if (statsBar) statsBar.style.display = 'grid';
     displayName.textContent = user.user_metadata.full_name || user.email;
   } else {
     currentUser = null;
     loginModal.style.display = 'flex';
     userInfo.style.display = 'none';
-    readForm.style.display = 'none';
+    if (formSection) formSection.style.display = 'none';
     if (historySection) historySection.style.display = 'none';
     if (leaderboardSection) leaderboardSection.style.display = 'none';
+    const statsBar = document.getElementById('stats-bar');
+    if (statsBar) statsBar.style.display = 'none';
     displayName.textContent = '';
   }
 }
@@ -161,13 +165,27 @@ async function loadLeaderboard() {
     const tbody = document.querySelector('#leaderboard tbody');
     if (!tbody) return;
     tbody.innerHTML = '';
-    Object.entries(totals)
-      .sort((a,b)=> b[1]-a[1])          // descending
-      .forEach(([name, pts]) => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${name}</td><td>${pts.toFixed(1)}</td>`;
-        tbody.appendChild(tr);
-      });
+    const sortedEntries = Object.entries(totals).sort((a,b)=> b[1]-a[1]);
+
+    sortedEntries.forEach(([name, pts]) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="text-left">${name}</td><td class="text-right">${pts.toFixed(1)}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    if (currentUser) {
+      const username = currentUser.user_metadata.full_name || currentUser.email;
+      const userTotal = totals[username] || 0;
+      const statTotalPages = document.getElementById('stat-total-pages');
+      const statRank = document.getElementById('stat-rank');
+
+      if (statTotalPages) statTotalPages.textContent = userTotal.toFixed(0);
+
+      if (statRank) {
+        const rankIndex = sortedEntries.findIndex(([name]) => name === username);
+        statRank.textContent = rankIndex !== -1 ? `#${rankIndex + 1}` : '#--';
+      }
+    }
   } catch (err) {
     console.error('Error loading leaderboard:', err);
   }

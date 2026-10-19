@@ -2,74 +2,155 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Read Tracker – kto przeczyta więcej stron?</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-  <h1>Read Tracker – kto przeczyta więcej stron?</h1>
+  <main class="container">
+    <header>
+      <h1 class="app-title">Read Tracker</h1>
+      <p class="subtitle">Kto przeczyta więcej stron?</p>
+    </header>
 
-  <!-- Login modal -->
-  <div id="login-modal" class="modal">
-    <div class="modal-content">
-      <h2 class="modal-title">Zaloguj się</h2>
-      <p>Aby dodawać strony, musisz się zalogować.</p>
-      <button id="google-login-btn" type="button">Zaloguj przez Google</button>
+    <!-- Stats Bar -->
+    <section id="stats-bar" class="stats-grid" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-icon"><i data-lucide="book-open"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">Twoje strony</span>
+          <span id="stat-total-pages" class="stat-value">0</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon"><i data-lucide="trophy"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">Ranking</span>
+          <span id="stat-rank" class="stat-value">#--</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Login modal -->
+    <div id="login-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-icon"><i data-lucide="user-circle"></i></div>
+        <h2 class="modal-title">Zaloguj się</h2>
+        <p>Aby dodawać strony, musisz się zalogować.</p>
+        <button id="google-login-btn" class="btn btn-primary btn-lg">
+          <i data-lucide="log-in"></i>
+          <span>Zaloguj przez Google</span>
+        </button>
+      </div>
     </div>
-  </div>
 
-  <!-- User info / Logout -->
-  <div id="user-info" style="display:none; margin-bottom: 20px; text-align: right;">
-    <span id="display-name" style="margin-right: 10px; font-weight: bold;"></span>
-    <button id="logout-btn" type="button">Wyloguj</button>
-  </div>
-
-  <form id="read-form" style="display:none;">
-    <div>
-      <label for="title">Tytuł:</label>
-      <input type="text" id="title" placeholder="Co przeczytałeś?" required />
+    <!-- User info / Logout -->
+    <div id="user-info" style="display:none;">
+      <div class="user-header">
+        <div class="user-profile">
+          <span id="display-name"></span>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-sm">
+          <i data-lucide="log-out"></i>
+          <span>Wyloguj</span>
+        </button>
+      </div>
     </div>
-    <br>
-    <div>
-      <label for="pages">Liczba stron:</label>
-      <input type="number" id="pages" min="1" required />
-    </div>
-    <br>
-    <label>Mnożnik:</label>
-    <div id="multiplier-container" style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
-      <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Angielski</label>
-      <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Naukowa</label>
-    </div>
-    <br>
-    <button type="submit">Dodaj</button>
-  </form>
-  <div id="error-message" style="display:none;color:red;"></div>
 
-  <h2 id="leaderboard-title">Leaderboard</h2>
-  <table id="leaderboard">
-    <thead>
-      <tr>
-        <th>Imię</th>
-        <th>Punkty (strony × mnożnik)</th>
-      </tr>
-    </thead>
-    <tbody id="leaderboard-body"></tbody>
-  </table>
+    <div class="dashboard-grid">
+      <!-- Left Column: Form -->
+      <div class="form-column">
+        <section id="form-section" style="display:none;">
+          <form id="read-form" class="card">
+            <div class="card-header">
+              <i data-lucide="plus-circle" class="card-icon"></i>
+              <h2>Dodaj postęp</h2>
+            </div>
+            <div class="form-group">
+              <label for="title">Tytuł książki</label>
+              <div class="input-wrapper">
+                <i data-lucide="book" class="input-icon"></i>
+                <input type="text" id="title" placeholder="Co przeczytałeś?" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="pages">Liczba stron</label>
+              <div class="input-wrapper">
+                <i data-lucide="layers" class="input-icon"></i>
+                <input type="number" id="pages" min="1" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Mnożnik</label>
+              <div id="multiplier-container" class="multiplier-grid">
+                <label class="checkbox-label">
+                  <input type="checkbox" class="multiplier-checkbox" value="1.5">
+                  <span class="check-text">1.5x Angielski</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" class="multiplier-checkbox" value="1.5">
+                  <span class="check-text">1.5x Naukowa</span>
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block btn-lg">
+              <i data-lucide="send"></i>
+              <span>Dodaj wpis</span>
+            </button>
+            <div id="error-message" class="error-msg" style="display:none;"></div>
+          </form>
+        </section>
+      </div>
 
-  <div id="history-section" style="display:none;">
-    <h2 id="history-title">Ostatnie wpisy</h2>
-    <table id="history-table">
-      <thead>
-        <tr>
-          <th>Tytuł</th>
-          <th>Strony</th>
-          <th>Data</th>
-        </tr>
-      </thead>
-      <tbody id="history-body"></tbody>
-    </table>
-  </div>
+      <!-- Right Column: Leaderboard & History -->
+      <div class="info-column">
+        <section id="leaderboard-section" style="display:none;" class="card">
+          <div class="card-header">
+            <i data-lucide="award" class="card-icon"></i>
+            <h2>Leaderboard</h2>
+          </div>
+          <div class="table-container">
+            <table id="leaderboard">
+              <thead>
+                <tr>
+                  <th>Imię</th>
+                  <th class="text-right">Punkty</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="history-section" style="display:none;" class="card">
+          <div class="card-header">
+            <i data-lucide="history" class="card-icon"></i>
+            <h2>Ostatnie wpisy</h2>
+          </div>
+          <div class="table-container">
+            <table id="history-table">
+              <thead>
+                <tr>
+                  <th>Tytuł</th>
+                  <th class="text-right">Strony</th>
+                  <th class="text-right">Data</th>
+                </tr>
+              </thead>
+              <tbody id="history-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
+  <script>
+    // Initialize Lucide icons
+    lucide.createIcons();
+  </script>
 </body>
 </html>
