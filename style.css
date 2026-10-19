@@ -299,9 +299,12 @@ input:focus {
   font-size: 0.75rem;
 }
 
-/* Tables */
-.table-container {
-  overflow-x: auto;
+/* User Progress Section */
+.user-progress-block .user-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
 }
 
 table {

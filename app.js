@@ -236,23 +236,41 @@ async function loadUserProgress() {
       for (const [username, books] of Object.entries(grouped)) {
         const userBlock = document.createElement('div');
         userBlock.className = 'user-progress-block';
-        userBlock.style.marginBottom = '1.5rem';
-        userBlock.innerHTML = `<h3 class="user-name" style="margin-bottom:0.5rem; color:var(--primary-color);">${username}</h3>`;
+        userBlock.style.marginBottom = '2rem';
+        userBlock.innerHTML = `<h3 class="user-name" style="margin-bottom:0.75rem; color:var(--primary);">${username}</h3>`;
 
-        const bookList = document.createElement('ul');
-        bookList.className = 'book-list';
-        bookList.style.listStyle = 'none';
-        bookList.style.paddingLeft = '0';
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'table-container';
+
+        const table = document.createElement('table');
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Tytuł</th>
+              <th class="text-right">Strony</th>
+              <th class="text-right">Mnożnik</th>
+              <th class="text-right">Wynik</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
 
         books.forEach(book => {
-          const li = document.createElement('li');
-          li.style.padding = '0.25rem 0';
-          li.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
-          li.innerHTML = `<span style="font-weight:500;">${book.title}</span>: <span style="color:var(--accent-color);">${book.pages} stron</span> <small style="opacity:0.7;">(${book.multiplier}x)</small>`;
-          bookList.appendChild(li);
+          const tr = document.createElement('tr');
+          const score = (book.pages * book.multiplier).toFixed(1);
+          tr.innerHTML = `
+            <td>${book.title}</td>
+            <td class="text-right">${book.pages}</td>
+            <td class="text-right">${book.multiplier}x</td>
+            <td class="text-right" style="font-weight:600;">${score}</td>
+          `;
+          tbody.appendChild(tr);
         });
 
-        userBlock.appendChild(bookList);
+        tableContainer.appendChild(table);
+        userBlock.appendChild(tableContainer);
         container.appendChild(userBlock);
       }
     }
