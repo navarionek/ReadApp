@@ -30,6 +30,7 @@ function fetchJSON(url, opts = {}) {
         throw new Error('Invalid JSON response');
       }
     });
+}
 
 function postJSON(url, data) {
   return fetchJSON(url, {
