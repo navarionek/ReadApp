@@ -115,7 +115,11 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
   const title = document.getElementById('title').value;
   const pages = parseInt(document.getElementById('pages').value, 10);
-  const multiplier = parseFloat(document.getElementById('multiplier').value);
+
+  let multiplier = 1;
+  document.querySelectorAll('.multiplier-checkbox:checked').forEach(cb => {
+    multiplier *= parseFloat(cb.value);
+  });
 
   if (!currentUser) {
     showError('Musisz być zalogowany!');

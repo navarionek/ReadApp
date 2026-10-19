@@ -34,13 +34,12 @@
     </label>
     <label>
       Mnożnik:
-      <select id="multiplier">
-        <option value="1">1x</option>
-        <option value="1.5">1.5x Angielski</option>
-        <option value="1.5">1.5x Naukowa</option>
-        <option value="2">2x Inne</option>
-      </select>
     </label>
+    <div id="multiplier-container" style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
+      <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Angielski</label>
+      <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Naukowa</label>
+      <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="2"> 2x Inne</label>
+    </div>
     <button type="submit">Dodaj</button>
   </form>
   <div id="error-message" style="display:none;color:red;"></div>
