@@ -81,16 +81,16 @@ function updateUI(user) {
   const userInfo = document.getElementById('user-info');
   const displayName = document.getElementById('display-name');
   const formSection = document.getElementById('form-section');
-  const historySection = document.getElementById('history-section');
   const leaderboardSection = document.getElementById('leaderboard-section');
+  const userProgressSection = document.getElementById('user-progress-section');
 
   if (user) {
     currentUser = user;
     loginModal.style.display = 'none';
     userInfo.style.display = 'block';
     if (formSection) formSection.style.display = 'block';
-    if (historySection) historySection.style.display = 'block';
     if (leaderboardSection) leaderboardSection.style.display = 'block';
+    if (userProgressSection) userProgressSection.style.display = 'block';
     const statsBar = document.getElementById('stats-bar');
     if (statsBar) statsBar.style.display = 'grid';
     displayName.textContent = user.user_metadata.full_name || user.email;
@@ -99,8 +99,8 @@ function updateUI(user) {
     loginModal.style.display = 'flex';
     userInfo.style.display = 'none';
     if (formSection) formSection.style.display = 'none';
-    if (historySection) historySection.style.display = 'none';
     if (leaderboardSection) leaderboardSection.style.display = 'none';
+    if (userProgressSection) userProgressSection.style.display = 'none';
     const statsBar = document.getElementById('stats-bar');
     if (statsBar) statsBar.style.display = 'none';
     displayName.textContent = '';
@@ -136,7 +136,9 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const username = currentUser.user_metadata.full_name || currentUser.email;
 
   try {
-    await loadLeaderboard();      // refresh table
+    await postJSON(READS_ENDPOINT, { username, pages, multiplier, title });
+    await loadLeaderboard();
+    await loadUserProgress();
     e.target.reset();
     if (document.getElementById('error-message')) {
       document.getElementById('error-message').style.display = 'none';
@@ -189,6 +191,49 @@ async function loadLeaderboard() {
   }
 }
 
+/* ----------------- User Progress loader ----------------- */
+async function loadUserProgress() {
+  try {
+    const rows = await getJSON(`${READS_ENDPOINT}&select=username,title,pages,multiplier&order=created_at.desc`);
+    const container = document.getElementById('user-progress-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (rows) {
+      const grouped = {};
+      rows.forEach(r => {
+        if (!grouped[r.username]) grouped[r.username] = [];
+        grouped[r.username].push(r);
+      });
+
+      for (const [username, books] of Object.entries(grouped)) {
+        const userBlock = document.createElement('div');
+        userBlock.className = 'user-progress-block';
+        userBlock.style.marginBottom = '1.5rem';
+        userBlock.innerHTML = `<h3 class="user-name" style="margin-bottom:0.5rem; color:var(--primary-color);">${username}</h3>`;
+
+        const bookList = document.createElement('ul');
+        bookList.className = 'book-list';
+        bookList.style.listStyle = 'none';
+        bookList.style.paddingLeft = '0';
+
+        books.forEach(book => {
+          const li = document.createElement('li');
+          li.style.padding = '0.25rem 0';
+          li.style.borderBottom = '1px solid rgba(0,0,0,0.05)';
+          li.innerHTML = `<span style="font-weight:500;">${book.title}</span>: <span style="color:var(--accent-color);">${book.pages} stron</span> <small style="opacity:0.7;">(${book.multiplier}x)</small>`;
+          bookList.appendChild(li);
+        });
+
+        userBlock.appendChild(bookList);
+        container.appendChild(userBlock);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading user progress:', err);
+  }
+}
+
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
@@ -202,10 +247,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateUI(user);
     if (user) {
       loadLeaderboard();
+      loadUserProgress();
     } else {
       // Clear tables if logging out
       const leaderboardBody = document.querySelector('#leaderboard tbody');
       if (leaderboardBody) leaderboardBody.innerHTML = '';
+      const progressContainer = document.getElementById('user-progress-container');
+      if (progressContainer) progressContainer.innerHTML = '';
     }
   });
 
