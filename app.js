@@ -82,6 +82,7 @@ function updateUI(user) {
   const displayName = document.getElementById('display-name');
   const readForm = document.getElementById('read-form');
   const historySection = document.getElementById('history-section');
+  const leaderboardSection = document.getElementById('leaderboard-section');
 
   if (user) {
     currentUser = user;
@@ -89,6 +90,7 @@ function updateUI(user) {
     userInfo.style.display = 'block';
     readForm.style.display = 'block';
     if (historySection) historySection.style.display = 'block';
+    if (leaderboardSection) leaderboardSection.style.display = 'block';
     displayName.textContent = user.user_metadata.full_name || user.email;
   } else {
     currentUser = null;
@@ -96,6 +98,7 @@ function updateUI(user) {
     userInfo.style.display = 'none';
     readForm.style.display = 'none';
     if (historySection) historySection.style.display = 'none';
+    if (leaderboardSection) leaderboardSection.style.display = 'none';
     displayName.textContent = '';
   }
 }
@@ -199,11 +202,19 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Listen for auth changes
   supabaseClient.auth.onAuthStateChange((event, session) => {
     console.log('Auth state changed:', event, session);
-    updateUI(session?.user || null);
-    loadLeaderboard();
-    loadHistory();
+    const user = session?.user || null;
+    updateUI(user);
+    if (user) {
+      loadLeaderboard();
+      loadHistory();
+    } else {
+      // Clear tables if logging out
+      const leaderboardBody = document.querySelector('#leaderboard tbody');
+      if (leaderboardBody) leaderboardBody.innerHTML = '';
+      const historyBody = document.querySelector('#history-body');
+      if (historyBody) historyBody.innerHTML = '';
+    }
   });
 
-  // Initial load
-  loadLeaderboard();
+  // Initial load (onAuthStateChange will handle this if session exists)
 });
