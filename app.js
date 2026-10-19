@@ -1,6 +1,9 @@
 /* ----------------- Configuration ----------------- */
 const SUPABASE_URL   = 'https://ipqjdqvfyfgggykaazug.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';  // <-- publishable key
+const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';
+
+// Initialize Supabase client
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const READS_ENDPOINT = `${SUPABASE_URL}/rest/v1/reads?apikey=${SUPABASE_ANON_KEY}`;
 const FETCH_HEADERS = {
@@ -48,17 +51,45 @@ function getJSON(url) {
   return fetchJSON(url, { headers: FETCH_HEADERS });
 }
 
-/* ----------------- User handling ----------------- */
-const usernameKey = 'readTrackerUsername';
-function getUsername() { return localStorage.getItem(usernameKey); }
-function setUsername(name) { localStorage.setItem(usernameKey, name); document.getElementById('login-modal').style.display = 'none'; }
-function showLoginModal() { document.getElementById('login-modal').style.display = 'flex'; }
+/* ----------------- Auth & User handling ----------------- */
+let currentUser = null;
 
-document.getElementById('save-username').addEventListener('click', e => {
-  e.preventDefault();
-  const name = document.getElementById('username').value.trim();
-  if (name) setUsername(name);
-});
+async function handleGoogleLogin() {
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+  });
+  if (error) {
+    showError('Błąd logowania: ' + error.message);
+  }
+}
+
+async function handleLogout() {
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) {
+    showError('Błąd wylogowania: ' + error.message);
+  }
+}
+
+function updateUI(user) {
+  const loginModal = document.getElementById('login-modal');
+  const userInfo = document.getElementById('user-info');
+  const displayName = document.getElementById('display-name');
+  const readForm = document.getElementById('read-form');
+
+  if (user) {
+    currentUser = user;
+    loginModal.style.display = 'none';
+    userInfo.style.display = 'block';
+    readForm.style.display = 'block';
+    displayName.textContent = user.user_metadata.full_name || user.email;
+  } else {
+    currentUser = null;
+    loginModal.style.display = 'flex';
+    userInfo.style.display = 'none';
+    readForm.style.display = 'none';
+    displayName.textContent = '';
+  }
+}
 
 /* ----------------- Submit handler ----------------- */
 function showError(msg) {
@@ -71,15 +102,17 @@ function showError(msg) {
   }
 }
 
-// ... existing code ...
-
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
   const pages = parseInt(document.getElementById('pages').value, 10);
   const multiplier = parseFloat(document.getElementById('multiplier').value);
-  const username = getUsername();
 
-  if (!username) { showLoginModal(); return; }
+  if (!currentUser) {
+    showError('Musisz być zalogowany!');
+    return;
+  }
+
+  const username = currentUser.user_metadata.full_name || currentUser.email;
 
   try {
     await postJSON(READS_ENDPOINT, { username, pages, multiplier });
@@ -97,26 +130,44 @@ document.getElementById('read-form').addEventListener('submit', async e => {
 
 /* ----------------- Leaderboard loader ----------------- */
 async function loadLeaderboard() {
-  const rows = await getJSON(`${READS_ENDPOINT}&select=*,username,pages,multiplier&order=created_at.desc`);
-  const totals = {};
-  rows.forEach(r => {
-    const pts = r.pages * r.multiplier;
-    totals[r.username] = (totals[r.username] || 0) + pts;
-  });
+  try {
+    const rows = await getJSON(`${READS_ENDPOINT}&select=*,username,pages,multiplier&order=created_at.desc`);
+    const totals = {};
+    if (rows) {
+      rows.forEach(r => {
+        const pts = r.pages * r.multiplier;
+        totals[r.username] = (totals[r.username] || 0) + pts;
+      });
+    }
 
-  const tbody = document.querySelector('#leaderboard tbody');
-  tbody.innerHTML = '';
-  Object.entries(totals)
-    .sort((a,b)=> b[1]-a[1])          // descending
-    .forEach(([name, pts]) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${name}</td><td>${pts.toFixed(1)}</td>`;
-      tbody.appendChild(tr);
-    });
+    const tbody = document.querySelector('#leaderboard tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    Object.entries(totals)
+      .sort((a,b)=> b[1]-a[1])          // descending
+      .forEach(([name, pts]) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${name}</td><td>${pts.toFixed(1)}</td>`;
+        tbody.appendChild(tr);
+      });
+  } catch (err) {
+    console.error('Error loading leaderboard:', err);
+  }
 }
 
 /* ----------------- Init ----------------- */
-window.addEventListener('DOMContentLoaded', () => {
-  if (!getUsername()) showLoginModal();
+window.addEventListener('DOMContentLoaded', async () => {
+  // Setup event listeners
+  document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
+  document.getElementById('logout-btn').addEventListener('click', handleLogout);
+
+  // Listen for auth changes
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    console.log('Auth state changed:', event, session);
+    updateUI(session?.user || null);
+    loadLeaderboard();
+  });
+
+  // Initial load
   loadLeaderboard();
 });

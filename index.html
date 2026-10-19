@@ -11,10 +11,16 @@
   <!-- Login modal -->
   <div id="login-modal" class="modal">
     <div class="modal-content">
-      <h2>Podaj swoje imię</h2>
-      <input id="username" type="text" placeholder="Twoje imię" />
-      <button id="save-username" type="button">Zapisz</button>
+      <h2>Zaloguj się</h2>
+      <p>Aby dodawać strony, musisz się zalogować.</p>
+      <button id="google-login-btn" type="button">Zaloguj przez Google</button>
     </div>
+  </div>
+
+  <!-- User info / Logout -->
+  <div id="user-info" style="display:none; margin-bottom: 20px; text-align: right;">
+    <span id="display-name" style="margin-right: 10px; font-weight: bold;"></span>
+    <button id="logout-btn" type="button">Wyloguj</button>
   </div>
 
   <form id="read-form">
@@ -43,9 +49,10 @@
         <th>Punkty (strony × mnożnik)</th>
       </tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="leaderboard-body"></tbody>
   </table>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>
 </html>
