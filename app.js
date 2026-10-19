@@ -57,6 +57,9 @@ let currentUser = null;
 async function handleGoogleLogin() {
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
   });
   if (error) {
     showError('Błąd logowania: ' + error.message);
