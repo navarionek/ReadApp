@@ -136,9 +136,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const username = currentUser.user_metadata.full_name || currentUser.email;
 
   try {
-    await postJSON(READS_ENDPOINT, { username, pages, multiplier, title });
     await loadLeaderboard();      // refresh table
-    await loadHistory();          // refresh history
     e.target.reset();
     if (document.getElementById('error-message')) {
       document.getElementById('error-message').style.display = 'none';
@@ -191,26 +189,6 @@ async function loadLeaderboard() {
   }
 }
 
-/* ----------------- History loader ----------------- */
-async function loadHistory() {
-  try {
-    const rows = await getJSON(`${READS_ENDPOINT}&select=title,pages,created_at&order=created_at.desc&limit=20`);
-    const tbody = document.querySelector('#history-body');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    if (rows) {
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        const date = new Date(r.created_at).toLocaleDateString();
-        tr.innerHTML = `<td>${r.title || '-'}</td><td>${r.pages}</td><td>${date}</td>`;
-        tbody.appendChild(tr);
-      });
-    }
-  } catch (err) {
-    console.error('Error loading history:', err);
-  }
-}
-
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
@@ -224,13 +202,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateUI(user);
     if (user) {
       loadLeaderboard();
-      loadHistory();
     } else {
       // Clear tables if logging out
       const leaderboardBody = document.querySelector('#leaderboard tbody');
       if (leaderboardBody) leaderboardBody.innerHTML = '';
-      const historyBody = document.querySelector('#history-body');
-      if (historyBody) historyBody.innerHTML = '';
     }
   });
 
