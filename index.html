@@ -11,7 +11,7 @@
   <!-- Login modal -->
   <div id="login-modal" class="modal">
     <div class="modal-content">
-      <h2>Zaloguj się</h2>
+      <h2 class="modal-title">Zaloguj się</h2>
       <p>Aby dodawać strony, musisz się zalogować.</p>
       <button id="google-login-btn" type="button">Zaloguj przez Google</button>
     </div>
@@ -24,6 +24,10 @@
   </div>
 
   <form id="read-form">
+    <label>
+      Tytuł:
+      <input type="text" id="title" placeholder="Co przeczytałeś?" required />
+    </label>
     <label>
       Liczba stron:
       <input type="number" id="pages" min="1" required />
@@ -41,7 +45,7 @@
   </form>
   <div id="error-message" style="display:none;color:red;"></div>
 
-  <h2>Leaderboard</h2>
+  <h2 id="leaderboard-title">Leaderboard</h2>
   <table id="leaderboard">
     <thead>
       <tr>
@@ -51,6 +55,20 @@
     </thead>
     <tbody id="leaderboard-body"></tbody>
   </table>
+
+  <div id="history-section" style="display:none;">
+    <h2 id="history-title">Ostatnie wpisy</h2>
+    <table id="history-table">
+      <thead>
+        <tr>
+          <th>Tytuł</th>
+          <th>Strony</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
