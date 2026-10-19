@@ -14,41 +14,42 @@
       <h2 class="modal-title">Zaloguj się</h2>
       <p>Aby dodawać strony, musisz się zalogować.</p>
       <button id="google-login-btn" type="button">Zaloguj przez Google</button>
-    </div >
-  </div >
+    </div>
+  </div>
 
   <!-- User info / Logout -->
   <div id="user-info" style="display:none; margin-bottom: 20px; text-align: right;">
     <span id="display-name" style="margin-right: 10px; font-weight: bold;"></span>
     <button id="logout-btn" type="button">Wyloguj</button>
-  </div >
+  </div>
 
-  <form id="read-form">
-    <label>
-      Tytuł:
+  <form id="read-form" style="display:none;">
+    <div>
+      <label for="title">Tytuł:</label>
       <input type="text" id="title" placeholder="Co przeczytałeś?" required />
-    </label>
-    <label>
-      Liczba stron:
+    </div>
+    <br>
+    <div>
+      <label for="pages">Liczba stron:</label>
       <input type="number" id="pages" min="1" required />
-    </label>
-    <label>
-      Mnożnik:
-    </label>
+    </div>
+    <br>
+    <label>Mnożnik:</label>
     <div id="multiplier-container" style="margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px;">
       <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Angielski</label>
       <label style="display: block;"><input type="checkbox" class="multiplier-checkbox" value="1.5"> 1.5x Naukowa</label>
-    </div >
+    </div>
+    <br>
     <button type="submit">Dodaj</button>
   </form>
-  <div id="error-message" style="display:none;color:red;"></div >
+  <div id="error-message" style="display:none;color:red;"></div>
 
   <h2 id="leaderboard-title">Leaderboard</h2>
   <table id="leaderboard">
     <thead>
       <tr>
-        <th >Imię</th>
-        <th >Punkty (strony × mnożnik)</th>
+        <th>Imię</th>
+        <th>Punkty (strony × mnożnik)</th>
       </tr>
     </thead>
     <tbody id="leaderboard-body"></tbody>
@@ -59,14 +60,14 @@
     <table id="history-table">
       <thead>
         <tr>
-          <th >Tytuł</th>
-          <th >Strony</th>
-          <th >Data</th>
+          <th>Tytuł</th>
+          <th>Strony</th>
+          <th>Data</th>
         </tr>
       </thead>
       <tbody id="history-body"></tbody>
     </table>
-  </div >
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
