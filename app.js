@@ -49,7 +49,8 @@ function getUsername() { return localStorage.getItem(usernameKey); }
 function setUsername(name) { localStorage.setItem(usernameKey, name); document.getElementById('login-modal').style.display = 'none'; }
 function showLoginModal() { document.getElementById('login-modal').style.display = 'flex'; }
 
-document.getElementById('save-username').addEventListener('click', () => {
+document.getElementById('save-username').addEventListener('click', e => {
+  e.preventDefault();
   const name = document.getElementById('username').value.trim();
   if (name) setUsername(name);
 });
