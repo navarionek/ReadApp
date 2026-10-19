@@ -12,8 +12,24 @@ const FETCH_HEADERS = {
 
 /* ----------------- Helper functions ----------------- */
 function fetchJSON(url, opts = {}) {
-  return fetch(url, opts).then(r => r.json());
-}
+  return fetch(url, opts)
+    .then(async res => {
+      const raw = await res.text();
+      if (!res.ok) {
+        let msg = `${res.status} ${res.statusText}`;
+        try {
+          const data = JSON.parse(raw);
+          if (data && data.message) msg += `: ${data.message}`;
+          else if (typeof data === 'object') msg += `: ${JSON.stringify(data)}`;
+        } catch {}
+        throw new Error(msg);
+      }
+      try {
+        return JSON.parse(raw);
+      } catch {
+        throw new Error('Invalid JSON response');
+      }
+    });
 
 function postJSON(url, data) {
   return fetchJSON(url, {
