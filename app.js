@@ -39,6 +39,18 @@ document.getElementById('save-username').addEventListener('click', () => {
 });
 
 /* ----------------- Submit handler ----------------- */
+function showError(msg) {
+  const errDiv = document.getElementById('error-message');
+  if (errDiv) {
+    errDiv.textContent = msg;
+    errDiv.style.display = 'block';
+  } else {
+    alert(msg);
+  }
+}
+
+// ... existing code ...
+
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
   const pages = parseInt(document.getElementById('pages').value, 10);
@@ -51,9 +63,13 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     await postJSON(READS_ENDPOINT, { username, pages, multiplier });
     await loadLeaderboard();      // refresh table
     e.target.reset();
+    if (document.getElementById('error-message')) {
+      document.getElementById('error-message').style.display = 'none';
+    }
   } catch (err) {
     console.error('Error posting read:', err);
-    alert('Wystąpił błąd. Spróbuj ponownie.');
+    const msg = err.message || 'Wystąpił błąd. Spróbuj ponownie.';
+    showError(msg);
   }
 });
 
