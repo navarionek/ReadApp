@@ -24,6 +24,7 @@ function fetchJSON(url, opts = {}) {
         } catch {}
         throw new Error(msg);
       }
+      if (!raw || raw.trim() === "") return null;
       try {
         return JSON.parse(raw);
       } catch {
@@ -35,7 +36,10 @@ function fetchJSON(url, opts = {}) {
 function postJSON(url, data) {
   return fetchJSON(url, {
     method: 'POST',
-    headers: FETCH_HEADERS,
+    headers: {
+      ...FETCH_HEADERS,
+      'Prefer': 'return=representation'
+    },
     body: JSON.stringify(data),
   });
 }
