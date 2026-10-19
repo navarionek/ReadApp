@@ -29,6 +29,18 @@
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+body.dark-mode {
+  --bg-body: #0f172a;
+  --bg-card: #1e293b;
+
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+
+  --border: #334155;
+  --border-focus: #475569;
+  --primary-light: #312e81;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -51,6 +51,33 @@ function getJSON(url) {
   return fetchJSON(url, { headers: FETCH_HEADERS });
 }
 
+/* ----------------- Theme handling ----------------- */
+function setTheme(isDark) {
+  if (isDark) {
+    document.body.classList.add('dark-mode');
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+      icon.setAttribute('data-lucide', 'sun');
+    }
+  } else {
+    document.body.classList.remove('dark-mode');
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+      icon.setAttribute('data-lucide', 'moon');
+    }
+  }
+  localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  // Re-run lucide to update the icon
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.contains('dark-mode');
+  setTheme(!isDark);
+}
+
 /* ----------------- Auth & User handling ----------------- */
 let currentUser = null;
 
@@ -239,6 +266,25 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Setup event listeners
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+  // Initialize Theme
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    setTheme(savedTheme === 'dark');
+  } else {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(prefersDark);
+  }
+
+  // Register Service Worker for PWA
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('SW registered!', reg))
+        .catch(err => console.log('SW registration failed: ', err));
+    });
+  }
 
   // Listen for auth changes
   supabaseClient.auth.onAuthStateChange((event, session) => {
