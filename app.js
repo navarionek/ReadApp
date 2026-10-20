@@ -169,15 +169,62 @@ function updateUI(user) {
   }
 }
 
+/* ----------------- Mnożniki (z tabeli, zarządza admin) ----------------- */
+let multipliers = [];          // [{ id, label, value }]
+let editingMultiplier = null;  // mnożnik edytowanego wpisu, zachowany, jeśli nie da się go odtworzyć z checkboxów
+let multiplierTouched = false;
+
+function formatMultiplier(value) {
+  return String(Number(value));
+}
+
+async function loadMultipliers() {
+  const { data, error } = await supabaseClient
+    .from('multipliers')
+    .select('id, label, value')
+    .order('id');
+
+  if (error) {
+    console.error('Error loading multipliers:', error);
+    return;
+  }
+  multipliers = data.map(m => ({ ...m, value: Number(m.value) }));
+  renderMultiplierCheckboxes();
+  if (isAdmin) renderMultiplierAdmin();
+  refreshIcons();
+}
+
+function renderMultiplierCheckboxes() {
+  const container = document.getElementById('multiplier-container');
+  if (!multipliers.length) {
+    container.replaceChildren(el('span', { class: 'hint', text: 'Brak mnożników.' }));
+    return;
+  }
+  container.replaceChildren(...multipliers.map(m => {
+    const checkbox = el('input', { type: 'checkbox', class: 'multiplier-checkbox', value: String(m.value) });
+    checkbox.addEventListener('change', () => {
+      multiplierTouched = true;
+      document.getElementById('multiplier-note').hidden = true;
+    });
+    return el('label', { class: 'checkbox-label' }, [
+      checkbox,
+      el('span', { class: 'check-text', text: `${formatMultiplier(m.value)}x ${m.label}` }),
+    ]);
+  }));
+}
+
 /* ----------------- Form: add & edit ----------------- */
 function multiplierCheckboxes() {
   return [...document.querySelectorAll('.multiplier-checkbox')];
 }
 
 function readMultiplier() {
-  return multiplierCheckboxes()
+  // Edycja wpisu z mnożnikiem spoza obecnych opcji: bez ruszania checkboxów zostaje stary
+  if (editingId && !multiplierTouched && editingMultiplier !== null) return editingMultiplier;
+  const product = multiplierCheckboxes()
     .filter(cb => cb.checked)
     .reduce((m, cb) => m * parseFloat(cb.value), 1);
+  return Math.round(product * 10000) / 10000;
 }
 
 // Odwrotność readMultiplier: znajdź zestaw checkboxów, który daje zapisany mnożnik
@@ -185,12 +232,13 @@ function applyMultiplier(multiplier) {
   const boxes = multiplierCheckboxes();
   for (let mask = 0; mask < (1 << boxes.length); mask++) {
     const product = boxes.reduce((m, cb, i) => (mask & (1 << i) ? m * parseFloat(cb.value) : m), 1);
-    if (Math.abs(product - multiplier) < 1e-9) {
+    if (Math.abs(product - multiplier) < 1e-4) {
       boxes.forEach((cb, i) => { cb.checked = !!(mask & (1 << i)); });
-      return;
+      return true;
     }
   }
   boxes.forEach(cb => { cb.checked = false; });
+  return false;
 }
 
 function setFormMode(isEditing) {
@@ -203,7 +251,14 @@ function startEdit(book) {
   editingId = book.id;
   document.getElementById('title').value = book.title || '';
   document.getElementById('pages').value = book.pages;
-  applyMultiplier(Number(book.multiplier));
+  editingMultiplier = Number(book.multiplier);
+  multiplierTouched = false;
+  const note = document.getElementById('multiplier-note');
+  const matched = applyMultiplier(editingMultiplier);
+  note.textContent = matched
+    ? ''
+    : `Ten wpis ma mnożnik ×${formatMultiplier(editingMultiplier)}, którego nie da się złożyć z obecnych opcji. Zostanie zachowany, jeśli nie zmienisz zaznaczenia.`;
+  note.hidden = matched;
   hideError();
   setFormMode(true);
   goTo('dodaj');
@@ -212,6 +267,9 @@ function startEdit(book) {
 
 function cancelEdit() {
   editingId = null;
+  editingMultiplier = null;
+  multiplierTouched = false;
+  document.getElementById('multiplier-note').hidden = true;
   document.getElementById('read-form').reset();
   hideError();
   setFormMode(false);
@@ -303,7 +361,11 @@ async function loadProfile() {
     document.getElementById('prize-year').value = currentYear();
     loadPrizeIntoForm();
   }
-  if (isAdmin) loadMoneyPrizeList();
+  if (isAdmin) {
+    loadMoneyPrizeList();
+    renderMultiplierAdmin();
+    refreshIcons();
+  }
 }
 
 /* ----------------- Nagroda pieniężna: uczestnicy ----------------- */
@@ -350,6 +412,98 @@ async function handleMoneyPrizeToggle(profile, checkbox) {
   }
   showMoneyPrizeMessage(`${profile.display_name}: ${participates ? 'bierze udział' : 'nie bierze udziału'} w nagrodzie pieniężnej.`);
   await loadReads();
+}
+
+/* ----------------- Admin: mnożniki ----------------- */
+function showMultiplierMessage(text, isError = false) {
+  const msg = document.getElementById('multiplier-message');
+  msg.textContent = text;
+  msg.classList.toggle('error-msg', isError);
+  msg.hidden = false;
+}
+
+// Wspólna walidacja dla dodawania i edycji; zwraca null, jeśli dane są złe
+function readMultiplierInputs(labelInput, valueInput) {
+  const label = labelInput.value.trim();
+  const value = Number(valueInput.value);
+  if (!label || label.length > 40) {
+    showMultiplierMessage('Nazwa musi mieć od 1 do 40 znaków.', true);
+    return null;
+  }
+  if (!(value > 0 && value <= 10)) {
+    showMultiplierMessage('Wartość musi być większa od 0 i najwyżej 10.', true);
+    return null;
+  }
+  return { label, value };
+}
+
+function renderMultiplierAdmin() {
+  const list = document.getElementById('multiplier-admin-list');
+  if (!multipliers.length) {
+    list.replaceChildren(el('div', { class: 'status-box', text: 'Brak mnożników. Dodaj pierwszy poniżej.' }));
+    return;
+  }
+
+  list.replaceChildren(...multipliers.map(m => {
+    const labelInput = el('input', { type: 'text', class: 'plain-input', maxlength: '40', 'aria-label': 'Nazwa mnożnika' });
+    labelInput.value = m.label;
+    const valueInput = el('input', { type: 'number', class: 'plain-input', min: '0.01', max: '10', step: '0.01', 'aria-label': 'Wartość mnożnika' });
+    valueInput.value = formatMultiplier(m.value);
+
+    const row = el('form', { class: 'multiplier-row' }, [
+      labelInput,
+      valueInput,
+      el('button', { type: 'submit', class: 'btn btn-outline btn-icon', 'aria-label': 'Zapisz mnożnik', title: 'Zapisz' }, [icon('check')]),
+      actionButton('trash-2', 'Usuń mnożnik', () => handleMultiplierDelete(m)),
+    ]);
+    row.addEventListener('submit', e => {
+      e.preventDefault();
+      handleMultiplierSave(m, labelInput, valueInput);
+    });
+    return row;
+  }));
+}
+
+async function handleMultiplierSave(m, labelInput, valueInput) {
+  const values = readMultiplierInputs(labelInput, valueInput);
+  if (!values) return;
+
+  const { data, error } = await supabaseClient.from('multipliers').update(values).eq('id', m.id).select('id');
+  if (error || !data?.length) {
+    showMultiplierMessage('Nie udało się zapisać: ' + (error ? friendlyError(error) : 'brak uprawnień admina.'), true);
+    return;
+  }
+  showMultiplierMessage(`Zapisano: ${formatMultiplier(values.value)}x ${values.label}.`);
+  await loadMultipliers();
+}
+
+async function handleMultiplierDelete(m) {
+  if (!confirm(`Usunąć mnożnik „${m.label}” (${formatMultiplier(m.value)}x)? Stare wpisy zachowają swój wynik.`)) return;
+
+  const { data, error } = await supabaseClient.from('multipliers').delete().eq('id', m.id).select('id');
+  if (error || !data?.length) {
+    showMultiplierMessage('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień admina.'), true);
+    return;
+  }
+  showMultiplierMessage(`Usunięto mnożnik „${m.label}”.`);
+  await loadMultipliers();
+}
+
+async function handleMultiplierAdd(e) {
+  e.preventDefault();
+  const labelInput = document.getElementById('new-multiplier-label');
+  const valueInput = document.getElementById('new-multiplier-value');
+  const values = readMultiplierInputs(labelInput, valueInput);
+  if (!values) return;
+
+  const { data, error } = await supabaseClient.from('multipliers').insert(values).select('id');
+  if (error || !data?.length) {
+    showMultiplierMessage('Nie udało się dodać: ' + (error ? friendlyError(error) : 'brak uprawnień admina.'), true);
+    return;
+  }
+  e.target.reset();
+  showMultiplierMessage(`Dodano: ${formatMultiplier(values.value)}x ${values.label}.`);
+  await loadMultipliers();
 }
 
 /* ----------------- Prize (nagroda roku) ----------------- */
@@ -691,6 +845,7 @@ window.addEventListener('DOMContentLoaded', () => {
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
+  document.getElementById('multiplier-add-form').addEventListener('submit', handleMultiplierAdd);
 
   document.querySelectorAll('.current-year').forEach(span => { span.textContent = currentYear(); });
 
@@ -729,6 +884,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // setTimeout: nie wołamy Supabase wewnątrz callbacka auth (zalecenie supabase-js, unika deadlocka)
     if (user && userChanged) {
       setTimeout(() => {
+        loadMultipliers();
         loadProfile();
         loadReads();
       }, 0);

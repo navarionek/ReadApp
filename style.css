@@ -761,3 +761,38 @@ a.btn {
   color: var(--primary);
   background: var(--primary-light);
 }
+
+/* Admin: mnożniki */
+.multiplier-admin-list {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.multiplier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.multiplier-row .btn-icon {
+  margin: 0;
+  padding: 0.55rem;
+}
+
+.multiplier-add {
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--border);
+}
+
+#multiplier-note {
+  margin-top: 0.5rem;
+}
+
+.form-msg.error-msg {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error);
+}
