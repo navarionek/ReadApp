@@ -1726,3 +1726,9 @@ header {
 .settings-menu {
   max-width: min(18rem, calc(100vw - 2rem));
 }
+
+/* Przyciski w oknie książki: odstęp między sobą i od okładki/wyboru okładki */
+#book-modal-body > * + .btn-block,
+#book-modal-body > * + .cover-picker {
+  margin-top: 0.75rem;
+}

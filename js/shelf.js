@@ -70,8 +70,8 @@ export function openReadingModal(item) {
 
   if (own) {
     const done = el('button', { type: 'button', class: 'btn btn-primary btn-block' }, [icon('check'), el('span', { text: 'Skończone' })]);
-    done.addEventListener('click', () => {
-      closeBookModal();
+    done.addEventListener('click', async () => {
+      await closeBookModal();
       startFinishing(item);
     });
     const drop = el('button', { type: 'button', class: 'btn btn-outline btn-block cancel-btn' }, [icon('x'), el('span', { text: 'Usuń z „Teraz czytam”' })]);
@@ -91,7 +91,7 @@ export function openReadingModal(item) {
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
-  document.getElementById('book-modal').hidden = false;
+  showBookModal();
   refreshIcons();
 }
 
@@ -258,9 +258,29 @@ export async function fillMissingBookInfo(userId) {
 }
 
 /* ----------------- Szczegóły książki ----------------- */
+// Okno ma własny wpis w historii, więc „Wstecz” zamyka tylko okno i zostaje na tej samej stronie.
+// Zwraca obietnicę, która kończy się po zamknięciu (cofnięcie historii jest asynchroniczne),
+// żeby kolejna nawigacja nie została przez nie cofnięta.
 export function closeBookModal() {
-  document.getElementById('book-modal').hidden = true;
+  const modal = document.getElementById('book-modal');
+  if (modal.hidden) return Promise.resolve();
+  modal.hidden = true;
+  if (!history.state?.bookModal) return Promise.resolve();
+  return new Promise(resolve => {
+    window.addEventListener('popstate', resolve, { once: true });
+    history.back();
+  });
 }
+
+function showBookModal() {
+  const modal = document.getElementById('book-modal');
+  if (modal.hidden) history.pushState({ bookModal: true }, '');
+  modal.hidden = false;
+}
+
+window.addEventListener('popstate', () => {
+  document.getElementById('book-modal').hidden = true;
+});
 
 export function openBookModal(row) {
   const own = row.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
@@ -305,7 +325,7 @@ export function openBookModal(row) {
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
-  document.getElementById('book-modal').hidden = false;
+  showBookModal();
   refreshIcons();
 }
 
