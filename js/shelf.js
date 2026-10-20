@@ -380,8 +380,8 @@ export function renderCoverPicker(container, row, query, save) {
   const form = el('form', { class: 'cover-search' }, [input, searchBtn]);
   const results = el('div', { class: 'cover-results' }, [el('div', { class: 'status-box', text: 'Szukam…' })]);
 
-  // Własne zdjęcie okładki: aparat albo galeria (telefon sam pyta, skąd wziąć plik)
-  const photoInput = el('input', { type: 'file', accept: 'image/*', hidden: '' });
+  // Własne zdjęcie okładki: od razu aparat (capture), bez wyboru z galerii
+  const photoInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: '' });
   const photoBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block cover-photo-btn' }, [icon('camera'), el('span', { text: 'Zrób zdjęcie okładki' })]);
   photoBtn.addEventListener('click', () => photoInput.click());
   photoInput.addEventListener('change', async () => {
