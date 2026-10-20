@@ -131,6 +131,17 @@ export async function loadShelfPeople() {
 }
 
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
+let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
+
+// Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
+function shelfSig(userId, rows) {
+  const current = state.readingNow.filter(item => item.user_id === userId);
+  return JSON.stringify([
+    userId,
+    rows.map(r => [r.id, r.title, r.pages, r.multiplier, r.unfinished, r.cover_url, r.author, r.info_checked_at]),
+    current.map(i => [i.id, i.title, i.cover_url, i.info_checked_at]),
+  ]);
+}
 
 export async function loadShelf() {
   const userId = state.shelfUserId || viewerId();
@@ -154,6 +165,10 @@ export async function loadShelf() {
     shelf.replaceChildren(el('div', { class: 'status-box', text: 'Nie udało się wczytać półki. ' + friendlyError(error) }));
     return;
   }
+  const signature = shelfSig(userId, data || []);
+  // Nic się nie zmieniło od ostatniej wizyty: zostawiamy półkę w spokoju, żeby okładki nie mrugały
+  if (signature === shelfSignature && state.shelfRows[0]?.user_id === userId) return;
+  shelfSignature = signature;
   state.shelfRows = data || [];
   renderShelf();
   fillMissingBookInfo(userId);
@@ -352,7 +367,7 @@ async function resizeToJpeg(file, maxSide = 900, quality = 0.85) {
 async function uploadCoverPhoto(file) {
   const blob = await resizeToJpeg(file);
   const path = `${state.currentUser.id}/${crypto.randomUUID()}.jpg`;
-  const { error } = await supabaseClient.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg' });
+  const { error } = await supabaseClient.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
   if (error) throw error;
   return supabaseClient.storage.from('covers').getPublicUrl(path).data.publicUrl;
 }
@@ -452,6 +467,7 @@ export async function saveReadingInfo(item, info) {
 
 // Po wylogowaniu: następne konto na tym urządzeniu nie dostaje cudzych okładek ani wyników
 export function resetShelfCaches() {
+  shelfSignature = null;
   lookupCache.clear();
   readingCovers.clear();
   readingCoversPending.clear();
