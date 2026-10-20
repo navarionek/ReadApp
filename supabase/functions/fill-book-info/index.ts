@@ -29,7 +29,7 @@ function jwtRole(header: string | null): string | null {
   }
 }
 
-const TABLES = ['reads', 'reading_now'];
+const TABLES = ['reads', 'reading_now', 'reading_queue'];
 const FIELDS = 'id, cover_url, author, published_year, info_url, description, info_checked_at';
 
 type Row = { id: number; title: string; author: string | null; info_checked_at: string | null };

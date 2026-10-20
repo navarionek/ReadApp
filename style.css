@@ -2417,3 +2417,21 @@ img.rank-avatar {
   width: 0.875rem;
   height: 0.875rem;
 }
+
+/* ----------------- Do przeczytania (kolejka) ----------------- */
+.queue-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+@media (max-width: 520px) {
+  .queue-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.queue-section .hint {
+  margin: 0;
+}

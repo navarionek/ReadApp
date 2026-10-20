@@ -1,6 +1,6 @@
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
-import { handleDropReading, renderReadingNow } from './data.js';
+import { handleDropReading, loadReads, renderReadingNow } from './data.js';
 import { daysSince, formatMultiplier, startFinishing } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { currentScreen } from './shell.js';
@@ -202,14 +202,127 @@ export async function loadShelfPeople() {
   }));
 }
 
+/* ----------------- Do przeczytania (kolejka) ----------------- */
+// Formularz dodawania do własnej kolejki: tytuł + opcjonalnie autor
+function queueForm() {
+  const title = el('input', { type: 'text', class: 'plain-input', maxlength: '300', required: '', placeholder: 'Tytuł książki', 'aria-label': 'Tytuł książki do kolejki', autocomplete: 'off' });
+  const author = el('input', { type: 'text', class: 'plain-input', maxlength: '200', placeholder: 'Autor (opcjonalnie)', 'aria-label': 'Autor', autocomplete: 'off' });
+  const add = el('button', { type: 'submit', class: 'btn btn-primary' }, [icon('plus'), el('span', { text: 'Dodaj' })]);
+  const form = el('form', { class: 'queue-form' }, [title, author, add]);
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const values = { title: title.value.trim(), author: author.value.trim().slice(0, 200) || null };
+    if (!values.title) return;
+    add.disabled = true;
+    const { error } = await supabaseClient.from('reading_queue').insert(values);
+    add.disabled = false;
+    if (error) {
+      showToast('Nie udało się dodać: ' + friendlyError(error));
+      return;
+    }
+    showToast('Dodano do kolejki.');
+    shelfSignature = null;
+    await loadShelf();
+  });
+  return form;
+}
+
+// Uzupełnianie okładek książek w kolejce (patrz enrichBooks)
+async function fillMissingQueueInfo(userId) {
+  await enrichBooks('reading_queue', state.shelfQueue, items => {
+    if ((state.shelfUserId || viewerId()) !== userId) return;  // ktoś przełączył półkę
+    items.forEach(it => applyInfo(state.shelfQueue, it));
+    if (currentScreen() === 'polka') renderShelf();
+  });
+}
+
+async function saveQueueInfo(item, info) {
+  if (!await updateBookInfo('reading_queue', item, info)) return;
+  renderShelf();
+  openQueueModal(item);
+}
+
+export function openQueueModal(item) {
+  openReadingId = null;
+  const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
+
+  const body = [
+    el('div', { class: 'book-modal-top' }, [
+      coverEl({ title: item.title, cover_url: item.cover_url, author: item.author }, 'large'),
+      el('div', { class: 'book-modal-info' }, [
+        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: item.title }),
+        ...(item.author || item.published_year
+          ? [el('p', { class: 'book-modal-author', text: [item.author, item.published_year].filter(Boolean).join(' · ') })]
+          : []),
+        el('p', { class: 'book-modal-author', text: `W kolejce od ${formatDay(new Date(item.created_at))}` }),
+        ...(item.info_url
+          ? [el('a', { class: 'book-modal-link', href: item.info_url, target: '_blank', rel: 'noopener noreferrer', text: item.info_url.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' })]
+          : []),
+      ]),
+    ]),
+    ...(item.description ? [el('p', { class: 'book-modal-desc', text: item.description })] : []),
+  ];
+
+  if (own) {
+    const start = el('button', { type: 'button', class: 'btn btn-primary btn-block' }, [icon('book-open'), el('span', { text: 'Zaczynam czytać' })]);
+    start.addEventListener('click', async () => {
+      start.disabled = true;
+      const { error } = await supabaseClient.rpc('start_from_queue', { p_id: item.id });
+      if (error) {
+        start.disabled = false;
+        showToast('Nie udało się: ' + friendlyError(error));
+        return;
+      }
+      await closeBookModal();
+      showToast('Zaczęte! Książka jest teraz w „Czyta teraz”.');
+      shelfSignature = null;
+      await loadReads();
+      await loadShelf();
+    });
+
+    const drop = el('button', { type: 'button', class: 'btn btn-outline btn-block cancel-btn' }, [icon('x'), el('span', { text: 'Usuń z kolejki' })]);
+    drop.addEventListener('click', async () => {
+      if (!confirm(`Usunąć „${item.title}” z kolejki?`)) return;
+      const { data, error } = await supabaseClient.from('reading_queue').delete().eq('id', item.id).select('id');
+      if (error || !data?.length) {
+        showToast('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
+        return;
+      }
+      await closeBookModal();
+      shelfSignature = null;
+      await loadShelf();
+    });
+
+    const authorEdit = authorEditor('reading_queue', item, () => {
+      renderShelf();
+      openQueueModal(item);
+    });
+    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
+    const picker = el('div', { class: 'cover-picker', hidden: '' });
+    pickBtn.addEventListener('click', () => {
+      pickBtn.hidden = true;
+      picker.hidden = false;
+      renderCoverPicker(picker, item, item.title, saveQueueInfo);
+    });
+    body.push(start, authorEdit, pickBtn, picker, drop);
+  }
+
+  document.getElementById('book-modal-body').replaceChildren(...body);
+  showBookModal();
+  refreshIcons();
+}
+
+const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, info_url, description, info_checked_at, created_at';
+
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
 
 // Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
-function shelfSig(userId, rows) {
+function shelfSig(userId, rows, queue = []) {
   const current = state.readingNow.filter(item => item.user_id === userId);
   return JSON.stringify([
     userId,
+    queue.map(q => [q.id, q.title, q.author, q.cover_url, q.info_checked_at]),
     rows.map(r => [r.id, r.title, r.pages, r.multiplier, r.unfinished, r.cover_url, r.author, r.info_checked_at]),
     current.map(i => [i.id, i.title, i.cover_url, i.info_checked_at]),
   ]);
@@ -225,25 +338,38 @@ export async function loadShelf() {
   }
   loadShelfPeople();
 
-  const { data, error } = await supabaseClient
-    .from('reads')
-    .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false });
+  const [readsResult, queueResult] = await Promise.all([
+    supabaseClient
+      .from('reads')
+      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false }),
+    supabaseClient
+      .from('reading_queue')
+      .select(QUEUE_FIELDS)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }),
+  ]);
+  const { data, error } = readsResult;
+  if (queueResult.error) console.error('Error loading reading queue:', queueResult.error);
+  const queueRows = queueResult.data || [];
 
   if (seq !== shelfSeq) return;  // w międzyczasie ktoś przełączył półkę albo odświeżył ją ponownie
   if (error) {
     shelf.replaceChildren(el('div', { class: 'status-box', text: 'Nie udało się wczytać półki. ' + friendlyError(error) }));
     return;
   }
-  const signature = shelfSig(userId, data || []);
+  const signature = shelfSig(userId, data || [], queueRows);
   // Nic się nie zmieniło od ostatniej wizyty: zostawiamy półkę w spokoju, żeby okładki nie mrugały
   if (signature === shelfSignature && state.shelfRows[0]?.user_id === userId) return;
   shelfSignature = signature;
   state.shelfRows = data || [];
+  state.shelfQueue = queueRows;
   renderShelf();
   fillMissingBookInfo(userId);
+  fillMissingQueueInfo(userId);
 }
 
 export function renderShelf() {
@@ -271,6 +397,21 @@ export function renderShelf() {
     ]));
   }
 
+  // „Do przeczytania”: własna kolejka z formularzem dodawania, cudzą można tylko podejrzeć
+  if (isOwn || state.shelfQueue.length) {
+    const nq = state.shelfQueue.length;
+    sections.push(el('section', { class: 'shelf-section queue-section' }, [
+      el('h3', { class: 'shelf-year' }, [document.createTextNode('Do przeczytania'), ...(nq ? [el('span', { class: 'shelf-year-count', text: ` · ${nq}` })] : [])]),
+      ...(isOwn ? [queueForm()] : []),
+      ...(nq
+        ? [el('div', { class: 'shelf-grid' }, state.shelfQueue.map(item => bookTile(
+            { title: item.title, author: item.author, cover_url: item.cover_url },
+            () => openQueueModal(item),
+          )))]
+        : [el('p', { class: 'hint', text: 'Wrzuć tu książki, które chcesz przeczytać. Znajomi będą mogli je podejrzeć.' })]),
+    ]));
+  }
+
   const byYear = new Map();
   state.shelfRows.forEach(r => {
     const y = new Date(r.created_at).getFullYear();
@@ -284,7 +425,7 @@ export function renderShelf() {
     ]));
   });
 
-  if (!sections.length) {
+  if (!current.length && !byYear.size) {
     sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
   }
   document.getElementById('shelf').replaceChildren(...sections);
