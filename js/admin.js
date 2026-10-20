@@ -6,10 +6,20 @@ import { supabaseClient } from './supabase.js';
 import { currentYear, el, friendlyError, icon, refreshIcons, setHeaderName } from './ui.js';
 
 /* ----------------- Profile ----------------- */
+// Awatar z konta Google trafia do profilu (widać go w rankingu); odświeżamy go, gdy ktoś zmienił zdjęcie.
+// Baza przyjmuje tylko adresy googleusercontent.com, a błąd tu nie jest krytyczny.
+async function syncAvatar(saved) {
+  const meta = state.currentUser.user_metadata || {};
+  const fresh = meta.avatar_url || meta.picture || null;
+  if (!fresh || fresh === saved) return;
+  const { error } = await supabaseClient.from('profiles').update({ avatar_url: fresh }).eq('id', state.currentUser.id);
+  if (error) console.error('Error syncing avatar:', error);
+}
+
 export async function loadProfile() {
   const { data, error } = await supabaseClient
     .from('profiles')
-    .select('display_name, is_admin')
+    .select('display_name, is_admin, avatar_url')
     .eq('id', state.currentUser.id)
     .maybeSingle();
 
@@ -20,6 +30,7 @@ export async function loadProfile() {
   if (!data) return;
 
   setHeaderName(data.display_name);
+  syncAvatar(data.avatar_url);
   state.isAdmin = data.is_admin;
   document.getElementById('settings-admin').hidden = !state.isAdmin;
   // Wejście prosto na #admin: ekran pokazujemy dopiero, gdy wiadomo, że to admin

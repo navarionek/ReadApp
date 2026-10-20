@@ -19,6 +19,7 @@ export function groupByReader(rows) {
         key: r.user_id,
         name: r.profiles?.display_name || '?',
         inMoneyPrize: !!r.profiles?.in_money_prize,
+        avatarUrl: r.profiles?.avatar_url || null,
         points: 0,
         books: [],
       });
@@ -66,7 +67,7 @@ export async function loadReads() {
   const [readsResult, nowResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize)')
+      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize, avatar_url)')
       .gte('created_at', new Date(year, 0, 1).toISOString())
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),

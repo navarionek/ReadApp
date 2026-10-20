@@ -13,10 +13,24 @@ const STEP_MS = 380;             // odstęp między wejściem kolejnych miejsc n
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const firstName = name => (name || '?').split(' ')[0];
 
+// Zdjęcie z Google w żądanym rozmiarze (px); bez zdjęcia albo przy błędzie ładowania: kolorowe kółko z inicjałem
+function googleAvatarUrl(url, size) {
+  return `${url.replace(/=s\d+(-c)?$/, '')}=s${size}-c`;
+}
+
 function avatar(reader, colors, extraClass = '') {
-  const node = el('span', { class: `rank-avatar ${extraClass}`.trim(), 'aria-hidden': 'true', text: firstName(reader.name).charAt(0).toUpperCase() });
-  node.style.background = colors.get(reader.key);
-  return node;
+  const classes = `rank-avatar ${extraClass}`.trim();
+  const initial = () => {
+    const node = el('span', { class: classes, 'aria-hidden': 'true', text: firstName(reader.name).charAt(0).toUpperCase() });
+    node.style.background = colors.get(reader.key);
+    return node;
+  };
+  if (!reader.avatarUrl) return initial();
+  const size = extraClass.includes('lg') ? 160 : 96;
+  const img = el('img', { class: classes, src: googleAvatarUrl(reader.avatarUrl, size), alt: '', referrerpolicy: 'no-referrer', loading: 'lazy' });
+  img.style.background = colors.get(reader.key);
+  img.addEventListener('error', () => img.replaceWith(initial()));
+  return img;
 }
 
 function renderPodium(ranked, colors) {

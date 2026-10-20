@@ -2388,3 +2388,7 @@ label .hint {
   .summary-rank-new,
   .summary-details li { animation: none; }
 }
+
+img.rank-avatar {
+  object-fit: cover;
+}
