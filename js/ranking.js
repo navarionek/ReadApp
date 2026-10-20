@@ -53,6 +53,44 @@ function renderPodium(ranked, colors) {
   return el('div', { class: 'podium', role: 'list', 'aria-label': 'Podium' }, columns);
 }
 
+/* ----- Dymek odznaki: pojawia się nad medalem, zamyka się po stuknięciu (w dymek, medal albo gdziekolwiek) ----- */
+let badgePop = null;
+
+function closeBadgePop() {
+  badgePop?.remove();
+  badgePop = null;
+}
+
+function toggleBadgePop(chip, badge) {
+  const reopenSame = badgePop && badgePop.chip === chip;
+  closeBadgePop();
+  if (reopenSame) return;  // drugie stuknięcie w ten sam medal zamyka dymek
+
+  const bubble = el('div', { class: 'badge-pop', role: 'tooltip' }, [
+    el('strong', { text: badge.name }),
+    el('span', { text: badge.desc }),
+  ]);
+  document.body.appendChild(bubble);
+
+  const r = chip.getBoundingClientRect();
+  const w = bubble.offsetWidth;
+  const h = bubble.offsetHeight;
+  const centerX = r.left + r.width / 2;
+  const left = Math.max(8, Math.min(centerX - w / 2, window.innerWidth - w - 8));
+  const above = r.top - h - 10 >= 8;  // brak miejsca nad medalem: pod nim
+  bubble.style.left = `${left}px`;
+  bubble.style.top = `${above ? r.top - h - 10 : r.bottom + 10}px`;
+  bubble.style.setProperty('--arrow-x', `${centerX - left}px`);
+  bubble.classList.toggle('below', !above);
+
+  badgePop = { chip, el: bubble, remove: () => bubble.remove() };
+}
+
+document.addEventListener('click', closeBadgePop);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBadgePop(); });
+window.addEventListener('scroll', closeBadgePop, true);
+window.addEventListener('resize', closeBadgePop);
+
 // Pasek jednej osoby: długość = punkty względem lidera, a w środku kolejne książki jako segmenty
 function renderBar(reader, rank, leaderPoints, colors, ranked) {
   const pages = reader.books.reduce((sum, b) => sum + b.pages, 0);
@@ -92,8 +130,11 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
     ...(earned.length
       ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
           earned.map(b => {
-            const chip = el('button', { type: 'button', class: 'badge-mini', title: `${b.name}: ${b.desc}`, 'aria-label': b.name }, [icon(b.icon)]);
-            chip.addEventListener('click', () => showToast(`${b.name}: ${b.desc}`));
+            const chip = el('button', { type: 'button', class: 'badge-mini', 'aria-label': `${b.name}: ${b.desc}` }, [icon(b.icon)]);
+            chip.addEventListener('click', e => {
+              e.stopPropagation();  // globalny klik zamykałby dymek od razu
+              toggleBadgePop(chip, b);
+            });
             return chip;
           }))]
       : []),
