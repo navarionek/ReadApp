@@ -21,9 +21,15 @@ function yearOf(date: unknown): number | null {
 
 // q to gotowe zapytanie Google (np. intitle:"…" albo zwykły tekst).
 // null = Google nie odpowiedział (brak klucza, 503…), [] = odpowiedział, że nic nie ma.
+// Ostatni problem z Google (do diagnozy: brak klucza, kod HTTP); trafia do odpowiedzi jako googleStatus
+let googleProblem: string | null = null;
+
 async function google(q: string, limit: number): Promise<Result[] | null> {
   const key = Deno.env.get('GOOGLE_BOOKS_API_KEY');
-  if (!key) return null;
+  if (!key) {
+    googleProblem = 'no key';
+    return null;
+  }
   const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=${limit}&printType=books&key=${key}`;
   // Google Books często odpowiada chwilowym 503/429: ponawiamy z rosnącą przerwą
   let res: Response | null = null;
@@ -34,6 +40,7 @@ async function google(q: string, limit: number): Promise<Result[] | null> {
   }
   if (!res || !res.ok) {
     console.error('google books', res?.status);
+    googleProblem = `http ${res?.status}`;
     return null;
   }
   const data = await res.json();
@@ -75,7 +82,7 @@ async function openLibrary(q: string, limit: number): Promise<Result[]> {
 }
 
 // google = true tylko gdy Google naprawdę odpowiedział, inaczej „nie znaleziono” nie jest pewne
-export async function searchBooks(q: string, limit: number): Promise<{ results: Result[]; google: boolean }> {
+export async function searchBooks(q: string, limit: number): Promise<{ results: Result[]; google: boolean; googleProblem: string | null }> {
   // Google: dokładny tytuł + zwykłe wyszukiwanie (każde łapie co innego), Open Library jako uzupełnienie
   const [gExact, gPlain, o] = await Promise.all([
     google(`intitle:"${q.replace(/"/g, '')}"`, limit),
@@ -101,5 +108,6 @@ export async function searchBooks(q: string, limit: number): Promise<{ results: 
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .map(x => x.r)
     .slice(0, limit);
-  return { results, google: gExact !== null || gPlain !== null };
+  const answered = gExact !== null || gPlain !== null;
+  return { results, google: answered, googleProblem: answered ? null : googleProblem };
 }
