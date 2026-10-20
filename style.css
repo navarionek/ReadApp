@@ -2539,3 +2539,82 @@ img.rank-avatar {
 .goal-card .card-header {
   margin-bottom: 0.5rem;
 }
+
+/* ----------------- Statystyki: tempo, rekordy, rozkład długości ----------------- */
+.insight-item {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.insight-item + .insight-item {
+  margin-top: 0.75rem;
+}
+
+.insight-meta {
+  padding-left: calc(min(8rem, 30%) + 0.75rem);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.record {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  padding: 0.875rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
+}
+
+.record-icon {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.record-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.record-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.record-main {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.record-sub {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.length-fill {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+  border-radius: 0 4px 4px 0;
+  overflow: hidden;
+}
+
+.length-seg {
+  display: block;
+  min-width: 4px;
+}

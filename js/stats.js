@@ -1,3 +1,4 @@
+import { renderInsights } from './insights.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { currentScreen } from './shell.js';
 import { state } from './state.js';
@@ -96,6 +97,7 @@ export function renderStats(readers, rows) {
   state.statsRows = rows;
   renderStatTiles(rows);
   renderBooksChart(readers);
+  renderInsights(readers, rows);
   if (currentScreen() !== 'statystyki') return;
   drawTimeline();
   if (state.racePending) {
