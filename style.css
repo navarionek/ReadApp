@@ -611,3 +611,38 @@ textarea:focus {
     margin: 0.125rem 0 0.125rem auto;
   }
 }
+
+/* Nagroda pieniężna */
+.money-badge {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.375rem;
+  color: #d97706;
+}
+
+.money-badge svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.prize-participants {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.admin-subsection {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.admin-subtitle {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.participants-list {
+  display: grid;
+  gap: 0.5rem;
+}

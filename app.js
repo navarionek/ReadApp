@@ -260,6 +260,53 @@ async function loadProfile() {
     document.getElementById('prize-year').value = currentYear();
     loadPrizeIntoForm();
   }
+  if (isAdmin) loadMoneyPrizeList();
+}
+
+/* ----------------- Nagroda pieniężna: uczestnicy ----------------- */
+function showMoneyPrizeMessage(text, isError = false) {
+  const msg = document.getElementById('money-prize-message');
+  msg.textContent = text;
+  msg.classList.toggle('error-msg', isError);
+  msg.hidden = false;
+}
+
+async function loadMoneyPrizeList() {
+  const list = document.getElementById('money-prize-list');
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('id, display_name, in_money_prize')
+    .order('display_name');
+
+  if (error) {
+    list.replaceChildren(el('div', { class: 'status-box', text: 'Nie udało się wczytać kont. ' + friendlyError(error) }));
+    return;
+  }
+
+  list.replaceChildren(...data.map(profile => {
+    const checkbox = el('input', { type: 'checkbox' });
+    checkbox.checked = profile.in_money_prize;
+    checkbox.addEventListener('change', () => handleMoneyPrizeToggle(profile, checkbox));
+    return el('label', { class: 'checkbox-label' }, [checkbox, el('span', { text: profile.display_name })]);
+  }));
+}
+
+async function handleMoneyPrizeToggle(profile, checkbox) {
+  const participates = checkbox.checked;
+  checkbox.disabled = true;
+  document.getElementById('money-prize-message').hidden = true;
+
+  // Zmiana tylko przez funkcję w bazie, która sprawdza, czy wołający jest adminem
+  const { error } = await supabaseClient.rpc('set_money_prize', { target: profile.id, participates });
+  checkbox.disabled = false;
+
+  if (error) {
+    checkbox.checked = !participates;
+    showMoneyPrizeMessage('Nie udało się zapisać: ' + friendlyError(error), true);
+    return;
+  }
+  showMoneyPrizeMessage(`${profile.display_name}: ${participates ? 'bierze udział' : 'nie bierze udziału'} w nagrodzie pieniężnej.`);
+  await loadReads();
 }
 
 /* ----------------- Prize (nagroda roku) ----------------- */
@@ -273,11 +320,25 @@ async function fetchPrize(year) {
   return data?.description || '';
 }
 
+async function fetchMoneyPrizeParticipants() {
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('display_name')
+    .eq('in_money_prize', true)
+    .order('display_name');
+  if (error) throw error;
+  return data.map(p => p.display_name);
+}
+
 async function loadPrize() {
   try {
-    const description = await fetchPrize(currentYear());
+    const [description, participants] = await Promise.all([fetchPrize(currentYear()), fetchMoneyPrizeParticipants()]);
     document.getElementById('prize-text').textContent = description;
     document.getElementById('prize-banner').hidden = !description;
+
+    const participantsLine = document.getElementById('prize-participants');
+    participantsLine.textContent = participants.length ? `Nagroda pieniężna: ${participants.join(', ')}` : '';
+    participantsLine.hidden = !participants.length;
   } catch (err) {
     // Baner zostaje taki, jaki był; nagroda nie jest krytyczna
     console.error('Error loading prize:', err);
@@ -363,7 +424,13 @@ function groupByReader(rows) {
   const readers = new Map();
   rows.forEach(r => {
     if (!readers.has(r.user_id)) {
-      readers.set(r.user_id, { key: r.user_id, name: r.profiles?.display_name || '?', points: 0, books: [] });
+      readers.set(r.user_id, {
+        key: r.user_id,
+        name: r.profiles?.display_name || '?',
+        inMoneyPrize: !!r.profiles?.in_money_prize,
+        points: 0,
+        books: [],
+      });
     }
     const reader = readers.get(r.user_id);
     reader.points += bookPoints(r);
@@ -399,7 +466,7 @@ async function loadReads() {
   // Rywalizacja resetuje się co roku: tylko wpisy od 1 stycznia (czas lokalny)
   const { data: rows, error } = await supabaseClient
     .from('reads')
-    .select('id, user_id, title, pages, multiplier, profiles(display_name)')
+    .select('id, user_id, title, pages, multiplier, profiles(display_name, in_money_prize)')
     .gte('created_at', new Date(year, 0, 1).toISOString())
     .order('created_at', { ascending: true })
     .order('id', { ascending: true });
@@ -490,7 +557,12 @@ function renderLeaderboard(readers) {
     ]));
   } else {
     tbody.replaceChildren(...ranked.map(r => el('tr', {}, [
-      el('td', { text: r.name }),
+      el('td', {}, [
+        document.createTextNode(r.name),
+        ...(r.inMoneyPrize
+          ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
+          : []),
+      ]),
       el('td', { class: 'text-right', text: String(r.points) }),
     ])));
   }
