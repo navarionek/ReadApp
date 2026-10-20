@@ -194,7 +194,7 @@ export function playRankingIntro() {
       const x = r.left + r.width / 2;
       const y = r.top + r.height / 2;
       confettiBurst(x, y, { count: 110, speed: 900, spread: Math.PI });
-      confettiFountain(x, y, { duration: 1500, rate: 170, speed: 1100 });
+      confettiFountain(x, y, { duration: 1000, rate: 170, speed: 1100 });
     }, delay);
   }
 }
