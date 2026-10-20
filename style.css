@@ -2038,3 +2038,13 @@ label .hint {
   margin-left: 0.25rem;
   font-weight: 400;
 }
+
+#book-modal-body > * + .author-edit {
+  margin-top: 0.75rem;
+}
+
+.author-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+}

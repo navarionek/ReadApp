@@ -86,10 +86,40 @@ export function readingCoverOf(item) {
   return null;
 }
 
+// „Zmień autora” w oknie książki: przycisk, który odsłania pole z zapisem (reads albo reading_now)
+function authorEditor(table, row, afterSave) {
+  const input = el('input', { type: 'text', class: 'plain-input', maxlength: '200', 'aria-label': 'Autor', placeholder: 'np. Andrzej Sapkowski', autocomplete: 'off' });
+  input.value = row.author || '';
+  const save = el('button', { type: 'submit', class: 'btn btn-primary', text: 'Zapisz' });
+  const form = el('form', { class: 'author-form', hidden: '' }, [input, save]);
+  const toggle = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('user-round'), el('span', { text: 'Zmień autora' })]);
+
+  toggle.addEventListener('click', () => {
+    toggle.hidden = true;
+    form.hidden = false;
+    input.focus();
+  });
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const author = input.value.trim().slice(0, 200) || null;
+    save.disabled = true;
+    const { error } = await supabaseClient.from(table).update({ author }).eq('id', row.id);
+    save.disabled = false;
+    if (error) {
+      showToast('Nie udało się zapisać: ' + friendlyError(error));
+      return;
+    }
+    row.author = author;
+    showToast('Zapisano autora.');
+    afterSave();
+  });
+  return el('div', { class: 'author-edit' }, [toggle, form]);
+}
+
 export function openReadingModal(item) {
   const info = readingCoverOf(item);
   openReadingId = item.id;
-  const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
+  const book = { title: item.title, cover_url: info?.cover_url, author: item.author || info?.author };
   const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
   const days = daysSince(item.started_at);
 
@@ -123,7 +153,13 @@ export function openReadingModal(item) {
       picker.hidden = false;
       renderCoverPicker(picker, item, item.title, saveReadingInfo);
     });
-    body.push(pickBtn, picker, done, drop);
+    const authorEdit = authorEditor('reading_now', item, () => {
+      renderReadingNow();
+      if (currentScreen() === 'polka') renderShelf();
+      openReadingModal(item);
+      refreshIcons();
+    });
+    body.push(authorEdit, pickBtn, picker, done, drop);
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
@@ -229,7 +265,7 @@ export function renderShelf() {
       el('h3', { class: 'shelf-year', text: 'Czyta teraz' }),
       el('div', { class: 'shelf-grid' }, current.map(item => {
         const info = readingCoverOf(item);
-        const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
+        const book = { title: item.title, cover_url: info?.cover_url, author: item.author || info?.author };
         return bookTile(book, () => openReadingModal(item), true);
       })),
     ]));
@@ -343,7 +379,11 @@ export function openBookModal(row) {
       picker.hidden = false;
       renderCoverPicker(picker, row, row.title || '', saveBookInfo);
     });
-    body.push(pickBtn, picker);
+    const authorEdit = authorEditor('reads', row, () => {
+      renderShelf();
+      openBookModal(row);
+    });
+    body.push(authorEdit, pickBtn, picker);
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
