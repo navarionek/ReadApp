@@ -107,6 +107,17 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
   return row;
 }
 
+// Licznik wejść w ranking jako lider (localStorage tego urządzenia; bez niego losowo 1 do 3)
+function everyThirdLeaderVisit() {
+  try {
+    const visits = Number(localStorage.getItem('leaderVisits') || 0) + 1;
+    localStorage.setItem('leaderVisits', String(visits));
+    return visits % 3 === 0;
+  } catch {
+    return Math.random() < 1 / 3;
+  }
+}
+
 let viewerIsFirst = false;
 let introWanted = false;
 
@@ -183,8 +194,9 @@ export function playRankingIntro() {
     countUp(node, Number(node.dataset.count), barsStart + i * 170, 1100);
   });
 
-  // Wodotrysk dla lidera (gdy to ja jestem pierwszy): z awatara na szczycie podium
-  if (viewerIsFirst) {
+  // Wodotrysk dla lidera (gdy to ja jestem pierwszy): z awatara na szczycie podium,
+  // krótki i tylko co 3. wejście w ranking jako lider
+  if (viewerIsFirst && everyThirdLeaderVisit()) {
     const delay = hasPodium ? 450 + 350 : 200;
     setTimeout(() => {
       if (currentScreen() !== 'ranking') return;
@@ -194,7 +206,7 @@ export function playRankingIntro() {
       const x = r.left + r.width / 2;
       const y = r.top + r.height / 2;
       confettiBurst(x, y, { count: 110, speed: 900, spread: Math.PI });
-      confettiFountain(x, y, { duration: 1000, rate: 170, speed: 1100 });
+      confettiFountain(x, y, { duration: 400, rate: 170, speed: 1100 });
     }, delay);
   }
 }

@@ -161,7 +161,8 @@ header {
   height: 1.5rem;
 }
 
-.card h2 {
+.card h2,
+.goal-card h2 {
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
