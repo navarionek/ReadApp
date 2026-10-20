@@ -123,7 +123,7 @@ export function renderFinishPick() {
   const items = myReadingNow();
   select.replaceChildren(
     ...items.map(item => el('option', { value: String(item.id), text: `${item.title} (od ${formatDay(new Date(item.started_at))})` })),
-    el('option', { value: 'new', text: 'Inna książka (wpisz tytuł)' }),
+    el('option', { value: 'new', text: 'Nowa książka (wpisz tytuł)' }),
   );
   select.value = state.finishing ? String(state.finishing.id) : 'new';
 }
@@ -249,7 +249,7 @@ export function setEntryMode(mode) {
 export function renderQueuePick() {
   const select = document.getElementById('queue-pick');
   select.replaceChildren(
-    el('option', { value: 'new', text: 'Inna książka (wpisz tytuł)' }),
+    el('option', { value: 'new', text: 'Nowa książka (wpisz tytuł)' }),
     ...state.myQueue.map(item => el('option', { value: String(item.id), text: item.author ? `${item.title} (${item.author})` : item.title })),
   );
   select.value = state.startingFromQueue ? String(state.startingFromQueue.id) : 'new';
