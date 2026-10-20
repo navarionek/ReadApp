@@ -35,7 +35,22 @@ export function lookupBook(q, limit = 6) {
 export const readingCovers = new Map();
 export const readingCoversPending = new Set();
 
-export function readingCoverOf(item, onFound) {
+// Okładka książki „Teraz czytam”: z bazy albo z wyszukiwania w locie. Gdy wyszukiwanie się skończy,
+// odrysowujemy wszystkie miejsca, w których ta okładka może być widoczna (Start, półka, okno),
+// niezależnie od tego, który ekran je zainicjował.
+let openReadingId = null;  // id książki z „Teraz czytam” otwartej w oknie (null = okno pokazuje coś innego)
+
+function redrawReadingCovers() {
+  renderReadingNow();
+  if (currentScreen() === 'polka') renderShelf();
+  const item = state.readingNow.find(i => i.id === openReadingId);
+  const picker = document.querySelector('#book-modal-body .cover-picker');
+  // Nie ruszamy okna, gdy ktoś właśnie wybiera okładkę
+  if (item && !document.getElementById('book-modal').hidden && (!picker || picker.hidden)) openReadingModal(item);
+  refreshIcons();
+}
+
+export function readingCoverOf(item) {
   if (item.info_checked_at) return item;  // okładka wybrana albo zapisana w bazie
   const key = normalizeTitle(item.title);
   if (readingCovers.has(key)) return readingCovers.get(key);
@@ -46,14 +61,15 @@ export function readingCoverOf(item, onFound) {
       // Nieudane wyszukiwanie nie zostaje zapamiętane jako „brak okładki”
       if (!failed) readingCovers.set(key, best ? { cover_url: best.cover, author: best.author } : null);
       readingCoversPending.delete(key);
-      if (best) onFound();
+      if (best) redrawReadingCovers();
     });
   }
   return null;
 }
 
 export function openReadingModal(item) {
-  const info = readingCoverOf(item, () => openReadingModal(item));
+  const info = readingCoverOf(item);
+  openReadingId = item.id;
   const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
   const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
   const days = daysSince(item.started_at);
@@ -193,7 +209,7 @@ export function renderShelf() {
     sections.push(el('section', { class: 'shelf-section' }, [
       el('h3', { class: 'shelf-year', text: 'Czyta teraz' }),
       el('div', { class: 'shelf-grid' }, current.map(item => {
-        const info = readingCoverOf(item, renderShelf);
+        const info = readingCoverOf(item);
         const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
         return bookTile(book, () => openReadingModal(item), true);
       })),
@@ -281,6 +297,7 @@ export function closeBookModal() {
   const modal = document.getElementById('book-modal');
   if (modal.hidden) return Promise.resolve();
   modal.hidden = true;
+  openReadingId = null;
   if (!history.state?.bookModal) return Promise.resolve();
   return new Promise(resolve => {
     window.addEventListener('popstate', resolve, { once: true });
@@ -299,6 +316,7 @@ window.addEventListener('popstate', () => {
 });
 
 export function openBookModal(row) {
+  openReadingId = null;
   const own = row.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
   const finished = new Date(row.created_at);
   const dates = row.started_at

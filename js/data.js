@@ -127,7 +127,7 @@ export function renderReadingNow() {
           actionButton('x', 'Usuń z „Teraz czytam”', () => handleDropReading(item)),
         ]
       : [];
-    const info = readingCoverOf(item, () => { renderReadingNow(); refreshIcons(); });
+    const info = readingCoverOf(item);
     return el('div', { class: 'reading-now-item' }, [
       ...(info?.cover_url ? [coverEl({ title: item.title, cover_url: info.cover_url }, 'mini')] : []),
       el('div', { class: 'reading-now-info' }, [
