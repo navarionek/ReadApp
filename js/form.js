@@ -35,7 +35,7 @@ export function renderMultiplierCheckboxes() {
     return;
   }
   container.replaceChildren(...state.multipliers.map(m => {
-    const checkbox = el('input', { type: 'checkbox', class: 'multiplier-checkbox', value: String(m.value) });
+    const checkbox = el('input', { type: 'checkbox', class: 'multiplier-checkbox', value: String(m.value), 'data-label': m.label });
     checkbox.addEventListener('change', () => {
       state.multiplierTouched = true;
       document.getElementById('multiplier-note').hidden = true;
@@ -62,6 +62,23 @@ export function readMultiplier() {
 }
 
 // Odwrotność readMultiplier: znajdź zestaw checkboxów, który daje zapisany mnożnik
+// Zaznacza checkboxy według zapisanych nazw; false, gdy nie dają zapisanego mnożnika (np. zmieniono wartości)
+export function applyLabels(labels, multiplier) {
+  const boxes = multiplierCheckboxes();
+  const product = boxes
+    .filter(cb => labels.includes(cb.dataset.label))
+    .reduce((m, cb) => m * parseFloat(cb.value), 1);
+  if (Math.abs(product - multiplier) >= 1e-4) return false;
+  boxes.forEach(cb => { cb.checked = labels.includes(cb.dataset.label); });
+  return true;
+}
+
+// Nazwy zaznaczonych mnożników (do odznak); przy edycji bez ruszania zaznaczenia zostaje stary zapis
+export function readMultiplierLabels() {
+  if (state.editingId && !state.multiplierTouched) return state.editingLabels;
+  return multiplierCheckboxes().filter(cb => cb.checked).map(cb => cb.dataset.label);
+}
+
 export function applyMultiplier(multiplier) {
   const boxes = multiplierCheckboxes();
   for (let mask = 0; mask < (1 << boxes.length); mask++) {
@@ -189,11 +206,16 @@ export function startEdit(book) {
   state.editingMultiplier = Number(book.multiplier);
   state.multiplierTouched = false;
   const note = document.getElementById('multiplier-note');
-  const matched = applyMultiplier(state.editingMultiplier);
-  note.textContent = matched
+  state.editingLabels = book.multiplier_labels ?? null;
+  const matched = (state.editingLabels && applyLabels(state.editingLabels, state.editingMultiplier))
+    || applyMultiplier(state.editingMultiplier);
+  const unknownLabels = matched && state.editingLabels === null && state.editingMultiplier !== 1;
+  note.textContent = unknownLabels
+    ? 'Nie wiadomo, które mnożniki zaznaczono przy tym wpisie. Wybierz właściwe, żeby liczyły się do odznak.'
+    : matched
     ? ''
     : `Ten wpis ma mnożnik ${formatMultiplier(state.editingMultiplier)}x, którego nie da się złożyć z obecnych opcji. Zostanie zachowany, jeśli nie zmienisz zaznaczenia.`;
-  note.hidden = matched;
+  note.hidden = matched && !unknownLabels;
   hideError();
   updateFormUI();
   goTo('dodaj');
@@ -203,6 +225,7 @@ export function startEdit(book) {
 export function cancelEdit() {
   state.editingId = null;
   state.editingMultiplier = null;
+  state.editingLabels = null;
   state.multiplierTouched = false;
   state.finishing = null;
   state.finishPickedNew = false;
@@ -286,11 +309,12 @@ document.getElementById('read-form').addEventListener('submit', async e => {
         p_pages: pages,
         p_multiplier: multiplier,
         p_unfinished: document.getElementById('unfinished').checked,
+        p_labels: readMultiplierLabels(),
       });
       if (error) throw error;
     } else {
       // user_id i created_at ustawia baza (defaulty)
-      const values = { title, pages, multiplier, unfinished: document.getElementById('unfinished').checked };
+      const values = { title, pages, multiplier, multiplier_labels: readMultiplierLabels(), unfinished: document.getElementById('unfinished').checked };
       const { data, error } = state.editingId
         ? await supabaseClient.from('reads').update(values).eq('id', state.editingId).select('id')
         : await supabaseClient.from('reads').insert(values).select('id');
