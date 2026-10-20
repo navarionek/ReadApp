@@ -27,16 +27,31 @@
       <h1 class="app-title">Czytanko</h1>
       <div id="user-panel" class="user-panel" hidden>
         <span id="display-name" class="user-name"></span>
-        <button id="rename-btn" class="btn btn-outline btn-sm" aria-label="Zmień nazwę" title="Zmień nazwę">
-          <i data-lucide="pencil"></i>
-        </button>
-        <button id="theme-toggle" class="btn btn-outline btn-sm" aria-label="Przełącz motyw">
-          <i data-lucide="moon" id="theme-icon"></i>
-        </button>
-        <button id="logout-btn" class="btn btn-outline btn-sm">
-          <i data-lucide="log-out"></i>
-          <span>Wyloguj</span>
-        </button>
+        <!-- Ustawienia: zmiana nazwy, motyw, panel admina -->
+        <div class="settings-wrap">
+          <button id="settings-btn" class="btn btn-outline btn-sm" aria-label="Ustawienia" title="Ustawienia" aria-haspopup="menu" aria-expanded="false" aria-controls="settings-menu">
+            <i data-lucide="settings"></i>
+          </button>
+          <div id="settings-menu" class="settings-menu" role="menu" hidden>
+            <button type="button" id="rename-btn" class="settings-item" role="menuitem">
+              <i data-lucide="pencil"></i>
+              <span>Zmień nazwę</span>
+            </button>
+            <button type="button" id="theme-toggle" class="settings-item" role="menuitemcheckbox" aria-checked="false">
+              <i data-lucide="moon" id="theme-icon"></i>
+              <span>Ciemny motyw</span>
+              <span id="theme-switch" class="switch" aria-hidden="true"></span>
+            </button>
+            <button type="button" id="settings-admin" class="settings-item" role="menuitem" hidden>
+              <i data-lucide="shield-check"></i>
+              <span>Panel admina</span>
+            </button>
+            <button type="button" id="logout-btn" class="settings-item settings-logout" role="menuitem">
+              <i data-lucide="log-out"></i>
+              <span>Wyloguj</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -65,10 +80,6 @@
       <a href="#statystyki" class="nav-item" data-screen="statystyki">
         <i data-lucide="chart-line"></i>
         <span>Statystyki</span>
-      </a>
-      <a href="#admin" id="nav-admin" class="nav-item" data-screen="admin" hidden>
-        <i data-lucide="shield-check"></i>
-        <span>Admin</span>
       </a>
     </nav>
 

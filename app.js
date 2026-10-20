@@ -131,10 +131,26 @@ function setTheme(isDark) {
   document.documentElement.classList.toggle('dark-mode', isDark);
   const themeIcon = document.getElementById('theme-icon');
   if (themeIcon) themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+  document.getElementById('theme-toggle')?.setAttribute('aria-checked', String(isDark));
+  document.getElementById('theme-switch')?.classList.toggle('on', isDark);
   try {
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
   } catch {}
   refreshIcons();
+}
+
+function toggleSettings() {
+  const menu = document.getElementById('settings-menu');
+  menu.hidden = !menu.hidden;
+  document.getElementById('settings-btn').setAttribute('aria-expanded', String(!menu.hidden));
+  if (!menu.hidden) menu.querySelector('.settings-item:not([hidden])')?.focus();
+}
+
+function closeSettings() {
+  const menu = document.getElementById('settings-menu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  document.getElementById('settings-btn').setAttribute('aria-expanded', 'false');
 }
 
 function toggleTheme() {
@@ -154,6 +170,7 @@ async function handleGoogleLogin() {
 }
 
 async function handleLogout() {
+  closeSettings();
   // Po wylogowaniu to urządzenie nie powinno dostawać powiadomień dla tego konta
   await disablePush({ quiet: true });
   const { error } = await supabaseClient.auth.signOut();
@@ -180,7 +197,7 @@ function updateUI(user) {
     shelfUserId = null;
     shelfRows = [];
     closeBookModal();
-    ['nav-admin', 'prize-banner', 'goal-card', 'view-as-banner'].forEach(id => {
+    ['settings-admin', 'prize-banner', 'goal-card', 'view-as-banner'].forEach(id => {
       document.getElementById(id).hidden = true;
     });
     cancelEdit();
@@ -513,7 +530,7 @@ async function loadProfile() {
 
   setHeaderName(data.display_name);
   isAdmin = data.is_admin;
-  document.getElementById('nav-admin').hidden = !isAdmin;
+  document.getElementById('settings-admin').hidden = !isAdmin;
   // Wejście prosto na #admin: ekran pokazujemy dopiero, gdy wiadomo, że to admin
   if (currentScreen() === 'admin') showScreen('admin');
   if (isAdmin && !document.getElementById('prize-year').value) {
@@ -890,7 +907,9 @@ function renderReadingNow() {
           actionButton('x', 'Usuń z „Teraz czytam”', () => handleDropReading(item)),
         ]
       : [];
+    const info = readingCoverOf(item, () => { renderReadingNow(); refreshIcons(); });
     return el('div', { class: 'reading-now-item' }, [
+      ...(info?.cover_url ? [coverEl({ title: item.title, cover_url: info.cover_url }, 'mini')] : []),
       el('div', { class: 'reading-now-info' }, [
         el('span', { class: 'reading-now-title', text: item.title }),
         el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
@@ -1806,6 +1825,62 @@ function lookupBook(q, limit = 6) {
   return lookupCache.get(key);
 }
 
+// Okładki książek „Teraz czytam”: szukane w locie i trzymane w pamięci sesji (tytuł -> info albo null)
+const readingCovers = new Map();
+const readingCoversPending = new Set();
+
+function readingCoverOf(item, onFound) {
+  const key = normalizeTitle(item.title);
+  if (readingCovers.has(key)) return readingCovers.get(key);
+  if (!readingCoversPending.has(key)) {
+    readingCoversPending.add(key);
+    lookupBook(item.title, 3).then(results => {
+      const best = results.find(r => r.cover && titleMatches(item.title, r.title));
+      readingCovers.set(key, best ? { cover_url: best.cover, author: best.author } : null);
+      readingCoversPending.delete(key);
+      if (best) onFound();
+    });
+  }
+  return null;
+}
+
+function openReadingModal(item) {
+  const info = readingCoverOf(item, () => openReadingModal(item));
+  const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
+  const own = item.user_id === currentUser?.id && viewerId() === currentUser?.id;
+  const days = daysSince(item.started_at);
+
+  const body = [
+    el('div', { class: 'book-modal-top' }, [
+      coverEl(book, 'large'),
+      el('div', { class: 'book-modal-info' }, [
+        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: item.title }),
+        ...(book.author ? [el('p', { class: 'book-modal-author', text: book.author })] : []),
+        el('p', { class: 'book-modal-author', text: `Czytane od ${formatDay(new Date(item.started_at))} · ${days} ${days === 1 ? 'dzień' : 'dni'}` }),
+      ]),
+    ]),
+  ];
+
+  if (own) {
+    const done = el('button', { type: 'button', class: 'btn btn-primary btn-block' }, [icon('check'), el('span', { text: 'Skończone' })]);
+    done.addEventListener('click', () => {
+      closeBookModal();
+      startFinishing(item);
+    });
+    const drop = el('button', { type: 'button', class: 'btn btn-outline btn-block cancel-btn' }, [icon('x'), el('span', { text: 'Usuń z „Teraz czytam”' })]);
+    drop.addEventListener('click', async () => {
+      closeBookModal();
+      await handleDropReading(item);
+      if (currentScreen() === 'polka') renderShelf();
+    });
+    body.push(done, drop);
+  }
+
+  document.getElementById('book-modal-body').replaceChildren(...body);
+  document.getElementById('book-modal').hidden = false;
+  refreshIcons();
+}
+
 function normalizeTitle(s) {
   return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l')
     .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1903,18 +1978,12 @@ function renderShelf() {
   if (current.length) {
     sections.push(el('section', { class: 'shelf-section' }, [
       el('h3', { class: 'shelf-year', text: 'Czyta teraz' }),
-      el('div', { class: 'shelf-grid' }, current.map(item => bookTile({ title: item.title, cover_url: item.cover_url, author: item.author }, null, true))),
+      el('div', { class: 'shelf-grid' }, current.map(item => {
+        const info = readingCoverOf(item, renderShelf);
+        const book = { title: item.title, cover_url: info?.cover_url, author: info?.author };
+        return bookTile(book, () => openReadingModal(item), true);
+      })),
     ]));
-    // Okładki czytanych teraz: tylko do pokazania (bez zapisu w bazie)
-    current.filter(item => !item.cover_checked).forEach(async item => {
-      item.cover_checked = true;
-      const best = (await lookupBook(item.title, 3)).find(r => r.cover && titleMatches(item.title, r.title));
-      if (best) {
-        item.cover_url = best.cover;
-        item.author = best.author;
-        renderShelf();
-      }
-    });
   }
 
   const byYear = new Map();
@@ -1936,14 +2005,16 @@ function renderShelf() {
   document.getElementById('shelf').replaceChildren(...sections);
 }
 
-function bookTile(book, row, reading = false) {
+// onOpen: wpis z reads (otwiera szczegóły) albo własna funkcja (np. dla „Czyta teraz”)
+function bookTile(book, onOpen, reading = false) {
   const tile = el('button', { type: 'button', class: `book-tile${reading ? ' reading' : ''}`, title: book.title || '' }, [
     coverEl(book),
     el('span', { class: 'book-tile-title', text: book.title || 'bez tytułu' }),
     ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
     ...(book.author ? [el('span', { class: 'book-tile-author', text: book.author })] : []),
   ]);
-  if (row) tile.addEventListener('click', () => openBookModal(row));
+  if (typeof onOpen === 'function') tile.addEventListener('click', onOpen);
+  else if (onOpen) tile.addEventListener('click', () => openBookModal(onOpen));
   else tile.disabled = true;
   return tile;
 }
@@ -2095,8 +2166,23 @@ async function saveBookInfo(row, info) {
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
-  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-  document.getElementById('rename-btn').addEventListener('click', handleRename);
+  document.getElementById('theme-toggle').addEventListener('click', toggleTheme);  // menu zostaje otwarte, widać przełącznik
+  document.getElementById('rename-btn').addEventListener('click', () => {
+    closeSettings();
+    handleRename();
+  });
+  document.getElementById('settings-admin').addEventListener('click', () => {
+    closeSettings();
+    goTo('admin');
+  });
+  document.getElementById('settings-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    toggleSettings();
+  });
+  // Kliknięcie poza menu je zamyka
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.settings-wrap')) closeSettings();
+  });
   document.getElementById('cancel-edit-btn').addEventListener('click', () => {
     cancelEdit();
     goTo('postepy');
@@ -2112,7 +2198,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'book-modal') closeBookModal();  // kliknięcie w tło
   });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeBookModal();
+    if (e.key !== 'Escape') return;
+    closeBookModal();
+    closeSettings();
   });
   document.getElementById('started-date').value = todayInputValue();
   document.getElementById('started-date').max = todayInputValue();

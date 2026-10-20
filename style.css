@@ -413,11 +413,12 @@ th {
   }
 
   .user-panel {
-    width: 100%;
+    margin-left: auto;
+    min-width: 0;
   }
 
   .user-panel .user-name {
-    flex: 1;
+    max-width: 40vw;
     min-width: 0;
     font-size: 1rem;
     overflow: hidden;
@@ -1593,4 +1594,106 @@ input[type="search"].plain-input {
 .unfinished-label .hint-inline {
   color: var(--text-muted);
   font-weight: 400;
+}
+
+/* ----------------- Menu ustawień ----------------- */
+header {
+  position: relative;
+  z-index: 950;  /* menu ustawień nad kartami i dolnym paskiem */
+}
+
+.settings-wrap {
+  position: relative;
+}
+
+.settings-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 14rem;
+  padding: 0.375rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-item:hover,
+.settings-item:focus-visible {
+  background: var(--bg-body);
+  outline: none;
+}
+
+.settings-item svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.settings-logout {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  color: var(--error);
+}
+
+.settings-logout svg {
+  color: var(--error);
+}
+
+/* Przełącznik motywu */
+.switch {
+  position: relative;
+  width: 2.25rem;
+  height: 1.25rem;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--border-focus);
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  transition: var(--transition);
+}
+
+.switch.on {
+  background: var(--primary);
+}
+
+.switch.on::after {
+  transform: translateX(1rem);
+}
+
+/* Mini okładka w „Teraz czytasz” na Starcie */
+.book-cover.mini {
+  width: 2.75rem;
+  flex-shrink: 0;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: 0 3px 8px -3px rgb(0 0 0 / 0.45);
 }
