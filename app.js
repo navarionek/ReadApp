@@ -96,7 +96,7 @@ function currentScreen() {
 function showScreen(name) {
   if (name === 'admin' && !isAdmin) name = 'start';
   // Wyjście z formularza w trakcie edycji = porzucenie edycji, żeby „Dodaj” było znowu puste
-  if (name !== 'dodaj' && editingId) cancelEdit();
+  if (name !== 'dodaj' && (editingId || finishing)) cancelEdit();
   document.querySelectorAll('.screen').forEach(screen => {
     screen.hidden = screen.dataset.screen !== name;
   });
@@ -110,7 +110,7 @@ function showScreen(name) {
 
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
   if (name === 'statystyki') {
-    if (hasData) requestAnimationFrame(playRace);
+    if (hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); });
     else racePending = true;
   } else if (raceFrame !== null) {
     cancelAnimationFrame(raceFrame);
@@ -255,13 +255,67 @@ function applyMultiplier(multiplier) {
   return false;
 }
 
-function setFormMode(isEditing) {
-  document.getElementById('form-title').textContent = isEditing ? 'Edytuj wpis' : 'Dodaj postęp';
-  document.getElementById('submit-label').textContent = isEditing ? 'Zapisz zmiany' : 'Dodaj wpis';
-  document.getElementById('cancel-edit-btn').hidden = !isEditing;
+/* ----------------- Tryb formularza: skończona / zaczęta / kończenie zaczętej ----------------- */
+let entryMode = 'finished';  // 'finished' albo 'started' (dodaj do „Teraz czytam”)
+let finishing = null;        // { id, title, startedAt } gdy kończymy książkę z „Teraz czytam”
+
+function todayInputValue() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function daysSince(iso) {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS));
+}
+
+function updateFormUI() {
+  const isEditing = !!editingId;
+  const started = entryMode === 'started' && !isEditing && !finishing;
+
+  document.getElementById('form-title').textContent =
+    isEditing ? 'Edytuj wpis' : finishing ? 'Skończona książka' : started ? 'Zaczynam czytać' : 'Dodaj postęp';
+  document.getElementById('submit-label').textContent =
+    isEditing ? 'Zapisz zmiany' : finishing ? 'Dodaj skończoną książkę' : started ? 'Zacznij czytać' : 'Dodaj wpis';
+
+  document.getElementById('mode-toggle').hidden = isEditing || !!finishing;
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    const active = btn.dataset.mode === entryMode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', String(active));
+  });
+
+  document.getElementById('started-group').hidden = !started;
+  document.getElementById('pages-group').hidden = started;
+  document.getElementById('multiplier-group').hidden = started;
+  document.getElementById('pages').required = !started;
+
+  const note = document.getElementById('finishing-note');
+  note.hidden = !finishing;
+  if (finishing) {
+    const days = daysSince(finishing.startedAt);
+    note.textContent = `Zaczęte ${formatDay(new Date(finishing.startedAt))} (${days} ${days === 1 ? 'dzień' : 'dni'} temu). Wpisz liczbę stron.`;
+  }
+
+  document.getElementById('cancel-edit-btn').hidden = !isEditing && !finishing;
+}
+
+function setEntryMode(mode) {
+  entryMode = mode;
+  hideError();
+  updateFormUI();
+}
+
+function startFinishing(item) {
+  cancelEdit();
+  finishing = { id: item.id, title: item.title, startedAt: item.started_at };
+  document.getElementById('title').value = item.title;
+  updateFormUI();
+  goTo('dodaj');
+  document.getElementById('pages').focus({ preventScroll: true });
 }
 
 function startEdit(book) {
+  finishing = null;
   editingId = book.id;
   document.getElementById('title').value = book.title || '';
   document.getElementById('pages').value = book.pages;
@@ -274,7 +328,7 @@ function startEdit(book) {
     : `Ten wpis ma mnożnik ${formatMultiplier(editingMultiplier)}x, którego nie da się złożyć z obecnych opcji. Zostanie zachowany, jeśli nie zmienisz zaznaczenia.`;
   note.hidden = matched;
   hideError();
-  setFormMode(true);
+  updateFormUI();
   goTo('dodaj');
   document.getElementById('title').focus({ preventScroll: true });
 }
@@ -283,10 +337,13 @@ function cancelEdit() {
   editingId = null;
   editingMultiplier = null;
   multiplierTouched = false;
+  finishing = null;
+  entryMode = 'finished';
   document.getElementById('multiplier-note').hidden = true;
   document.getElementById('read-form').reset();
+  document.getElementById('started-date').value = todayInputValue();
   hideError();
-  setFormMode(false);
+  updateFormUI();
 }
 
 async function handleDelete(book) {
@@ -320,23 +377,53 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const title = document.getElementById('title').value.trim();
   const pages = parseInt(document.getElementById('pages').value, 10);
   const multiplier = readMultiplier();
+  const startingNow = entryMode === 'started' && !editingId && !finishing;
 
   if (!title) {
     showError('Podaj tytuł książki.');
     return;
   }
 
+  // Data rozpoczęcia: dziś = teraz, wcześniejszy dzień = jego południe (bez kłopotów ze strefą)
+  let startedAt = null;
+  if (startingNow) {
+    const value = document.getElementById('started-date').value || todayInputValue();
+    if (value > todayInputValue()) {
+      showError('Data rozpoczęcia nie może być w przyszłości.');
+      return;
+    }
+    const [y, m, d] = value.split('-').map(Number);
+    startedAt = value === todayInputValue() ? new Date().toISOString() : new Date(y, m - 1, d, 12).toISOString();
+  }
+
   const labelBefore = submitLabel.textContent;
   submitBtn.disabled = true;
   submitLabel.textContent = 'Zapisywanie…';
   try {
-    // user_id i created_at ustawia baza (defaulty), klient może podać tylko te trzy pola
+    if (startingNow) {
+      const { error } = await supabaseClient.from('reading_now').insert({ title, started_at: startedAt });
+      if (error) throw error;
+      cancelEdit();
+      await loadReads();
+      showToast('Dodano do „Teraz czytam”.');
+      goTo('start');
+      return;
+    }
+
+    // user_id i created_at ustawia baza (defaulty); przy kończeniu zaczętej idzie też started_at
     const values = { title, pages, multiplier };
+    if (finishing) values.started_at = finishing.startedAt;
     const { data, error } = editingId
       ? await supabaseClient.from('reads').update(values).eq('id', editingId).select('id')
       : await supabaseClient.from('reads').insert(values).select('id');
     if (error) throw error;
     if (!data?.length) throw new Error('Nie udało się zapisać wpisu (brak uprawnień).');
+
+    // Skończona książka znika z „Teraz czytam” (wpis już jest, więc błąd tu nie jest krytyczny)
+    if (finishing) {
+      const { error: delError } = await supabaseClient.from('reading_now').delete().eq('id', finishing.id);
+      if (delError) console.error('Error removing reading_now:', delError);
+    }
 
     const wasEditing = !!editingId;
     cancelEdit();
@@ -676,12 +763,19 @@ async function loadReads() {
   loadPrize();
 
   // Rywalizacja resetuje się co roku: tylko wpisy od 1 stycznia (czas lokalny)
-  const { data: rows, error } = await supabaseClient
-    .from('reads')
-    .select('id, user_id, title, pages, multiplier, created_at, profiles(display_name, in_money_prize)')
-    .gte('created_at', new Date(year, 0, 1).toISOString())
-    .order('created_at', { ascending: true })
-    .order('id', { ascending: true });
+  const [readsResult, nowResult] = await Promise.all([
+    supabaseClient
+      .from('reads')
+      .select('id, user_id, title, pages, multiplier, created_at, started_at, profiles(display_name, in_money_prize)')
+      .gte('created_at', new Date(year, 0, 1).toISOString())
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }),
+    supabaseClient
+      .from('reading_now')
+      .select('id, user_id, title, started_at, profiles(display_name)')
+      .order('started_at', { ascending: true }),
+  ]);
+  const { data: rows, error } = readsResult;
 
   if (error) {
     console.error('Error loading reads:', error);
@@ -689,14 +783,63 @@ async function loadReads() {
     if (!hasData) renderStatus('Nie udało się wczytać wpisów. ' + friendlyError(error), true);
     return;
   }
+  if (nowResult.error) console.error('Error loading reading_now:', nowResult.error);
+  readingNow = nowResult.data || [];
 
   hasData = true;
   const readers = groupByReader(rows || []);
   renderLeaderboard(readers);
   renderGoal(readers);
+  renderReadingNow();
   renderUserProgress(readers);
   renderStats(readers, rows || []);
   refreshIcons();
+}
+
+/* ----------------- Teraz czytam ----------------- */
+let readingNow = [];  // zaczęte książki wszystkich: [{ id, user_id, title, started_at, profiles }]
+
+function readingNowLabel(item) {
+  const days = daysSince(item.started_at);
+  return `od ${formatDay(new Date(item.started_at))} · ${days} ${days === 1 ? 'dzień' : 'dni'}`;
+}
+
+function renderReadingNow() {
+  const mine = readingNow.filter(item => item.user_id === viewerId());
+  const card = document.getElementById('reading-now-card');
+  card.hidden = !mine.length;
+  // W podglądzie jako ktoś inny bez przycisków: to nie nasze książki
+  const canAct = viewerId() === currentUser?.id;
+
+  document.getElementById('reading-now-list').replaceChildren(...mine.map(item => {
+    const actions = canAct
+      ? [
+          (() => {
+            const done = el('button', { type: 'button', class: 'btn btn-primary btn-sm' }, [icon('check'), el('span', { text: 'Skończone' })]);
+            done.addEventListener('click', () => startFinishing(item));
+            return done;
+          })(),
+          actionButton('x', 'Usuń z „Teraz czytam”', () => handleDropReading(item)),
+        ]
+      : [];
+    return el('div', { class: 'reading-now-item' }, [
+      el('div', { class: 'reading-now-info' }, [
+        el('span', { class: 'reading-now-title', text: item.title }),
+        el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
+      ]),
+      el('div', { class: 'reading-now-actions' }, actions),
+    ]);
+  }));
+}
+
+async function handleDropReading(item) {
+  if (!confirm(`Usunąć „${item.title}” z „Teraz czytam”? Książka nie trafi do rankingu.`)) return;
+  const { data, error } = await supabaseClient.from('reading_now').delete().eq('id', item.id).select('id');
+  if (error || !data?.length) {
+    alert('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
+    return;
+  }
+  await loadReads();
 }
 
 /* ----------------- Plan na 1. miejsce ----------------- */
@@ -819,26 +962,51 @@ function compactNumber(n) {
   return `${String(Math.round(n / 100) / 10).replace('.', ',')}K`;  // 11000 -> 11K, 12150 -> 12,2K
 }
 
-// Punkty narastająco: schodek przy każdym wpisie (rows są posortowane po created_at)
+// Punkty narastająco. Książka z datą rozpoczęcia „przyrasta” równomiernie od startu do końca
+// czytania (rampa), książka bez niej wskakuje w całości w dniu dodania (schodek).
 function buildRaceSeries(readers, rows) {
   const colors = seriesColors(readers);
-  const byKey = new Map(readers.map(r => [r.key, { key: r.key, name: r.name, color: colors.get(r.key), steps: [], total: 0 }]));
+  const t0 = new Date(currentYear(), 0, 1).getTime();
+  const byKey = new Map(readers.map(r => [r.key, { key: r.key, name: r.name, color: colors.get(r.key), books: [], total: 0 }]));
   rows.forEach(row => {
     const s = byKey.get(row.user_id);
     if (!s) return;
-    s.total += bookPoints(row);
-    s.steps.push({ t: new Date(row.created_at).getTime(), v: s.total });
+    const end = new Date(row.created_at).getTime();
+    // Zaczęte w zeszłym roku: całe punkty rozkładamy w tym roku
+    const start = row.started_at ? Math.min(end, Math.max(t0, new Date(row.started_at).getTime())) : end;
+    const pts = bookPoints(row);
+    s.total += pts;
+    s.books.push({ start, end, pts });
+  });
+
+  // Punkty załamania linii: początki i końce książek. Między nimi wartość zmienia się liniowo,
+  // a w miejscu schodka są dwa punkty o tym samym czasie (przed i po).
+  byKey.forEach(s => {
+    const times = [...new Set(s.books.flatMap(b => [b.start, b.end]))].sort((a, b) => a - b);
+    s.points = [];
+    times.forEach(t => {
+      const before = valueAt(s, t, true);
+      const after = valueAt(s, t);
+      if (before !== after) s.points.push({ t, v: before });
+      s.points.push({ t, v: after });
+    });
   });
   return [...byKey.values()];
 }
 
-function valueAt(series, t) {
+// Wartość w chwili t; strictly = granica z lewej (schodek dnia t jeszcze nie wliczony)
+function valueAt(series, t, strictly = false) {
   let v = 0;
-  for (const step of series.steps) {
-    if (step.t > t) break;
-    v = step.v;
+  for (const b of series.books) {
+    if (b.end === b.start) {
+      if (strictly ? b.end < t : b.end <= t) v += b.pts;
+    } else if (t >= b.end) {
+      v += b.pts;
+    } else if (t > b.start) {
+      v += (b.pts * (t - b.start)) / (b.end - b.start);
+    }
   }
-  return v;
+  return Math.round(v);
 }
 
 function renderStats(readers, rows) {
@@ -847,6 +1015,7 @@ function renderStats(readers, rows) {
   renderStatTiles(rows);
   renderBooksChart(readers);
   if (currentScreen() !== 'statystyki') return;
+  drawTimeline();
   if (racePending) {
     racePending = false;
     playRace();
@@ -855,6 +1024,97 @@ function renderStats(readers, rows) {
     drawRace();
     setRaceProgress(raceProgress);
   }
+}
+
+/* ----------------- Kto co czytał kiedy (oś czasu) ----------------- */
+function drawTimeline() {
+  const container = document.getElementById('timeline-chart');
+  const width = container.clientWidth;
+  if (!width) return;  // ekran niewidoczny
+
+  const year = currentYear();
+  const t0 = new Date(year, 0, 1).getTime();
+  const t1 = Math.max(Date.now(), t0 + DAY_MS);
+  const colors = seriesColors(statsReaders);
+  const nameOf = new Map(statsReaders.map(r => [r.key, r.name]));
+  readingNow.forEach(item => { if (!nameOf.has(item.user_id)) nameOf.set(item.user_id, item.profiles?.display_name || '?'); });
+
+  // Odcinki: skończone książki z datą rozpoczęcia + czytane teraz (do dziś)
+  const spans = [
+    ...statsRows.filter(r => r.started_at).map(r => ({
+      user: r.user_id, title: r.title || 'bez tytułu', open: false,
+      start: Math.max(t0, new Date(r.started_at).getTime()), end: new Date(r.created_at).getTime(),
+    })),
+    ...readingNow.map(item => ({
+      user: item.user_id, title: item.title, open: true,
+      start: Math.max(t0, new Date(item.started_at).getTime()), end: t1,
+    })),
+  ].filter(s => s.end >= t0);
+
+  if (!spans.length) {
+    container.replaceChildren(el('div', { class: 'status-box', text: 'Pojawi się, gdy zaczniecie dodawać książki przez „Zaczynam czytać”.' }));
+    return;
+  }
+
+  const people = [...new Set(spans.map(s => s.user))]
+    .sort((a, b) => (nameOf.get(a) || '').localeCompare(nameOf.get(b) || '', 'pl'));
+  const narrow = width < 480;
+  const m = { top: 4, right: 8, bottom: 22, left: narrow ? 64 : 96 };
+  const lane = 14;
+  const x = t => m.left + ((t - t0) / (t1 - t0)) * (width - m.left - m.right);
+
+  // Tory: książki czytane równolegle przez jedną osobę idą jedna pod drugą
+  let yCursor = m.top;
+  const rows = people.map(user => {
+    const lanes = [];
+    const items = spans.filter(s => s.user === user).sort((a, b) => a.start - b.start).map(s => {
+      let i = lanes.findIndex(endT => endT < s.start);
+      if (i === -1) { i = lanes.length; lanes.push(0); }
+      lanes[i] = s.end;
+      return { ...s, lane: i };
+    });
+    const row = { user, items, y: yCursor, h: Math.max(1, lanes.length) * lane + 8 };
+    yCursor += row.h;
+    return row;
+  });
+  const height = yCursor + m.bottom;
+
+  const svg = svgEl('svg', { width, height, viewBox: `0 0 ${width} ${height}`, class: 'timeline-svg', role: 'img', 'aria-label': 'Kto co czytał kiedy' });
+
+  const lastMonth = new Date(t1).getMonth();
+  for (let month = 0; month <= lastMonth; month += narrow ? 2 : 1) {
+    const mx = x(new Date(year, month, 1).getTime());
+    svg.appendChild(svgEl('line', { x1: mx, x2: mx, y1: m.top, y2: height - m.bottom, class: 'grid-line' }));
+    const label = svgEl('text', { x: mx, y: height - 8, class: 'axis-text' });
+    label.textContent = MONTHS_PL[month];
+    svg.appendChild(label);
+  }
+
+  rows.forEach((row, i) => {
+    if (i > 0) svg.appendChild(svgEl('line', { x1: 0, x2: width, y1: row.y, y2: row.y, class: 'grid-line' }));
+    const name = svgEl('text', { x: 0, y: row.y + 4 + lane / 2 + 4, class: 'timeline-name' });
+    name.textContent = (nameOf.get(row.user) || '?').split(' ')[0];
+    svg.appendChild(name);
+
+    row.items.forEach(s => {
+      const bx = x(s.start);
+      const bw = Math.max(6, x(s.end) - bx);
+      const bar = svgEl('rect', {
+        x: bx, y: row.y + 4 + s.lane * lane + 3, width: bw, height: 8, rx: 4,
+        class: s.open ? 'timeline-bar open' : 'timeline-bar',
+        style: `fill: ${colors.get(s.user) || 'var(--series-other)'}`,
+      });
+      const days = Math.max(1, Math.round((s.end - s.start) / DAY_MS));
+      const tip = svgEl('title');
+      tip.textContent = s.open
+        ? `${s.title}: od ${formatDay(new Date(s.start))}, czyta ${days} ${days === 1 ? 'dzień' : 'dni'}`
+        : `${s.title}: ${formatDay(new Date(s.start))} – ${formatDay(new Date(s.end))} (${days} ${days === 1 ? 'dzień' : 'dni'})`;
+      bar.appendChild(tip);
+      svg.appendChild(bar);
+    });
+  });
+
+  container.replaceChildren(svg);
 }
 
 function renderStatTiles(rows) {
@@ -1028,14 +1288,14 @@ function setRaceProgress(p, dt = null) {
   race.y = y;
   drawRaceGrid(y, vMax);
 
-  // Linie schodkowe do bieżącego dnia
+  // Linie do bieżącego dnia: proste odcinki między punktami załamania (rampy i schodki)
   series.forEach(s => {
     let d = `M${x(t0)},${y(0)}`;
-    for (const step of s.steps) {
-      if (step.t > tCur) break;
-      d += ` H${x(step.t)} V${y(step.v)}`;
+    for (const pt of s.points) {
+      if (pt.t > tCur) break;
+      d += ` L${x(pt.t)},${y(pt.v)}`;
     }
-    s.path.setAttribute('d', `${d} H${xCur}`);
+    s.path.setAttribute('d', `${d} L${xCur},${y(valueAt(s, tCur))}`);
   });
 
   // Etykiety przy końcach linii; gdy się nakładają, rozsuwamy je i łączymy linią z kropką
@@ -1135,7 +1395,9 @@ let raceResizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(raceResizeTimer);
   raceResizeTimer = setTimeout(() => {
-    if (currentScreen() !== 'statystyki' || raceFrame !== null) return;
+    if (currentScreen() !== 'statystyki') return;
+    drawTimeline();
+    if (raceFrame !== null) return;
     drawRace();
     setRaceProgress(raceProgress);
   }, 150);
@@ -1231,8 +1493,14 @@ function renderUserProgress(readers) {
       el('tbody', {}, rows),
     ]);
 
+    const current = readingNow.filter(item => item.user_id === reader.key);
     return el('div', { class: 'user-progress-block' }, [
       el('h3', { class: 'user-name', text: reader.name }),
+      ...current.map(item => el('p', { class: 'reading-now-line' }, [
+        icon('book-open'),
+        el('span', { text: `Czyta teraz: ${item.title}` }),
+        el('span', { class: 'reading-now-meta', text: ` (${readingNowLabel(item)})` }),
+      ])),
       el('div', { class: 'table-container' }, [table]),
     ]);
   });
@@ -1449,13 +1717,17 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('rename-btn').addEventListener('click', handleRename);
   document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+    const back = finishing ? 'start' : 'postepy';
     cancelEdit();
-    goTo('postepy');
+    goTo(back);
   });
+  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
+  document.getElementById('started-date').value = todayInputValue();
+  document.getElementById('started-date').max = todayInputValue();
   window.addEventListener('hashchange', () => showScreen(currentScreen()));
   // Kliknięcie „Dodaj” w menu zawsze otwiera pusty formularz, także w trakcie edycji
   document.querySelector('.nav-item[data-screen="dodaj"]').addEventListener('click', () => {
-    if (editingId) cancelEdit();
+    if (editingId || finishing) cancelEdit();
   });
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);

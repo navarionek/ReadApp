@@ -132,6 +132,15 @@
           <dl id="goal-facts" class="goal-facts"></dl>
         </div>
 
+        <!-- Teraz czytasz: zaczęte książki z przyciskiem „Skończone” -->
+        <div id="reading-now-card" class="card" hidden>
+          <div class="card-header">
+            <i data-lucide="book-open" class="card-icon"></i>
+            <h2>Teraz czytasz</h2>
+          </div>
+          <div id="reading-now-list" class="reading-now-list"></div>
+        </div>
+
         <a href="#dodaj" class="btn btn-primary btn-block btn-lg start-cta">
           <i data-lucide="circle-plus"></i>
           <span>Dodaj przeczytane strony</span>
@@ -168,6 +177,12 @@
             <i data-lucide="circle-plus" class="card-icon"></i>
             <h2 id="form-title">Dodaj postęp</h2>
           </div>
+          <!-- Tryb: skończona książka albo dopiero zaczęta -->
+          <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Rodzaj wpisu">
+            <button type="button" class="mode-btn active" data-mode="finished" aria-pressed="true">Skończona książka</button>
+            <button type="button" class="mode-btn" data-mode="started" aria-pressed="false">Zaczynam czytać</button>
+          </div>
+          <p id="finishing-note" class="hint finishing-note" hidden></p>
           <div class="form-group">
             <label for="title">Tytuł książki</label>
             <div class="input-wrapper">
@@ -175,14 +190,18 @@
               <input type="text" id="title" placeholder="Co przeczytałeś?" maxlength="300" required />
             </div>
           </div>
-          <div class="form-group">
+          <div id="started-group" class="form-group" hidden>
+            <label for="started-date">Data rozpoczęcia</label>
+            <input type="date" id="started-date" class="plain-input" />
+          </div>
+          <div id="pages-group" class="form-group">
             <label for="pages">Liczba stron</label>
             <div class="input-wrapper">
               <i data-lucide="layers" class="input-icon"></i>
               <input type="number" id="pages" min="1" max="5000" required />
             </div>
           </div>
-          <div class="form-group">
+          <div id="multiplier-group" class="form-group">
             <label>Mnożnik</label>
             <!-- Checkboxy budowane z tabeli multipliers (zarządza admin) -->
             <div id="multiplier-container" class="multiplier-grid"></div>
@@ -273,6 +292,15 @@
               <span id="tile-longest" class="stat-value stat-value-sm">—</span>
             </div>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="calendar-range" class="card-icon"></i>
+            <h2>Kto co czytał kiedy</h2>
+          </div>
+          <p class="card-intro">Paski od rozpoczęcia do skończenia książki. Jaśniejsze paski to książki czytane teraz.</p>
+          <div id="timeline-chart" class="timeline-chart"></div>
         </div>
 
         <div class="card">
