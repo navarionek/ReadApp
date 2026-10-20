@@ -14,24 +14,32 @@ const MESSAGES = [
   'Ostatnio poznałeś coś nowego. Mózg się przegrzewa, daj mu odetchnąć.',
 ];
 
-function isDiscouragementOpen() {
+// Numer otwarcia aplikacji liczymy raz, przy starcie (a nie przy każdym odświeżeniu danych)
+function countOpen() {
   try {
     const opens = Number(localStorage.getItem('opens') || 0) + 1;
     localStorage.setItem('opens', String(opens));
-    return opens % 10 === 0;
+    return opens;
   } catch {
-    return Math.random() < 0.1;
+    return Math.floor(Math.random() * 60) + 1;  // bez localStorage: losowo, mniej więcej raz na 6 i raz na 10
   }
 }
 
-// Liczymy otwarcie raz, przy starcie aplikacji (a nie przy każdym odświeżeniu danych)
-const showThisOpen = isDiscouragementOpen();
+const openNumber = countOpen();
+const showThisOpen = openNumber % 10 === 0;
+
+// Co 6. otwarcie karta „Plan na 1. miejsce” mówi Krystianowi, że nic nie musi czytać
+export const goalJokeThisOpen = openNumber % 6 === 0;
+
+export function isKrystian(name) {
+  return (name || '').trim().split(/\s+/)[0].toLowerCase() === 'krystian';
+}
+
 let shown = false;
 
 export function maybeShowDiscouragement(displayName, force = false) {
   if (shown || !(showThisOpen || force)) return;
-  const firstName = (displayName || '').trim().split(/\s+/)[0].toLowerCase();
-  if (firstName !== 'krystian') return;
+  if (!isKrystian(displayName)) return;
   shown = true;
 
   const message = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];

@@ -1,3 +1,4 @@
+import { goalJokeThisOpen, isKrystian } from './discourage.js';
 import { loadPrize, viewerId } from './admin.js';
 import { renderBadgesCard } from './badges.js';
 import { renderRankingViz } from './ranking.js';
@@ -173,7 +174,22 @@ export function goalFact(label, value) {
   return [el('div', { class: 'goal-fact' }, [el('dt', { text: label }), el('dd', { text: value })])];
 }
 
+// Żart: co 6. otwarcie aplikacji Krystian czyta w tej karcie, że nic nie musi czytać
+function applyGoalJoke(readers) {
+  const me = readers.find(r => r.key === viewerId());
+  const name = me?.name ?? document.getElementById('display-name').textContent;
+  if (!goalJokeThisOpen || !isKrystian(name)) return;
+  document.getElementById('goal-number').textContent = '';
+  document.getElementById('goal-unit').textContent = 'Nic nie musisz czytać';
+  document.getElementById('goal-sub').textContent = 'Masz wystarczająco stron.';
+}
+
 export function renderGoal(readers) {
+  renderGoalCore(readers);
+  applyGoalJoke(readers);
+}
+
+function renderGoalCore(readers) {
   const card = document.getElementById('goal-card');
   if (!state.currentUser) {
     card.hidden = true;
