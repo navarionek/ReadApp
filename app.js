@@ -637,10 +637,11 @@ function renderUserProgress(readers) {
     const rows = reader.books.map(book => {
       const cells = [
         el('td', { text: book.title || '—' }),
-        // Na telefonie kolumna mnożnika jest schowana, a mnożnik pokazuje się przy stronach
-        el('td', { class: 'text-right' }, [
+        // Na telefonie kolumna mnożnika jest schowana, a mnożnik pokazuje się przed stronami,
+        // żeby liczby stron były wyrównane do prawej w jednej linii
+        el('td', { class: 'text-right pages-cell' }, [
+          ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'mult-inline', text: `×${book.multiplier}` })] : []),
           document.createTextNode(String(book.pages)),
-          ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'mult-inline', text: ` ×${book.multiplier}` })] : []),
         ]),
         el('td', { class: 'text-right col-mult', text: `${book.multiplier}x` }),
         el('td', { class: 'text-right score', text: String(bookPoints(book)) }),
