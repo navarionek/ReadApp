@@ -151,6 +151,8 @@ async function handleGoogleLogin() {
 }
 
 async function handleLogout() {
+  // Po wylogowaniu to urządzenie nie powinno dostawać powiadomień dla tego konta
+  await disablePush({ quiet: true });
   const { error } = await supabaseClient.auth.signOut();
   if (error) {
     alert('Błąd wylogowania: ' + friendlyError(error));
@@ -171,7 +173,8 @@ function updateUI(user) {
   if (!user) {
     hasData = false;
     isAdmin = false;
-    ['nav-admin', 'prize-banner', 'goal-card'].forEach(id => {
+    viewAs = null;
+    ['nav-admin', 'prize-banner', 'goal-card', 'view-as-banner'].forEach(id => {
       document.getElementById(id).hidden = true;
     });
     cancelEdit();
@@ -374,6 +377,7 @@ async function loadProfile() {
   }
   if (isAdmin) {
     loadMoneyPrizeList();
+    loadViewAsOptions();
     renderMultiplierAdmin();
     refreshIcons();
   }
@@ -720,10 +724,10 @@ function renderGoal(readers) {
   const daysElapsed = Math.max(1, (now - new Date(year, 0, 1)) / DAY_MS);
   const daysLeft = Math.max(1, (new Date(year + 1, 0, 1) - now) / DAY_MS);
 
-  const me = readers.find(r => r.key === currentUser.id);
+  const me = readers.find(r => r.key === viewerId());
   const myPoints = me ? me.points : 0;
   const myPace = myPoints / daysElapsed;
-  const others = readers.filter(r => r.key !== currentUser.id);
+  const others = readers.filter(r => r.key !== viewerId());
 
   const number = document.getElementById('goal-number');
   const unit = document.getElementById('goal-unit');
@@ -1146,19 +1150,27 @@ function renderLeaderboard(readers) {
       el('td', { colspan: '2', class: 'status-cell', text: `Brak wpisów w ${currentYear()} roku. Dodaj pierwszy!` }),
     ]));
   } else {
-    tbody.replaceChildren(...ranked.map(r => el('tr', {}, [
-      el('td', {}, [
-        document.createTextNode(r.name),
-        ...(r.inMoneyPrize
-          ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
-          : []),
-      ]),
-      el('td', { class: 'text-right', text: String(r.points) }),
-    ])));
+    tbody.replaceChildren(...ranked.map((r, i) => {
+      const earned = earnedBadges(r, i + 1);
+      return el('tr', {}, [
+        el('td', {}, [
+          document.createTextNode(r.name),
+          ...(r.inMoneyPrize
+            ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
+            : []),
+          ...(earned.length
+            ? [el('span', { class: 'badge-row', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
+                earned.map(b => el('span', { class: 'badge-mini', title: `${b.name}: ${b.desc}` }, [icon(b.icon)])))]
+            : []),
+        ]),
+        el('td', { class: 'text-right', text: String(r.points) }),
+      ]);
+    }));
   }
+  renderBadgesCard(ranked);
 
   if (currentUser) {
-    const rankIndex = ranked.findIndex(r => r.key === currentUser.id);
+    const rankIndex = ranked.findIndex(r => r.key === viewerId());
     const me = ranked[rankIndex];
     document.getElementById('stat-total-points').textContent = me ? String(me.points) : '0';
     document.getElementById('stat-rank').textContent = rankIndex !== -1 ? `#${rankIndex + 1}` : '#--';
@@ -1180,7 +1192,7 @@ function renderUserProgress(readers) {
 
   // Najpierw moje postępy, potem pozostałe osoby w dotychczasowej kolejności
   const mineFirst = [...readers].sort((a, b) =>
-    (b.key === currentUser?.id) - (a.key === currentUser?.id));
+    (b.key === viewerId()) - (a.key === viewerId()));
 
   const blocks = mineFirst.map(reader => {
     const isMine = currentUser && reader.key === currentUser.id;
@@ -1228,6 +1240,208 @@ function renderUserProgress(readers) {
   container.replaceChildren(...blocks);
 }
 
+/* ----------------- Podgląd jako inna osoba (admin) ----------------- */
+// Tylko widok: wszystko „moje” na ekranach liczy się dla wybranej osoby. Zapisy (dodawanie,
+// edycja, usuwanie) dalej idą jako zalogowany user i baza i tak nie pozwala ruszać cudzych wpisów.
+let viewAs = null;  // { id, name } albo null
+
+function viewerId() {
+  return viewAs?.id || currentUser?.id || null;
+}
+
+function setViewAs(profile) {
+  viewAs = profile && profile.id !== currentUser?.id ? profile : null;
+  const banner = document.getElementById('view-as-banner');
+  banner.hidden = !viewAs;
+  document.getElementById('view-as-name').textContent = viewAs ? viewAs.name : '';
+  loadReads();
+  if (viewAs) goTo('start');
+}
+
+async function loadViewAsOptions() {
+  const select = document.getElementById('view-as-select');
+  const { data, error } = await supabaseClient.from('profiles').select('id, display_name').order('display_name');
+  if (error) {
+    console.error('Error loading profiles:', error);
+    return;
+  }
+  select.replaceChildren(...data.map(p => {
+    const option = el('option', { value: p.id, text: p.id === currentUser.id ? `${p.display_name} (ja)` : p.display_name });
+    option.selected = p.id === viewerId();
+    return option;
+  }));
+}
+
+function handleViewAs() {
+  const select = document.getElementById('view-as-select');
+  const option = select.selectedOptions[0];
+  if (!option) return;
+  setViewAs({ id: option.value, name: option.textContent.replace(/ \(ja\)$/, '') });
+}
+
+/* ----------------- Odznaki ----------------- */
+// Liczone z wpisów bieżącego roku, więc resetują się razem z rywalizacją
+const BADGES = [
+  { id: 'first', icon: 'book-open', name: 'Pierwsza książka', desc: 'Pierwszy wpis w tym roku', test: s => s.books >= 1 },
+  { id: 'five', icon: 'library', name: 'Piątka', desc: '5 książek', test: s => s.books >= 5 },
+  { id: 'ten', icon: 'library-big', name: 'Dycha', desc: '10 książek', test: s => s.books >= 10 },
+  { id: 'twenty', icon: 'landmark', name: 'Dwudziestka', desc: '20 książek', test: s => s.books >= 20 },
+  { id: 'brick', icon: 'brick-wall', name: 'Cegła', desc: 'Książka mająca co najmniej 500 stron', test: s => s.longest >= 500 },
+  { id: 'pages1k', icon: 'flame', name: 'Tysiąc stron', desc: '1000 przeczytanych stron', test: s => s.pages >= 1000 },
+  { id: 'pages5k', icon: 'rocket', name: 'Pięć tysięcy stron', desc: '5000 przeczytanych stron', test: s => s.pages >= 5000 },
+  { id: 'bonus', icon: 'sparkles', name: 'Z bonusem', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
+  { id: 'streak', icon: 'calendar-check', name: 'Regularność', desc: 'Wpisy w 3 kolejnych miesiącach', test: s => s.monthStreak >= 3 },
+  { id: 'leader', icon: 'crown', name: 'Korona', desc: 'Aktualnie 1. miejsce w rankingu', test: s => s.rank === 1 },
+];
+
+function badgeStats(reader, rank) {
+  const months = new Set(reader.books.map(b => new Date(b.created_at).getMonth()));
+  let monthStreak = 0;
+  let run = 0;
+  for (let m = 0; m < 12; m++) {
+    run = months.has(m) ? run + 1 : 0;
+    monthStreak = Math.max(monthStreak, run);
+  }
+  return {
+    books: reader.books.length,
+    pages: reader.books.reduce((sum, b) => sum + b.pages, 0),
+    longest: reader.books.reduce((max, b) => Math.max(max, b.pages), 0),
+    bonus: reader.books.filter(b => Number(b.multiplier) > 1).length,
+    monthStreak,
+    rank,
+  };
+}
+
+function earnedBadges(reader, rank) {
+  const stats = badgeStats(reader, rank);
+  return BADGES.filter(b => b.test(stats));
+}
+
+function renderBadgesCard(ranked) {
+  const grid = document.getElementById('badges-grid');
+  const index = ranked.findIndex(r => r.key === viewerId());
+  const me = ranked[index] || { books: [] };
+  const earned = new Set(earnedBadges(me, index + 1).map(b => b.id));
+
+  document.getElementById('badges-count').textContent = `${earned.size}/${BADGES.length}`;
+  grid.replaceChildren(...BADGES.map(b => el('div', { class: `badge-item${earned.has(b.id) ? ' earned' : ''}` }, [
+    el('span', { class: 'badge-icon' }, [icon(b.icon)]),
+    el('span', { class: 'badge-text' }, [
+      el('span', { class: 'badge-name', text: b.name }),
+      el('span', { class: 'badge-desc', text: b.desc }),
+    ]),
+  ])));
+}
+
+/* ----------------- Powiadomienia push ----------------- */
+const VAPID_PUBLIC_KEY = 'BC2BNMw365Oow8fd946d5rJ9UlfCIpq0LeMSC8PdS4RuMGWeFh_GoZE4sM54H3haR6VGu58zO_h7ziZ-t7xRXoE';
+
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+function isIos() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+function base64UrlToUint8Array(base64Url) {
+  const base64 = (base64Url + '='.repeat((4 - (base64Url.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+}
+
+async function currentPushSubscription() {
+  if (!pushSupported()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+async function savePushSubscription(sub) {
+  const { endpoint, keys } = sub.toJSON();
+  const { error } = await supabaseClient.rpc('save_push_subscription', { p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth });
+  if (error) throw error;
+}
+
+async function refreshNotifyCard() {
+  const text = document.getElementById('notify-text');
+  const btn = document.getElementById('notify-btn');
+  const label = document.getElementById('notify-btn-label');
+  btn.hidden = true;
+
+  if (!pushSupported()) {
+    text.textContent = isIos() && !isStandalone()
+      ? 'Na iPhonie: dodaj Czytanko do ekranu początkowego (Udostępnij → Do ekranu początkowego) i otwórz z ikony. Wtedy da się tu włączyć powiadomienia.'
+      : 'Ta przeglądarka nie obsługuje powiadomień.';
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    text.textContent = 'Powiadomienia są zablokowane w ustawieniach przeglądarki lub telefonu dla tej strony.';
+    return;
+  }
+
+  const sub = await currentPushSubscription();
+  text.textContent = sub
+    ? 'Włączone na tym urządzeniu. Dostaniesz powiadomienie, gdy ktoś doda książkę albo cię wyprzedzi.'
+    : 'Dostaniesz powiadomienie, gdy ktoś doda książkę albo cię wyprzedzi.';
+  label.textContent = sub ? 'Wyłącz powiadomienia' : 'Włącz powiadomienia';
+  btn.dataset.state = sub ? 'on' : 'off';
+  btn.hidden = false;
+}
+
+async function enablePush() {
+  const permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    await refreshNotifyCard();
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription()
+    || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToUint8Array(VAPID_PUBLIC_KEY) });
+  await savePushSubscription(sub);
+  showToast('Powiadomienia włączone.');
+}
+
+async function disablePush({ quiet = false } = {}) {
+  try {
+    const sub = await currentPushSubscription();
+    if (!sub) return;
+    await supabaseClient.rpc('delete_push_subscription', { p_endpoint: sub.endpoint });
+    await sub.unsubscribe();
+    if (!quiet) showToast('Powiadomienia wyłączone.');
+  } catch (err) {
+    console.error('Error disabling push:', err);
+  }
+}
+
+async function handleNotifyToggle() {
+  const btn = document.getElementById('notify-btn');
+  btn.disabled = true;
+  try {
+    if (btn.dataset.state === 'on') await disablePush();
+    else await enablePush();
+  } catch (err) {
+    console.error('Error toggling push:', err);
+    showToast('Nie udało się zmienić powiadomień: ' + friendlyError(err));
+  } finally {
+    btn.disabled = false;
+    await refreshNotifyCard();
+  }
+}
+
+// Po zalogowaniu: jeśli to urządzenie ma już subskrypcję, przypisz ją do aktualnego konta
+async function syncPushSubscription() {
+  try {
+    const sub = await currentPushSubscription();
+    if (sub) await savePushSubscription(sub);
+  } catch (err) {
+    console.error('Error syncing push subscription:', err);
+  }
+  await refreshNotifyCard();
+}
+
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
@@ -1248,6 +1462,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
   document.getElementById('multiplier-add-form').addEventListener('submit', handleMultiplierAdd);
   document.getElementById('race-play').addEventListener('click', playRace);
+  document.getElementById('notify-btn').addEventListener('click', handleNotifyToggle);
+  document.getElementById('view-as-btn').addEventListener('click', handleViewAs);
+  document.getElementById('view-as-exit').addEventListener('click', () => setViewAs(null));
 
   document.querySelectorAll('.current-year').forEach(span => { span.textContent = currentYear(); });
 
@@ -1289,6 +1506,7 @@ window.addEventListener('DOMContentLoaded', () => {
         loadMultipliers();
         loadProfile();
         loadReads();
+        syncPushSubscription();
       }, 0);
     }
   });

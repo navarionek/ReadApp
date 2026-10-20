@@ -1,5 +1,5 @@
 // Podbij wersję przy zmianie listy ASSETS; zwykłe deploye i tak łapie network-first
-const CACHE_NAME = 'czytanko-v10';
+const CACHE_NAME = 'czytanko-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -58,4 +58,38 @@ self.addEventListener('fetch', event => {
       })
       .catch(() => caches.match(cacheKey))
   );
+});
+
+// Powiadomienia push (wysyła je funkcja notify-new-read)
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(self.registration.showNotification(data.title || 'Czytanko', {
+    body: data.body || '',
+    icon: './icon-192x192.png',
+    badge: './icon-192x192.png',
+    tag: data.tag,
+    data: { url: data.url || './' },
+  }));
+});
+
+// Kliknięcie w powiadomienie: otwórz apkę (albo przełącz na już otwartą) na właściwym ekranie
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || './', self.location).href;
+  event.waitUntil((async () => {
+    const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      if (new URL(client.url).origin === self.location.origin) {
+        await client.focus();
+        if ('navigate' in client) await client.navigate(url).catch(() => {});
+        return;
+      }
+    }
+    await clients.openWindow(url);
+  })());
 });

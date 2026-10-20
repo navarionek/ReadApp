@@ -68,6 +68,13 @@
       </a>
     </nav>
 
+    <!-- Podgląd aplikacji jako inna osoba (tylko admin) -->
+    <div id="view-as-banner" class="view-as-banner" role="status" hidden>
+      <i data-lucide="eye"></i>
+      <span>Podgląd jako <strong id="view-as-name"></strong></span>
+      <button type="button" id="view-as-exit" class="btn btn-outline btn-sm">Wróć do siebie</button>
+    </div>
+
     <!-- Login modal -->
     <div id="login-modal" class="modal" hidden>
       <div class="modal-content">
@@ -125,10 +132,33 @@
           <dl id="goal-facts" class="goal-facts"></dl>
         </div>
 
-        <a href="#dodaj" class="btn btn-primary btn-block btn-lg">
+        <a href="#dodaj" class="btn btn-primary btn-block btn-lg start-cta">
           <i data-lucide="circle-plus"></i>
           <span>Dodaj przeczytane strony</span>
         </a>
+
+        <!-- Odznaki (liczone z wpisów bieżącego roku) -->
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="medal" class="card-icon"></i>
+            <h2>Twoje odznaki</h2>
+            <span id="badges-count" class="badges-count"></span>
+          </div>
+          <div id="badges-grid" class="badges-grid"></div>
+        </div>
+
+        <!-- Powiadomienia push -->
+        <div class="card notify-card">
+          <div class="card-header">
+            <i data-lucide="bell" class="card-icon"></i>
+            <h2>Powiadomienia</h2>
+          </div>
+          <p id="notify-text" class="card-intro"></p>
+          <button type="button" id="notify-btn" class="btn btn-outline btn-block" hidden>
+            <i data-lucide="bell-ring"></i>
+            <span id="notify-btn-label">Włącz powiadomienia</span>
+          </button>
+        </div>
       </section>
 
       <!-- Ekran: Dodaj / edytuj wpis -->
@@ -256,6 +286,18 @@
 
       <!-- Ekran: Admin -->
       <section class="screen" data-screen="admin" hidden>
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="eye" class="card-icon"></i>
+            <h2>Podgląd jako</h2>
+          </div>
+          <p class="card-intro">Zobacz Start, odznaki i plan tak, jak widzi je wybrana osoba. Tylko podgląd: dodawanie i edycja dalej działają na twoim koncie.</p>
+          <div class="view-as-row">
+            <select id="view-as-select" class="plain-input" aria-label="Osoba do podglądu"></select>
+            <button type="button" id="view-as-btn" class="btn btn-primary">Pokaż</button>
+          </div>
+        </div>
+
         <form id="prize-form" class="card">
           <div class="card-header">
             <i data-lucide="gift" class="card-icon"></i>
