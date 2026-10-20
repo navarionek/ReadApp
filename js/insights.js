@@ -52,12 +52,6 @@ function renderPace(readers, colors) {
 }
 
 /* ----- 2. Rekordy ----- */
-function mondayOf(date) {
-  const d = new Date(date);
-  const back = (d.getDay() + 6) % 7;  // poniedziałek = 0
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - back);
-}
-
 function bestBucket(rows, keyOf) {
   const sums = new Map();
   rows.forEach(r => {
@@ -103,14 +97,59 @@ function renderRecords(readers, rows) {
     const top = rows.reduce((best, b) => (bookPoints(b) > bookPoints(best) ? b : best));
     items.push(record('gem', 'Najwięcej punktów za książkę', top.title || 'bez tytułu', `${who(top.user_id)} · ${bookPoints(top)} pkt`));
 
-    const week = bestBucket(rows, d => mondayOf(d).getTime());
-    if (week) {
-      const monday = new Date(Number(week.bucket));
-      items.push(record('calendar-days', 'Najlepszy tydzień', `${week.points} pkt`, `${who(week.userId)} · od ${monday.getDate()} ${MONTH_NAMES[monday.getMonth()].slice(0, 3)}`));
-    }
     const month = bestBucket(rows, d => d.getMonth());
     if (month) {
       items.push(record('calendar', 'Najlepszy miesiąc', `${month.points} pkt`, `${who(month.userId)} · ${MONTH_NAMES[Number(month.bucket)]}`));
+    }
+
+    // Najwięcej książek w jednym miesiącu (jedna osoba)
+    const counts = new Map();
+    rows.forEach(r => {
+      const key = `${r.user_id}|${new Date(r.created_at).getMonth()}`;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    });
+    let busiest = null;
+    counts.forEach((n, key) => { if (!busiest || n > busiest.n) busiest = { n, key }; });
+    if (busiest && busiest.n > 1) {
+      const [userId, m] = busiest.key.split('|');
+      items.push(record('library', 'Najwięcej książek w miesiącu', `${busiest.n} ${plural(busiest.n, 'książka', 'książki', 'książek')}`, `${who(userId)} · ${MONTH_NAMES[Number(m)]}`));
+    }
+
+    const finished = rows.filter(r => !r.unfinished);
+    if (finished.length) {
+      const shortest = finished.reduce((best, b) => (b.pages < best.pages ? b : best));
+      items.push(record('feather', 'Najkrótsza książka', shortest.title || 'bez tytułu', `${who(shortest.user_id)} · ${shortest.pages} str.`));
+    }
+
+    const longestTitle = rows.reduce((best, b) => ((b.title || '').length > (best.title || '').length ? b : best));
+    if ((longestTitle.title || '').length > 0) {
+      items.push(record('type', 'Najdłuższy tytuł', longestTitle.title, `${who(longestTitle.user_id)} · ${longestTitle.title.length} ${plural(longestTitle.title.length, 'znak', 'znaki', 'znaków')}`));
+    }
+
+    const boosted = rows.reduce((best, b) => (Number(b.multiplier) > Number(best.multiplier) ? b : best));
+    if (Number(boosted.multiplier) > 1) {
+      items.push(record('sparkles', 'Najwyższy mnożnik', `${String(Number(boosted.multiplier)).replace('.', ',')}x`, `${who(boosted.user_id)} · ${boosted.title || 'bez tytułu'}`));
+    }
+
+    // Najdłuższa przerwa między dwoma kolejnymi wpisami jednej osoby
+    let gap = null;
+    readers.forEach(r => {
+      const times = r.books.map(b => new Date(b.created_at).getTime()).sort((a, b) => a - b);
+      for (let i = 1; i < times.length; i++) {
+        const days = Math.round((times[i] - times[i - 1]) / DAY_MS);
+        if (!gap || days > gap.days) gap = { days, userId: r.key, from: new Date(times[i - 1]), to: new Date(times[i]) };
+      }
+    });
+    if (gap && gap.days > 0) {
+      const label = d => `${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)}`;
+      items.push(record('moon', 'Najdłuższa przerwa', `${gap.days} ${plural(gap.days, 'dzień', 'dni', 'dni')}`, `${who(gap.userId)} · ${label(gap.from)} – ${label(gap.to)}`));
+    }
+
+    // Rok wydania znamy tylko dla książek z uzupełnionymi informacjami o książce
+    const dated = rows.filter(r => r.published_year != null);
+    if (dated.length) {
+      const oldest = dated.reduce((best, b) => (b.published_year < best.published_year ? b : best));
+      items.push(record('landmark', 'Najstarsza książka', oldest.title || 'bez tytułu', `${who(oldest.user_id)} · wydana ${oldest.published_year}`));
     }
   }
 
