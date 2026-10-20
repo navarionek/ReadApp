@@ -136,12 +136,14 @@ export function applyFinishDefault() {
 export function updateFormUI() {
   const isEditing = !!state.editingId;
   const started = state.entryMode === 'started' && !isEditing;
-  const canPick = !isEditing && !started && myReadingNow().length > 0;
+  const queueing = state.entryMode === 'queue' && !isEditing;
+  const slim = started || queueing;  // bez stron, mnożników i „niedokończona”
+  const canPick = !isEditing && !slim && myReadingNow().length > 0;
 
   document.getElementById('form-title').textContent =
-    isEditing ? 'Edytuj wpis' : started ? 'Zaczynam czytać' : 'Dodaj postęp';
+    isEditing ? 'Edytuj wpis' : started ? 'Zaczynam czytać' : queueing ? 'Do przeczytania' : 'Dodaj postęp';
   document.getElementById('submit-label').textContent =
-    isEditing ? 'Zapisz zmiany' : started ? 'Zacznij czytać' : state.finishing ? 'Dodaj skończoną książkę' : 'Dodaj wpis';
+    isEditing ? 'Zapisz zmiany' : started ? 'Zacznij czytać' : queueing ? 'Dodaj do kolejki' : state.finishing ? 'Dodaj skończoną książkę' : 'Dodaj wpis';
 
   document.getElementById('mode-toggle').hidden = isEditing;
   document.querySelectorAll('.mode-btn').forEach(btn => {
@@ -153,15 +155,15 @@ export function updateFormUI() {
   document.getElementById('finish-pick-group').hidden = !canPick;
   if (canPick) renderFinishPick();
   // Tytuł bierze się z wybranej zaczętej książki, więc pole jest wtedy schowane
-  document.getElementById('title-group').hidden = !!state.finishing && !started;
+  document.getElementById('title-group').hidden = !!state.finishing && !slim;
   document.getElementById('started-group').hidden = !started;
-  document.getElementById('pages-group').hidden = started;
-  document.getElementById('multiplier-group').hidden = started;
-  document.getElementById('unfinished-group').hidden = started;
-  document.getElementById('pages').required = !started;
+  document.getElementById('pages-group').hidden = slim;
+  document.getElementById('multiplier-group').hidden = slim;
+  document.getElementById('unfinished-group').hidden = slim;
+  document.getElementById('pages').required = !slim;
 
   const note = document.getElementById('finishing-note');
-  note.hidden = !state.finishing || started;
+  note.hidden = !state.finishing || slim;
   if (state.finishing) {
     const days = daysSince(state.finishing.startedAt);
     note.textContent = `Zaczęte ${formatDay(new Date(state.finishing.startedAt))} (${days} ${days === 1 ? 'dzień' : 'dni'} temu). Wpisz liczbę stron.`;
@@ -172,7 +174,7 @@ export function updateFormUI() {
 
 export function setEntryMode(mode) {
   state.entryMode = mode;
-  if (mode === 'started') {
+  if (mode === 'started' || mode === 'queue') {
     // Nowa zaczęta książka: zaczynamy od pustego tytułu; po powrocie znowu podpowiemy zaczętą
     selectFinishing(null);
     state.finishPickedNew = false;
@@ -317,6 +319,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const pages = parseInt(document.getElementById('pages').value, 10);
   const multiplier = readMultiplier();
   const startingNow = state.entryMode === 'started' && !state.editingId && !state.finishing;
+  const queueing = state.entryMode === 'queue' && !state.editingId;
 
   if (!title) {
     showError('Podaj tytuł książki.');
@@ -324,7 +327,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   }
 
   // Przysięga tylko przy dodawaniu skończonej książki (nie przy edycji ani „Zaczynam czytać”)
-  if (!startingNow && !state.editingId && needsOath() && !await askOath()) return;
+  if (!startingNow && !queueing && !state.editingId && needsOath() && !await askOath()) return;
 
   // Data rozpoczęcia: dziś = teraz, wcześniejszy dzień = jego południe (bez kłopotów ze strefą)
   let startedAt = null;
@@ -342,6 +345,17 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   submitBtn.disabled = true;
   submitLabel.textContent = 'Zapisywanie…';
   try {
+    if (queueing) {
+      // „Do przeczytania”: tylko tytuł i autor; zostajemy w formularzu, żeby dało się dodać kolejne
+      const { error } = await supabaseClient.from('reading_queue').insert({ title, author: author || null });
+      if (error) throw error;
+      document.getElementById('title').value = '';
+      document.getElementById('author').value = '';
+      showToast('Dodano do kolejki.');
+      document.getElementById('title').focus({ preventScroll: true });
+      return;
+    }
+
     if (startingNow) {
       const { error } = await supabaseClient.from('reading_now').insert({ title, started_at: startedAt, author: author || null });
       if (error) throw error;

@@ -203,30 +203,6 @@ export async function loadShelfPeople() {
 }
 
 /* ----------------- Do przeczytania (kolejka) ----------------- */
-// Formularz dodawania do własnej kolejki: tytuł + opcjonalnie autor
-function queueForm() {
-  const title = el('input', { type: 'text', class: 'plain-input', maxlength: '300', required: '', placeholder: 'Tytuł książki', 'aria-label': 'Tytuł książki do kolejki', autocomplete: 'off' });
-  const author = el('input', { type: 'text', class: 'plain-input', maxlength: '200', placeholder: 'Autor (opcjonalnie)', 'aria-label': 'Autor', autocomplete: 'off' });
-  const add = el('button', { type: 'submit', class: 'btn btn-primary' }, [icon('plus'), el('span', { text: 'Dodaj' })]);
-  const form = el('form', { class: 'queue-form' }, [title, author, add]);
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    const values = { title: title.value.trim(), author: author.value.trim().slice(0, 200) || null };
-    if (!values.title) return;
-    add.disabled = true;
-    const { error } = await supabaseClient.from('reading_queue').insert(values);
-    add.disabled = false;
-    if (error) {
-      showToast('Nie udało się dodać: ' + friendlyError(error));
-      return;
-    }
-    showToast('Dodano do kolejki.');
-    shelfSignature = null;
-    await loadShelf();
-  });
-  return form;
-}
-
 // Uzupełnianie okładek książek w kolejce (patrz enrichBooks)
 async function fillMissingQueueInfo(userId) {
   await enrichBooks('reading_queue', state.shelfQueue, items => {
@@ -402,13 +378,12 @@ export function renderShelf() {
     const nq = state.shelfQueue.length;
     sections.push(el('section', { class: 'shelf-section queue-section' }, [
       el('h3', { class: 'shelf-year' }, [document.createTextNode('Do przeczytania'), ...(nq ? [el('span', { class: 'shelf-year-count', text: ` · ${nq}` })] : [])]),
-      ...(isOwn ? [queueForm()] : []),
       ...(nq
         ? [el('div', { class: 'shelf-grid' }, state.shelfQueue.map(item => bookTile(
             { title: item.title, author: item.author, cover_url: item.cover_url },
             () => openQueueModal(item),
           )))]
-        : [el('p', { class: 'hint', text: 'Wrzuć tu książki, które chcesz przeczytać. Znajomi będą mogli je podejrzeć.' })]),
+        : [el('p', { class: 'hint', text: 'Dodasz je na ekranie „Dodaj” (zakładka „Do przeczytania”). Znajomi będą mogli je podejrzeć.' })]),
     ]));
   }
 
