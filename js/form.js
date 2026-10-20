@@ -421,7 +421,7 @@ function askEssay(bookTitle) {
       el('div', { class: 'modal-content essay-content' }, [
         el('div', { class: 'modal-icon' }, [icon('pen-line')]),
         el('h2', { id: 'essay-title', class: 'modal-title', text: 'Referat, Krystian!' }),
-        el('p', { text: `Angielski i naukowa naraz? Napisz referat o „${bookTitle}” (min. ${ESSAY_MIN} znaków). Jak Ci się nie chce, możesz pominąć. To tylko dla beki.` }),
+        el('p', { text: `Angielski i naukowa naraz? Napisz referat o „${bookTitle}” (min. ${ESSAY_MIN} znaków).` }),
         area,
         counter,
         el('div', { class: 'oath-actions essay-actions' }, [cancel, skip, ok]),
