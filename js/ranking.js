@@ -9,7 +9,7 @@ import { currentYear, el, icon, refreshIcons, showToast } from './ui.js';
 /* ----------------- Ranking: podium i paski „książka po książce” ----------------- */
 const PODIUM_ORDER = [1, 0, 2];  // układ na ekranie: 2. miejsce, 1., 3.
 const MEDALS = ['gold', 'silver', 'bronze'];
-const STEP_MS = 380;             // odstęp między wejściem kolejnych miejsc na podium
+const STEP_MS = 180;             // odstęp między wejściem kolejnych miejsc na podium
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const firstName = name => (name || '?').split(' ')[0];
@@ -175,11 +175,11 @@ export function playRankingIntro() {
 
   viz.classList.add('intro');
   const hasPodium = !!viz.querySelector('.podium');
-  const barsStart = hasPodium ? 3 * STEP_MS + 350 : 150;
+  const barsStart = hasPodium ? 3 * STEP_MS + 150 : 100;
 
   // Paski: po kolei od lidera
   fills.forEach((f, i) => {
-    f.style.transition = `width 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) ${barsStart + i * 170}ms`;
+    f.style.transition = `width 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) ${barsStart + i * 90}ms`;
     f.style.width = `${f.dataset.width}%`;
   });
   viz.style.setProperty('--bars-start', `${barsStart}ms`);
@@ -188,16 +188,16 @@ export function playRankingIntro() {
   viz.querySelectorAll('.podium-place').forEach(place => {
     const rank = Number(place.style.getPropertyValue('--rank'));
     const pts = place.querySelector('.podium-points');
-    countUp(pts, Number(pts.dataset.count), rank * STEP_MS + 450, 900);
+    countUp(pts, Number(pts.dataset.count), rank * STEP_MS + 250, 600);
   });
   viz.querySelectorAll('.rank-total').forEach((node, i) => {
-    countUp(node, Number(node.dataset.count), barsStart + i * 170, 1100);
+    countUp(node, Number(node.dataset.count), barsStart + i * 90, 700);
   });
 
   // Wodotrysk dla lidera (gdy to ja jestem pierwszy): z awatara na szczycie podium,
   // krótki i tylko co 3. wejście w ranking jako lider
   if (viewerIsFirst && everyThirdLeaderVisit()) {
-    const delay = hasPodium ? 450 + 350 : 200;
+    const delay = hasPodium ? 450 : 150;
     setTimeout(() => {
       if (currentScreen() !== 'ranking') return;
       const target = viz.querySelector('.podium-gold .rank-avatar') || viz.querySelector('.rank-row.leader');
