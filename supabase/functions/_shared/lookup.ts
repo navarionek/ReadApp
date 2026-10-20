@@ -31,12 +31,13 @@ async function google(q: string, limit: number): Promise<Result[] | null> {
     return null;
   }
   const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=${limit}&printType=books&key=${key}`;
-  // Google Books często odpowiada chwilowym 503/429: ponawiamy z rosnącą przerwą
+  // Google Books czasem odpowiada chwilowym 503/500: ponawiamy z rosnącą przerwą. 429 to wyczerpany limit,
+  // ponawianie niczego nie da, a zjada kolejne zapytania z limitu, więc przy 429 odpuszczamy od razu
   let res: Response | null = null;
   for (const wait of [0, 400, 1200]) {
     if (wait) await new Promise(r => setTimeout(r, wait));
     res = await fetch(url);
-    if (res.ok || (res.status !== 503 && res.status !== 429 && res.status !== 500)) break;
+    if (res.ok || (res.status !== 503 && res.status !== 500)) break;
   }
   if (!res || !res.ok) {
     console.error('google books', res?.status);
@@ -83,12 +84,15 @@ async function openLibrary(q: string, limit: number): Promise<Result[]> {
 
 // google = true tylko gdy Google naprawdę odpowiedział, inaczej „nie znaleziono” nie jest pewne
 export async function searchBooks(q: string, limit: number): Promise<{ results: Result[]; google: boolean; googleProblem: string | null }> {
-  // Google: dokładny tytuł + zwykłe wyszukiwanie (każde łapie co innego), Open Library jako uzupełnienie
-  const [gExact, gPlain, o] = await Promise.all([
-    google(`intitle:"${q.replace(/"/g, '')}"`, limit),
-    google(q, limit),
-    openLibrary(q, limit),
-  ]);
+  // Google ma niewielki dzienny limit zapytań, więc oszczędzamy: najpierw dokładny tytuł, a zwykłe wyszukiwanie
+  // (łapie inne wydania) tylko gdy dokładne nic pasującego nie dało i Google nie jest wyczerpany (429).
+  // Open Library idzie równolegle jako uzupełnienie.
+  const openLibraryResults = openLibrary(q, limit);
+  const gExact = await google(`intitle:"${q.replace(/"/g, '')}"`, limit);
+  const exactMatched = !!gExact?.some(r => titleMatches(q, r.title));
+  const quotaOut = gExact === null && googleProblem === 'http 429';
+  const gPlain = exactMatched || quotaOut ? null : await google(q, limit);
+  const o = await openLibraryResults;
 
   // Bez duplikatów (ten sam tytuł + okładka), najpierw pasujące tytułem, potem z okładką
   const seen = new Set<string>();

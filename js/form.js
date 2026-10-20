@@ -387,6 +387,58 @@ function askOath() {
   });
 }
 
+// Wariant drugi tego samego żartu: referat na 1000 znaków o przeczytanej książce.
+// Można go pominąć („dla beki”), więc nie blokuje dodania książki.
+const ESSAY_MIN = 1000;
+
+function askEssay(bookTitle) {
+  return new Promise(resolve => {
+    const area = el('textarea', { class: 'essay-text', rows: '8', 'aria-label': 'Referat', placeholder: 'Rozwinięcie, wnioski, ulubiony cytat…' });
+    const counter = el('span', { class: 'essay-counter', text: `0 / ${ESSAY_MIN}` });
+    const ok = el('button', { type: 'button', class: 'btn btn-primary', text: 'Dodaj książkę' });
+    const skip = el('button', { type: 'button', class: 'btn btn-outline', text: 'Dodaj bez referatu' });
+    const cancel = el('button', { type: 'button', class: 'btn btn-outline', text: 'Jednak nie' });
+    ok.disabled = true;
+
+    area.addEventListener('input', () => {
+      const n = area.value.trim().length;
+      counter.textContent = `${n} / ${ESSAY_MIN}`;
+      counter.classList.toggle('done', n >= ESSAY_MIN);
+      ok.disabled = n < ESSAY_MIN;
+    });
+
+    const finish = answer => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(answer);
+    };
+    const onKey = e => { if (e.key === 'Escape') finish(false); };
+    ok.addEventListener('click', () => finish(true));
+    skip.addEventListener('click', () => finish(true));  // pominięcie też dodaje książkę, to tylko żart
+    cancel.addEventListener('click', () => finish(false));
+
+    const overlay = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'essay-title' }, [
+      el('div', { class: 'modal-content essay-content' }, [
+        el('div', { class: 'modal-icon' }, [icon('pen-line')]),
+        el('h2', { id: 'essay-title', class: 'modal-title', text: 'Referat, Krystian!' }),
+        el('p', { text: `Angielski i naukowa naraz? Napisz referat o „${bookTitle}” (min. ${ESSAY_MIN} znaków). Jak Ci się nie chce, możesz pominąć. To tylko dla beki.` }),
+        area,
+        counter,
+        el('div', { class: 'oath-actions essay-actions' }, [cancel, skip, ok]),
+      ]),
+    ]);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    refreshIcons();
+    area.focus();
+  });
+}
+
+// Losowo: przysięga albo referat
+function askKrystian(bookTitle) {
+  return Math.random() < 0.5 ? askOath() : askEssay(bookTitle);
+}
+
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
   hideError();
@@ -411,7 +463,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   }
 
   // Przysięga tylko przy dodawaniu skończonej książki (nie przy edycji ani „Zaczynam czytać”)
-  if (!startingNow && !queueing && !state.editingId && needsOath() && !await askOath()) return;
+  if (!startingNow && !queueing && !state.editingId && needsOath() && !await askKrystian(title)) return;
 
   // Data rozpoczęcia: dziś = teraz, wcześniejszy dzień = jego południe (bez kłopotów ze strefą)
   let startedAt = null;

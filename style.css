@@ -2456,3 +2456,39 @@ img.rank-avatar {
   overflow: hidden;
   border-radius: 999px;
 }
+
+/* Referat Krystiana */
+.essay-content {
+  max-width: 32rem;
+}
+
+.essay-text {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  resize: vertical;
+}
+
+.essay-counter {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.essay-counter.done {
+  color: #1baf7a;
+  font-weight: 700;
+}
+
+.essay-actions {
+  flex-wrap: wrap;
+}
