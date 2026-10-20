@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192x192.png">
   <link rel="apple-touch-icon" href="icon-192x192.png">
@@ -40,43 +40,29 @@
       </div>
     </header>
 
-    <!-- Stats Bar -->
-    <section id="stats-bar" class="stats-grid" hidden>
-      <div class="stat-card">
-        <div class="stat-icon"><i data-lucide="book-open"></i></div>
-        <div class="stat-info">
-          <span class="stat-label">Twoje punkty</span>
-          <span id="stat-total-points" class="stat-value">0</span>
-        </div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-icon"><i data-lucide="trophy"></i></div>
-        <div class="stat-info">
-          <span class="stat-label">Ranking</span>
-          <span id="stat-rank" class="stat-value">#--</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Nagroda roku (ustawia admin) -->
-    <section id="prize-banner" class="prize-banner" hidden>
-      <div class="stat-icon"><i data-lucide="gift"></i></div>
-      <div class="prize-info">
-        <span class="stat-label">Nagroda <span class="current-year"></span></span>
-        <span id="prize-text" class="prize-text"></span>
-        <span id="prize-participants" class="prize-participants" hidden></span>
-      </div>
-    </section>
-
-    <!-- Ile trzeba czytać, żeby wygrać -->
-    <section id="goal-card" class="goal-card" hidden>
-      <div class="stat-icon"><i data-lucide="target"></i></div>
-      <div class="goal-info">
-        <span class="stat-label">Plan na 1. miejsce w <span class="current-year"></span></span>
-        <span id="goal-headline" class="goal-headline"></span>
-        <span id="goal-details" class="goal-details"></span>
-      </div>
-    </section>
+    <!-- Menu: na komputerze zakładki pod nagłówkiem, na telefonie pasek na dole -->
+    <nav id="app-nav" class="app-nav" aria-label="Menu" hidden>
+      <a href="#start" class="nav-item" data-screen="start">
+        <i data-lucide="house"></i>
+        <span>Start</span>
+      </a>
+      <a href="#dodaj" class="nav-item" data-screen="dodaj">
+        <i data-lucide="circle-plus"></i>
+        <span>Dodaj</span>
+      </a>
+      <a href="#ranking" class="nav-item" data-screen="ranking">
+        <i data-lucide="trophy"></i>
+        <span>Ranking</span>
+      </a>
+      <a href="#postepy" class="nav-item" data-screen="postepy">
+        <i data-lucide="library-big"></i>
+        <span>Postępy</span>
+      </a>
+      <a href="#admin" id="nav-admin" class="nav-item" data-screen="admin" hidden>
+        <i data-lucide="shield-check"></i>
+        <span>Admin</span>
+      </a>
+    </nav>
 
     <!-- Login modal -->
     <div id="login-modal" class="modal" hidden>
@@ -91,96 +77,108 @@
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <!-- Left Column: Form -->
-      <div class="form-column">
-        <section id="form-section" hidden>
-          <form id="read-form" class="card">
-            <div class="card-header">
-              <i data-lucide="circle-plus" class="card-icon"></i>
-              <h2 id="form-title">Dodaj postęp</h2>
+    <div id="app-screens" hidden>
+      <!-- Ekran: Start -->
+      <section class="screen" data-screen="start">
+        <div id="stats-bar" class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon"><i data-lucide="book-open"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Twoje punkty</span>
+              <span id="stat-total-points" class="stat-value">0</span>
             </div>
-            <div class="form-group">
-              <label for="title">Tytuł książki</label>
-              <div class="input-wrapper">
-                <i data-lucide="book" class="input-icon"></i>
-                <input type="text" id="title" placeholder="Co przeczytałeś?" maxlength="300" required />
-              </div>
+          </div>
+          <a href="#ranking" class="stat-card stat-link">
+            <div class="stat-icon"><i data-lucide="trophy"></i></div>
+            <div class="stat-info">
+              <span class="stat-label">Ranking</span>
+              <span id="stat-rank" class="stat-value">#--</span>
             </div>
-            <div class="form-group">
-              <label for="pages">Liczba stron</label>
-              <div class="input-wrapper">
-                <i data-lucide="layers" class="input-icon"></i>
-                <input type="number" id="pages" min="1" max="5000" required />
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Mnożnik</label>
-              <div id="multiplier-container" class="multiplier-grid">
-                <label class="checkbox-label">
-                  <input type="checkbox" class="multiplier-checkbox" value="1.5">
-                  <span class="check-text">1.5x Angielski</span>
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" class="multiplier-checkbox" value="1.5">
-                  <span class="check-text">1.5x Naukowa</span>
-                </label>
-                <label class="checkbox-label">
-                  <input type="checkbox" class="multiplier-checkbox" value="0.5">
-                  <span class="check-text">0.5x Obrazkowa</span>
-                </label>
-              </div>
-            </div>
-            <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">
-              <i data-lucide="send"></i>
-              <span id="submit-label">Dodaj wpis</span>
-            </button>
-            <button type="button" id="cancel-edit-btn" class="btn btn-outline btn-block cancel-btn" hidden>
-              <i data-lucide="x"></i>
-              <span>Anuluj edycję</span>
-            </button>
-            <div id="error-message" class="error-msg" hidden></div>
-          </form>
-        </section>
+          </a>
+        </div>
 
-        <!-- Panel admina: nagroda roku -->
-        <section id="admin-section" hidden>
-          <form id="prize-form" class="card">
-            <div class="card-header">
-              <i data-lucide="shield-check" class="card-icon"></i>
-              <h2>Panel admina</h2>
-            </div>
-            <div class="form-group">
-              <label for="prize-year">Rok</label>
-              <input type="number" id="prize-year" class="plain-input" min="2000" max="2100" required />
-            </div>
-            <div class="form-group">
-              <label for="prize-description">Nagroda</label>
-              <textarea id="prize-description" class="plain-input" rows="3" maxlength="500" placeholder="Np. kolacja stawiana przez resztę"></textarea>
-              <small class="hint">Puste pole usuwa nagrodę na ten rok.</small>
-            </div>
-            <button type="submit" id="prize-submit-btn" class="btn btn-primary btn-block">
-              <i data-lucide="save"></i>
-              <span>Zapisz nagrodę</span>
-            </button>
-            <div id="prize-message" class="form-msg" hidden></div>
+        <!-- Nagroda roku (ustawia admin) -->
+        <div id="prize-banner" class="prize-banner" hidden>
+          <div class="stat-icon"><i data-lucide="gift"></i></div>
+          <div class="prize-info">
+            <span class="stat-label">Nagroda <span class="current-year"></span></span>
+            <span id="prize-text" class="prize-text"></span>
+            <span id="prize-participants" class="prize-participants" hidden></span>
+          </div>
+        </div>
 
-            <div class="admin-subsection">
-              <h3 class="admin-subtitle">Nagroda pieniężna: kto bierze udział</h3>
-              <div id="money-prize-list" class="participants-list"></div>
-              <small class="hint">Zmiana zapisuje się od razu.</small>
-              <div id="money-prize-message" class="form-msg" hidden></div>
-            </div>
-          </form>
-        </section>
-      </div>
+        <!-- Ile trzeba czytać, żeby wygrać -->
+        <div id="goal-card" class="goal-card" hidden>
+          <div class="stat-icon"><i data-lucide="target"></i></div>
+          <div class="goal-info">
+            <span class="stat-label">Plan na 1. miejsce w <span class="current-year"></span></span>
+            <span id="goal-headline" class="goal-headline"></span>
+            <span id="goal-details" class="goal-details"></span>
+          </div>
+        </div>
 
-      <!-- Right Column: Leaderboard & Progress -->
-      <div class="info-column">
-        <section id="leaderboard-section" class="card" hidden>
+        <a href="#dodaj" class="btn btn-primary btn-block btn-lg">
+          <i data-lucide="circle-plus"></i>
+          <span>Dodaj przeczytane strony</span>
+        </a>
+      </section>
+
+      <!-- Ekran: Dodaj / edytuj wpis -->
+      <section class="screen" data-screen="dodaj" hidden>
+        <form id="read-form" class="card">
+          <div class="card-header">
+            <i data-lucide="circle-plus" class="card-icon"></i>
+            <h2 id="form-title">Dodaj postęp</h2>
+          </div>
+          <div class="form-group">
+            <label for="title">Tytuł książki</label>
+            <div class="input-wrapper">
+              <i data-lucide="book" class="input-icon"></i>
+              <input type="text" id="title" placeholder="Co przeczytałeś?" maxlength="300" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="pages">Liczba stron</label>
+            <div class="input-wrapper">
+              <i data-lucide="layers" class="input-icon"></i>
+              <input type="number" id="pages" min="1" max="5000" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Mnożnik</label>
+            <div id="multiplier-container" class="multiplier-grid">
+              <label class="checkbox-label">
+                <input type="checkbox" class="multiplier-checkbox" value="1.5">
+                <span class="check-text">1.5x Angielski</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="multiplier-checkbox" value="1.5">
+                <span class="check-text">1.5x Naukowa</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" class="multiplier-checkbox" value="0.5">
+                <span class="check-text">0.5x Obrazkowa</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">
+            <i data-lucide="send"></i>
+            <span id="submit-label">Dodaj wpis</span>
+          </button>
+          <button type="button" id="cancel-edit-btn" class="btn btn-outline btn-block cancel-btn" hidden>
+            <i data-lucide="x"></i>
+            <span>Anuluj edycję</span>
+          </button>
+          <div id="error-message" class="error-msg" hidden></div>
+        </form>
+      </section>
+
+      <!-- Ekran: Ranking -->
+      <section class="screen" data-screen="ranking" hidden>
+        <div class="card">
           <div class="card-header">
             <i data-lucide="award" class="card-icon"></i>
-            <h2>Leaderboard <span class="current-year"></span></h2>
+            <h2>Ranking <span class="current-year"></span></h2>
           </div>
           <div class="table-container">
             <table id="leaderboard">
@@ -193,18 +191,57 @@
               <tbody id="leaderboard-body"></tbody>
             </table>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <section id="user-progress-section" class="card" hidden>
+      <!-- Ekran: Postępy -->
+      <section class="screen" data-screen="postepy" hidden>
+        <div class="card">
           <div class="card-header">
             <i data-lucide="users" class="card-icon"></i>
             <h2>Szczegółowe postępy <span class="current-year"></span></h2>
           </div>
           <div id="user-progress-container" class="progress-list"></div>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <!-- Ekran: Admin -->
+      <section class="screen" data-screen="admin" hidden>
+        <form id="prize-form" class="card">
+          <div class="card-header">
+            <i data-lucide="gift" class="card-icon"></i>
+            <h2>Nagroda roku</h2>
+          </div>
+          <div class="form-group">
+            <label for="prize-year">Rok</label>
+            <input type="number" id="prize-year" class="plain-input" min="2000" max="2100" required />
+          </div>
+          <div class="form-group">
+            <label for="prize-description">Nagroda</label>
+            <textarea id="prize-description" class="plain-input" rows="3" maxlength="500" placeholder="Np. kolacja stawiana przez resztę"></textarea>
+            <small class="hint">Puste pole usuwa nagrodę na ten rok.</small>
+          </div>
+          <button type="submit" id="prize-submit-btn" class="btn btn-primary btn-block">
+            <i data-lucide="save"></i>
+            <span>Zapisz nagrodę</span>
+          </button>
+          <div id="prize-message" class="form-msg" hidden></div>
+        </form>
+
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="coins" class="card-icon"></i>
+            <h2>Nagroda pieniężna</h2>
+          </div>
+          <p class="card-intro">Kto bierze udział. Zmiana zapisuje się od razu.</p>
+          <div id="money-prize-list" class="participants-list"></div>
+          <div id="money-prize-message" class="form-msg" hidden></div>
+        </div>
+      </section>
     </div>
   </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
   <script src="app.js"></script>

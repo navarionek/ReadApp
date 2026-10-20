@@ -5,7 +5,8 @@ const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';
 // Klient sam dokłada token zalogowanego usera do każdego zapytania
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const AUTH_ONLY_SECTIONS = ['user-panel', 'stats-bar', 'form-section', 'leaderboard-section', 'user-progress-section'];
+const AUTH_ONLY_SECTIONS = ['user-panel', 'app-nav', 'app-screens'];
+const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'admin'];
 
 let currentUser = null;
 let editingId = null;   // id wpisu edytowanego w formularzu, null = dodawanie
@@ -74,6 +75,43 @@ function hideError() {
   document.getElementById('error-message').hidden = true;
 }
 
+let toastTimer = null;
+function showToast(text) {
+  const toast = document.getElementById('toast');
+  toast.textContent = text;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.hidden = true; }, 2500);
+}
+
+/* ----------------- Ekrany (menu) ----------------- */
+// Ekran wynika z #hash w adresie, więc działa przycisk Wstecz.
+// Nieznany hash (np. #access_token po powrocie z logowania Google) = Start; nie nadpisujemy go,
+// bo supabase-js sam go czyta i czyści.
+function currentScreen() {
+  const name = window.location.hash.slice(1);
+  return SCREENS.includes(name) ? name : 'start';
+}
+
+function showScreen(name) {
+  if (name === 'admin' && !isAdmin) name = 'start';
+  document.querySelectorAll('.screen').forEach(screen => {
+    screen.hidden = screen.dataset.screen !== name;
+  });
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const active = item.dataset.screen === name;
+    item.classList.toggle('active', active);
+    if (active) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
+  });
+  window.scrollTo(0, 0);
+}
+
+function goTo(name) {
+  if (window.location.hash === '#' + name) showScreen(name);
+  else window.location.hash = name;
+}
+
 /* ----------------- Theme handling ----------------- */
 function setTheme(isDark) {
   document.documentElement.classList.toggle('dark-mode', isDark);
@@ -122,7 +160,7 @@ function updateUI(user) {
   if (!user) {
     hasData = false;
     isAdmin = false;
-    ['admin-section', 'prize-banner', 'goal-card'].forEach(id => {
+    ['nav-admin', 'prize-banner', 'goal-card'].forEach(id => {
       document.getElementById(id).hidden = true;
     });
     cancelEdit();
@@ -168,7 +206,7 @@ function startEdit(book) {
   applyMultiplier(Number(book.multiplier));
   hideError();
   setFormMode(true);
-  document.getElementById('read-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  goTo('dodaj');
   document.getElementById('title').focus({ preventScroll: true });
 }
 
@@ -228,8 +266,11 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     if (error) throw error;
     if (!data?.length) throw new Error('Nie udało się zapisać wpisu (brak uprawnień).');
 
+    const wasEditing = !!editingId;
     cancelEdit();
     await loadReads();
+    showToast(wasEditing ? 'Zapisano zmiany.' : 'Dodano wpis!');
+    goTo(wasEditing ? 'postepy' : 'start');
   } catch (err) {
     console.error('Error saving read:', err);
     showError(friendlyError(err));
@@ -255,7 +296,9 @@ async function loadProfile() {
 
   setHeaderName(data.display_name);
   isAdmin = data.is_admin;
-  document.getElementById('admin-section').hidden = !isAdmin;
+  document.getElementById('nav-admin').hidden = !isAdmin;
+  // Wejście prosto na #admin: ekran pokazujemy dopiero, gdy wiadomo, że to admin
+  if (currentScreen() === 'admin') showScreen('admin');
   if (isAdmin && !document.getElementById('prize-year').value) {
     document.getElementById('prize-year').value = currentYear();
     loadPrizeIntoForm();
@@ -639,7 +682,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('rename-btn').addEventListener('click', handleRename);
-  document.getElementById('cancel-edit-btn').addEventListener('click', cancelEdit);
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => {
+    cancelEdit();
+    goTo('postepy');
+  });
+  window.addEventListener('hashchange', () => showScreen(currentScreen()));
+  showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
 
