@@ -1739,6 +1739,95 @@ header {
   margin-top: 0.75rem;
 }
 
-.cover-photo-btn {
+.cover-photo-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* ----------------- Kadrowanie zdjęcia okładki ----------------- */
+.crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.crop-hint {
+  margin: 0;
+  max-width: 28rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.crop-stage {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+  line-height: 0;
+  border-radius: 4px;
+}
+
+.crop-canvas {
+  display: block;
+}
+
+/* Przyciemnienie poza ramką jest przycięte do zdjęcia, a uchwyty (osobna warstwa) mogą wychodzić poza nie */
+.crop-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+.crop-dim {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+}
+
+.crop-box {
+  position: absolute;
+  cursor: move;
+  touch-action: none;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 2.75rem;
+  height: 2.75rem;
+  touch-action: none;
+}
+
+.crop-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin: -0.5rem 0 0 -0.5rem;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.crop-handle-nw { top: -1.375rem; left: -1.375rem; cursor: nwse-resize; }
+.crop-handle-ne { top: -1.375rem; right: -1.375rem; cursor: nesw-resize; }
+.crop-handle-sw { bottom: -1.375rem; left: -1.375rem; cursor: nesw-resize; }
+.crop-handle-se { bottom: -1.375rem; right: -1.375rem; cursor: nwse-resize; }
+
+.crop-actions {
+  display: flex;
+  gap: 0.75rem;
 }

@@ -1,3 +1,4 @@
+import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
 import { handleDropReading, renderReadingNow } from './data.js';
 import { daysSince, formatMultiplier, startFinishing } from './form.js';
@@ -358,28 +359,8 @@ async function ownCover(url) {
   }
 }
 
-// Zdjęcie z aparatu może mieć kilka MB: zmniejszamy do JPEG-a o dłuższym boku max 900 px (~100 KB)
-async function resizeToJpeg(file, maxSide = 900, quality = 0.85) {
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  } catch {
-    bitmap = await createImageBitmap(file);
-  }
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close?.();
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Nie udało się przetworzyć zdjęcia.'))), 'image/jpeg', quality);
-  });
-}
-
-// Wysyła zdjęcie do własnego folderu w buckecie „covers” i zwraca jego publiczny adres
-async function uploadCoverPhoto(file) {
-  const blob = await resizeToJpeg(file);
+// Wysyła skadrowane zdjęcie do własnego folderu w buckecie „covers” i zwraca jego publiczny adres
+async function uploadCoverPhoto(blob) {
   const path = `${state.currentUser.id}/${crypto.randomUUID()}.jpg`;
   const { error } = await supabaseClient.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
   if (error) throw error;
@@ -394,18 +375,29 @@ export function renderCoverPicker(container, row, query, save) {
   const form = el('form', { class: 'cover-search' }, [input, searchBtn]);
   const results = el('div', { class: 'cover-results' }, [el('div', { class: 'status-box', text: 'Szukam…' })]);
 
-  // Własne zdjęcie okładki: od razu aparat (capture), bez wyboru z galerii
-  const photoInput = el('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: '' });
-  const photoBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block cover-photo-btn' }, [icon('camera'), el('span', { text: 'Zrób zdjęcie okładki' })]);
-  photoBtn.addEventListener('click', () => photoInput.click());
-  photoInput.addEventListener('change', async () => {
-    const file = photoInput.files[0];
-    photoInput.value = '';
-    if (!file) return;
-    photoBtn.disabled = true;
-    results.replaceChildren(el('div', { class: 'status-box', text: 'Wysyłam zdjęcie…' }));
+  // Własne zdjęcie okładki: z aparatu (capture) albo z galerii. Oba kończą się kadrowaniem.
+  const makePhotoSource = (iconName, label, capture) => {
+    const attrs = { type: 'file', accept: 'image/*', hidden: '' };
+    if (capture) attrs.capture = 'environment';
+    const fileInput = el('input', attrs);
+    const btn = el('button', { type: 'button', class: 'btn btn-outline cover-photo-btn' }, [icon(iconName), el('span', { text: label })]);
+    btn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      fileInput.value = '';
+      if (file) await handlePhoto(file);
+    });
+    return [btn, fileInput];
+  };
+
+  const photoButtons = [];
+  const handlePhoto = async file => {
+    photoButtons.forEach(b => { b.disabled = true; });
     try {
-      const url = await uploadCoverPhoto(file);
+      const blob = await cropImage(file);
+      if (!blob) return;  // anulowano kadrowanie
+      results.replaceChildren(el('div', { class: 'status-box', text: 'Wysyłam zdjęcie…' }));
+      const url = await uploadCoverPhoto(blob);
       // Tekstowe informacje (autor, rok, opis) zostają, zmienia się tylko okładka
       await save(row, {
         cover_url: url, author: row.author ?? null, published_year: row.published_year ?? null,
@@ -413,14 +405,19 @@ export function renderCoverPicker(container, row, query, save) {
       });
     } catch (err) {
       console.error('Cover upload failed:', err);
-      showToast('Nie udało się wysłać zdjęcia: ' + friendlyError(err));
+      showToast('Nie udało się dodać zdjęcia: ' + friendlyError(err));
       run(input.value.trim() || row.title || '');
     } finally {
-      photoBtn.disabled = false;
+      photoButtons.forEach(b => { b.disabled = false; });
     }
-  });
+  };
 
-  container.replaceChildren(form, photoBtn, photoInput, results);
+  const [cameraBtn, cameraInput] = makePhotoSource('camera', 'Zrób zdjęcie', true);
+  const [galleryBtn, galleryInput] = makePhotoSource('image', 'Wybierz z galerii', false);
+  photoButtons.push(cameraBtn, galleryBtn);
+  const photoRow = el('div', { class: 'cover-photo-row' }, [cameraBtn, galleryBtn, cameraInput, galleryInput]);
+
+  container.replaceChildren(form, photoRow, results);
   refreshIcons();
 
   const run = async q => {
