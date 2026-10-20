@@ -28,6 +28,8 @@ export const BADGES = [
   { id: 'scientist', icon: 'flask-conical', name: 'Naukowiec', desc: '5 książek z mnożnikiem „Naukowa”', test: s => s.science >= 5 },
   { id: 'loyal', icon: 'pen-line', name: 'Wierny autor', desc: '2 książki tego samego autora', test: s => s.sameAuthor >= 2 },
   { id: 'classic', icon: 'scroll-text', name: 'Klasyka', desc: 'Książka wydana przed 1950 rokiem', test: s => s.classic >= 1 },
+  { id: 'nonstop', icon: 'calendar-range', name: 'Bez przerw', desc: 'Wpis w każdym miesiącu od stycznia (co najmniej 4 pełne miesiące)', test: s => s.fromJanuary },
+  { id: 'giant', icon: 'mountain', name: 'Gigant', desc: 'Najdłuższa skończona książka w całej grupie w tym roku', test: s => s.giant },
 ];
 
 const hasLabel = (book, label) => (book.multiplier_labels || []).some(l => l.toLowerCase() === label);
@@ -53,6 +55,15 @@ export function badgeStats(reader, rank, ranked = []) {
       .forEach(a => authorCounts.set(a, (authorCounts.get(a) || 0) + 1));
   });
 
+  // Pełne miesiące od stycznia do ostatniego zakończonego: w każdym musi być wpis (min. 4, czyli styczeń–kwiecień)
+  const lastFullMonth = new Date().getMonth() - 1;
+  const fromJanuary = lastFullMonth >= 3 && Array.from({ length: lastFullMonth + 1 }, (_, m) => m).every(m => months.has(m));
+
+  // Najdłuższa skończona książka: ściśle dłuższa niż każda u pozostałych (przy remisie nikt nie dostaje)
+  const longestFinished = r => r.books.reduce((max, b) => (b.unfinished ? max : Math.max(max, b.pages)), 0);
+  const othersLongest = Math.max(0, ...ranked.filter(r => r.key !== reader.key).map(longestFinished));
+  const giant = ranked.length > 1 && longestFinished(reader) > othersLongest;
+
   return {
     books: books.length,
     pages: books.reduce((sum, b) => sum + b.pages, 0),
@@ -72,6 +83,8 @@ export function badgeStats(reader, rank, ranked = []) {
     science: books.filter(b => hasLabel(b, 'naukowa')).length,
     sameAuthor: Math.max(0, ...authorCounts.values()),
     classic: books.filter(b => b.published_year != null && b.published_year < 1950).length,
+    fromJanuary,
+    giant,
   };
 }
 
