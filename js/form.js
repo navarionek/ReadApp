@@ -97,6 +97,12 @@ export function applyMultiplier(multiplier) {
 
 /* ----------------- Tryb formularza: skończona / zaczęta / kończenie zaczętej ----------------- */
 
+// Data lokalna jako wartość pola <input type="date"> (RRRR-MM-DD)
+function dayInputValue(value) {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function todayInputValue() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -148,6 +154,8 @@ export function updateFormUI() {
     isEditing ? 'Zapisz zmiany' : started ? 'Zacznij czytać' : queueing ? 'Dodaj do kolejki' : state.finishing ? 'Dodaj skończoną książkę' : 'Dodaj wpis';
 
   document.getElementById('mode-toggle').hidden = isEditing;
+  document.getElementById('read-date-group').hidden = !isEditing;
+  document.getElementById('read-date').max = todayInputValue();
   document.querySelectorAll('.mode-btn').forEach(btn => {
     const active = btn.dataset.mode === state.entryMode;
     btn.classList.toggle('active', active);
@@ -295,6 +303,9 @@ export function startEdit(book) {
   state.multiplierTouched = false;
   const note = document.getElementById('multiplier-note');
   state.editingLabels = book.multiplier_labels ?? null;
+  state.editingCreatedAt = book.created_at;
+  state.editingStartedAt = book.started_at || null;
+  document.getElementById('read-date').value = dayInputValue(book.created_at);
   const matched = (state.editingLabels && applyLabels(state.editingLabels, state.editingMultiplier))
     || applyMultiplier(state.editingMultiplier);
   const unknownLabels = matched && state.editingLabels === null && state.editingMultiplier !== 1;
@@ -311,6 +322,8 @@ export function startEdit(book) {
 }
 
 export function cancelEdit() {
+  state.editingCreatedAt = null;
+  state.editingStartedAt = null;
   state.startingFromQueue = null;
   hidePagesHint();
   state.editingId = null;
@@ -465,6 +478,26 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   // Przysięga tylko przy dodawaniu skończonej książki (nie przy edycji ani „Zaczynam czytać”)
   if (!startingNow && !queueing && !state.editingId && needsOath() && !await askKrystian(title)) return;
 
+  // Edycja daty przeczytania: wysyłamy ją tylko, gdy ją zmieniono (sama godzina zostaje, jeśli dzień ten sam)
+  let newCreatedAt = null;
+  if (state.editingId) {
+    const value = document.getElementById('read-date').value;
+    if (value && value !== dayInputValue(state.editingCreatedAt)) {
+      if (value > todayInputValue()) {
+        showError('Data przeczytania nie może być w przyszłości.');
+        return;
+      }
+      if (state.editingStartedAt && value < dayInputValue(state.editingStartedAt)) {
+        showError(`Data przeczytania nie może być wcześniejsza niż data rozpoczęcia (${formatDay(new Date(state.editingStartedAt))}).`);
+        return;
+      }
+      const [y, m, d] = value.split('-').map(Number);
+      newCreatedAt = value === todayInputValue() ? new Date().toISOString() : new Date(y, m - 1, d, 12).toISOString();
+      // Ten sam dzień co rozpoczęcie: nie wcześniej niż moment rozpoczęcia (baza wymaga started_at <= created_at)
+      if (state.editingStartedAt && newCreatedAt < state.editingStartedAt) newCreatedAt = state.editingStartedAt;
+    }
+  }
+
   // Data rozpoczęcia: dziś = teraz, wcześniejszy dzień = jego południe (bez kłopotów ze strefą)
   let startedAt = null;
   if (startingNow) {
@@ -529,6 +562,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     } else {
       // user_id i created_at ustawia baza (defaulty)
       const values = { title, author: author || null, pages, multiplier, multiplier_labels: readMultiplierLabels(), unfinished: document.getElementById('unfinished').checked };
+      if (newCreatedAt) values.created_at = newCreatedAt;
       const { data, error } = state.editingId
         ? await supabaseClient.from('reads').update(values).eq('id', state.editingId).select('id')
         : await supabaseClient.from('reads').insert(values).select('id');
