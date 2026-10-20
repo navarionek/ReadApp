@@ -269,11 +269,28 @@ window.addEventListener('DOMContentLoaded', () => {
   setTheme(document.documentElement.classList.contains('dark-mode'));
 
   if ('serviceWorker' in navigator) {
+    // Nowa wersja SW przejęła stronę: przeładuj, żeby wczytać nowy kod.
+    // Przy pierwszej instalacji (brak poprzedniego SW) nie ma czego przeładowywać.
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js')
         .catch(err => console.warn('SW registration failed:', err));
     });
   }
+
+  // PWA wznowione z tła nie przeładowuje strony: sprawdź nową wersję i odśwież wpisy
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    navigator.serviceWorker?.getRegistration().then(reg => reg?.update());
+    if (currentUser) loadReads();
+  });
 
   supabaseClient.auth.onAuthStateChange((_event, session) => {
     const user = session?.user || null;

@@ -1,5 +1,5 @@
 // Podbij wersję przy zmianie listy ASSETS; zwykłe deploye i tak łapie network-first
-const CACHE_NAME = 'czytanko-v3';
+const CACHE_NAME = 'czytanko-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -41,8 +41,14 @@ self.addEventListener('fetch', event => {
   // Nawigacje (też powrót z OAuth z ?code=...) trzymamy pod jednym kluczem
   const cacheKey = req.mode === 'navigate' ? './' : req;
 
+  // no-cache: zawsze pytaj serwer (304 jeśli bez zmian), omijając max-age=600 z GitHub Pages.
+  // Requestu z mode 'navigate' nie da się sklonować z opcjami, więc budujemy go z URL.
+  const netReq = req.mode === 'navigate'
+    ? new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    : new Request(req, { cache: 'no-cache' });
+
   event.respondWith(
-    fetch(req)
+    fetch(netReq)
       .then(res => {
         if (res.ok) {
           const copy = res.clone();
