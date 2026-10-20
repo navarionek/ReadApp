@@ -604,7 +604,7 @@ textarea.plain-input {
 }
 
 textarea.plain-input {
-  resize: vertical;
+  resize: none;
 }
 
 textarea:focus {
@@ -1327,4 +1327,245 @@ select.plain-input {
 
 .timeline-bar.open {
   opacity: 0.5;
+}
+
+/* ----------------- Półka ----------------- */
+.shelf-controls {
+  margin-bottom: 0.5rem;
+}
+
+.shelf-summary {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.shelf-summary:empty {
+  display: none;
+}
+
+.shelf-section {
+  margin-bottom: 1.75rem;
+}
+
+.shelf-year {
+  font-size: 1.125rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+}
+
+.shelf-year-count {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(7rem, 30%), 1fr));
+  gap: 1.25rem 0.875rem;
+}
+
+.book-tile,
+.cover-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-tile:disabled {
+  cursor: default;
+}
+
+.book-tile:not(:disabled):hover .book-cover,
+.cover-option:hover .book-cover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 24px -8px rgb(0 0 0 / 0.45);
+}
+
+.book-tile:focus-visible .book-cover,
+.cover-option:focus-visible .book-cover {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.book-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: 4px 8px 8px 4px;
+  background: var(--bg-body);
+  box-shadow: 0 6px 14px -6px rgb(0 0 0 / 0.45), inset 3px 0 0 rgb(0 0 0 / 0.12);
+  transition: var(--transition);
+}
+
+/* Zastępcza okładka: tytuł na kolorowym tle */
+.book-cover.placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0.625rem 0.5rem;
+  color: #fff;
+  overflow: hidden;
+}
+
+.ph-title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ph-author {
+  font-size: 0.6875rem;
+  opacity: 0.85;
+}
+
+.book-tile.reading .book-cover {
+  opacity: 0.8;
+}
+
+.book-tile-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-tile-author {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Okno ze szczegółami książki */
+.book-modal {
+  align-items: flex-start;
+  overflow-y: auto;
+}
+
+.book-modal-content {
+  position: relative;
+  max-width: 34rem;
+  margin: 2rem auto;
+  text-align: left;
+}
+
+.book-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  margin: 0;
+}
+
+.book-modal-top {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1.25rem;
+  padding-right: 2.5rem;
+}
+
+.book-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin-bottom: 0.375rem;
+}
+
+.book-modal-author {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  margin-bottom: 0.5rem;
+}
+
+.book-modal-link {
+  color: var(--primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.book-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  padding: 0.875rem 0;
+  margin-bottom: 1rem;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.book-facts dt {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.book-facts dd {
+  font-weight: 700;
+}
+
+.book-modal-desc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+  margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cover-picker {
+  margin-top: 0.5rem;
+}
+
+.cover-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+input[type="search"].plain-input {
+  padding: 0.625rem;
+}
+
+.cover-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(6rem, 30%), 1fr));
+  gap: 1rem 0.75rem;
+}
+
+.cover-results .status-box {
+  grid-column: 1 / -1;
+}
+
+/* Menu ma teraz do 7 pozycji: na wąskim telefonie mniejsze podpisy */
+@media (max-width: 400px) {
+  .nav-item {
+    font-size: 0.625rem;
+    padding: 0.4rem 0.1rem;
+  }
+
+  .nav-item svg {
+    width: 1.125rem;
+    height: 1.125rem;
+  }
 }

@@ -58,6 +58,10 @@
         <i data-lucide="library-big"></i>
         <span>Postępy</span>
       </a>
+      <a href="#polka" class="nav-item" data-screen="polka">
+        <i data-lucide="book-copy"></i>
+        <span>Półka</span>
+      </a>
       <a href="#statystyki" class="nav-item" data-screen="statystyki">
         <i data-lucide="chart-line"></i>
         <span>Statystyki</span>
@@ -256,6 +260,21 @@
         </div>
       </section>
 
+      <!-- Ekran: Półka (przeczytane książki z okładkami) -->
+      <section class="screen" data-screen="polka" hidden>
+        <div class="card shelf-head">
+          <div class="card-header">
+            <i data-lucide="book-copy" class="card-icon"></i>
+            <h2 id="shelf-title">Twoja półka</h2>
+          </div>
+          <div class="shelf-controls">
+            <select id="shelf-person" class="plain-input" aria-label="Czyja półka"></select>
+          </div>
+          <p id="shelf-summary" class="shelf-summary"></p>
+        </div>
+        <div id="shelf" class="shelf"></div>
+      </section>
+
       <!-- Ekran: Statystyki -->
       <section class="screen" data-screen="statystyki" hidden>
         <div class="card">
@@ -381,6 +400,16 @@
       </section>
     </div>
   </main>
+
+  <!-- Szczegóły książki z półki -->
+  <div id="book-modal" class="modal book-modal" role="dialog" aria-modal="true" aria-labelledby="book-modal-title" hidden>
+    <div class="modal-content book-modal-content">
+      <button type="button" id="book-modal-close" class="btn btn-outline btn-icon book-modal-close" aria-label="Zamknij">
+        <i data-lucide="x"></i>
+      </button>
+      <div id="book-modal-body"></div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 

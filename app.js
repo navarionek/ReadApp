@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const AUTH_ONLY_SECTIONS = ['user-panel', 'app-nav', 'app-screens'];
-const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'statystyki', 'admin'];
+const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'polka', 'statystyki', 'admin'];
 
 let currentUser = null;
 let editingId = null;   // id wpisu edytowanego w formularzu, null = dodawanie
@@ -108,6 +108,9 @@ function showScreen(name) {
   });
   window.scrollTo(0, 0);
 
+  if (name === 'polka' && currentUser) loadShelf();
+  if (name !== 'polka') closeBookModal();
+
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
   if (name === 'statystyki') {
     if (hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); });
@@ -174,6 +177,9 @@ function updateUI(user) {
     hasData = false;
     isAdmin = false;
     viewAs = null;
+    shelfUserId = null;
+    shelfRows = [];
+    closeBookModal();
     ['nav-admin', 'prize-banner', 'goal-card', 'view-as-banner'].forEach(id => {
       document.getElementById(id).hidden = true;
     });
@@ -1579,6 +1585,7 @@ function viewerId() {
 
 function setViewAs(profile) {
   viewAs = profile && profile.id !== currentUser?.id ? profile : null;
+  shelfUserId = null;
   const banner = document.getElementById('view-as-banner');
   banner.hidden = !viewAs;
   document.getElementById('view-as-name').textContent = viewAs ? viewAs.name : '';
@@ -1770,6 +1777,314 @@ async function syncPushSubscription() {
   await refreshNotifyCard();
 }
 
+/* ----------------- Półka (okładki i informacje z publicznych baz) ----------------- */
+let shelfUserId = null;   // czyja półka; null = moja (albo podglądanej osoby)
+let shelfRows = [];
+const lookupCache = new Map();  // zapytanie -> Promise<wyniki>, żeby nie pytać dwa razy w sesji
+let lastLookupUsedGoogle = false;  // czy funkcja ma klucz Google Books (bez niego polskich książek prawie nie znajdzie)
+
+function lookupBook(q, limit = 6) {
+  const key = `${q.toLowerCase()}|${limit}`;
+  if (!lookupCache.has(key)) {
+    lookupCache.set(key, supabaseClient.functions.invoke('book-lookup', { body: { q, limit } })
+      .then(({ data, error }) => {
+        if (error) throw error;
+        lastLookupUsedGoogle = !!data?.google;
+        return data?.results || [];
+      })
+      .catch(err => {
+        lookupCache.delete(key);
+        console.error('Book lookup failed:', err);
+        return [];
+      }));
+  }
+  return lookupCache.get(key);
+}
+
+function normalizeTitle(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l')
+    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Czy wynik z bazy to ta sama książka: tytuł zawiera się w drugim albo większość słów się zgadza.
+// Lepiej zastępcza okładka niż cudza.
+function titleMatches(query, found) {
+  const a = normalizeTitle(query);
+  const b = normalizeTitle(found);
+  if (!a || !b) return false;
+  // Całymi słowami: „hail mary” pasuje do „project hail mary”, ale „kontakt” nie do „kontakte”
+  if (` ${b} `.includes(` ${a} `) || ` ${a} `.includes(` ${b} `)) return true;
+  const wa = new Set(a.split(' ').filter(w => w.length > 2));
+  const wb = new Set(b.split(' ').filter(w => w.length > 2));
+  if (!wa.size) return false;
+  const common = [...wa].filter(w => wb.has(w)).length;
+  return common / wa.size >= 0.6;
+}
+
+function titleHue(title) {
+  let h = 0;
+  for (const c of title || '') h = (h * 31 + c.codePointAt(0)) % 360;
+  return h;
+}
+
+// Okładka albo zastępcza „okładka” z tytułem (kolor z tytułu, więc zawsze ten sam)
+function coverEl(book, extraClass = '') {
+  const placeholder = () => {
+    const h = titleHue(book.title);
+    const ph = el('div', { class: `book-cover placeholder ${extraClass}`, 'aria-hidden': 'true' }, [
+      el('span', { class: 'ph-title', text: book.title || 'bez tytułu' }),
+      ...(book.author ? [el('span', { class: 'ph-author', text: book.author })] : []),
+    ]);
+    ph.style.background = `linear-gradient(160deg, hsl(${h} 45% 42%), hsl(${(h + 40) % 360} 50% 24%))`;
+    return ph;
+  };
+  if (!book.cover_url) return placeholder();
+  const img = el('img', { class: `book-cover ${extraClass}`, src: book.cover_url, alt: `Okładka: ${book.title}`, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  img.addEventListener('error', () => img.replaceWith(placeholder()));
+  return img;
+}
+
+async function loadShelfPeople() {
+  const { data, error } = await supabaseClient.from('profiles').select('id, display_name').order('display_name');
+  if (error) return;
+  const select = document.getElementById('shelf-person');
+  const current = shelfUserId || viewerId();
+  select.replaceChildren(...data.map(p => {
+    const option = el('option', { value: p.id, text: p.id === viewerId() ? `${p.display_name} (ty)` : p.display_name });
+    option.selected = p.id === current;
+    return option;
+  }));
+}
+
+async function loadShelf() {
+  const userId = shelfUserId || viewerId();
+  if (!userId) return;
+  const shelf = document.getElementById('shelf');
+  if (!shelfRows.length || shelfRows[0]?.user_id !== userId) {
+    shelf.replaceChildren(el('div', { class: 'status-box', text: 'Ładowanie półki…' }));
+  }
+  loadShelfPeople();
+
+  const { data, error } = await supabaseClient
+    .from('reads')
+    .select('id, user_id, title, pages, multiplier, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false });
+
+  if (error) {
+    shelf.replaceChildren(el('div', { class: 'status-box', text: 'Nie udało się wczytać półki. ' + friendlyError(error) }));
+    return;
+  }
+  shelfRows = data || [];
+  renderShelf();
+  fillMissingBookInfo(userId);
+}
+
+function renderShelf() {
+  const userId = shelfUserId || viewerId();
+  const isOwn = userId === viewerId();
+  const personName = document.querySelector(`#shelf-person option[value="${userId}"]`)?.textContent.replace(/ \(ty\)$/, '');
+  document.getElementById('shelf-title').textContent = isOwn ? 'Twoja półka' : `Półka: ${personName || ''}`;
+
+  const pages = shelfRows.reduce((sum, r) => sum + r.pages, 0);
+  const n = shelfRows.length;
+  document.getElementById('shelf-summary').textContent = n
+    ? `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron`
+    : '';
+
+  const sections = [];
+  const current = readingNow.filter(item => item.user_id === userId);
+  if (current.length) {
+    sections.push(el('section', { class: 'shelf-section' }, [
+      el('h3', { class: 'shelf-year', text: 'Czyta teraz' }),
+      el('div', { class: 'shelf-grid' }, current.map(item => bookTile({ title: item.title, cover_url: item.cover_url, author: item.author }, null, true))),
+    ]));
+    // Okładki czytanych teraz: tylko do pokazania (bez zapisu w bazie)
+    current.filter(item => !item.cover_checked).forEach(async item => {
+      item.cover_checked = true;
+      const best = (await lookupBook(item.title, 3)).find(r => r.cover && titleMatches(item.title, r.title));
+      if (best) {
+        item.cover_url = best.cover;
+        item.author = best.author;
+        renderShelf();
+      }
+    });
+  }
+
+  const byYear = new Map();
+  shelfRows.forEach(r => {
+    const y = new Date(r.created_at).getFullYear();
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y).push(r);
+  });
+  byYear.forEach((rows, year) => {
+    sections.push(el('section', { class: 'shelf-section' }, [
+      el('h3', { class: 'shelf-year' }, [document.createTextNode(String(year)), el('span', { class: 'shelf-year-count', text: ` · ${rows.length}` })]),
+      el('div', { class: 'shelf-grid' }, rows.map(r => bookTile(r, r))),
+    ]));
+  });
+
+  if (!sections.length) {
+    sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
+  }
+  document.getElementById('shelf').replaceChildren(...sections);
+}
+
+function bookTile(book, row, reading = false) {
+  const tile = el('button', { type: 'button', class: `book-tile${reading ? ' reading' : ''}`, title: book.title || '' }, [
+    coverEl(book),
+    el('span', { class: 'book-tile-title', text: book.title || 'bez tytułu' }),
+    ...(book.author ? [el('span', { class: 'book-tile-author', text: book.author })] : []),
+  ]);
+  if (row) tile.addEventListener('click', () => openBookModal(row));
+  else tile.disabled = true;
+  return tile;
+}
+
+// Uzupełnianie okładek: po 2 naraz. Własne wpisy zapisujemy w bazie (raz na zawsze),
+// cudze tylko pokazujemy (baza i tak nie pozwala ich zmieniać).
+async function fillMissingBookInfo(userId) {
+  const missing = shelfRows.filter(r => !r.info_checked_at);
+  const own = userId === currentUser?.id;
+  let rerender = false;
+  const worker = async () => {
+    while (missing.length) {
+      if ((shelfUserId || viewerId()) !== userId) return;  // ktoś przełączył półkę
+      const row = missing.shift();
+      const results = await lookupBook(row.title || '', 3);
+      const best = results.find(r => titleMatches(row.title, r.title) && r.cover)
+        || results.find(r => titleMatches(row.title, r.title));
+      // Bez Google Books „nie znaleziono” nie jest pewne: nie zapisujemy, spróbujemy przy następnym otwarciu
+      if (!best && !lastLookupUsedGoogle) continue;
+      const info = {
+        cover_url: best?.cover || null,
+        author: best?.author?.slice(0, 200) || null,
+        published_year: best?.year || null,
+        info_url: best?.infoUrl || null,
+        description: best?.description || null,
+        info_checked_at: new Date().toISOString(),
+      };
+      Object.assign(row, info);
+      if (own) {
+        const { error } = await supabaseClient.from('reads').update(info).eq('id', row.id);
+        if (error) console.error('Saving book info failed:', error);
+      }
+      rerender = true;
+      requestAnimationFrame(() => {
+        if (rerender && currentScreen() === 'polka') {
+          rerender = false;
+          renderShelf();
+        }
+      });
+    }
+  };
+  await Promise.all([worker(), worker()]);
+}
+
+/* ----------------- Szczegóły książki ----------------- */
+function closeBookModal() {
+  document.getElementById('book-modal').hidden = true;
+}
+
+function openBookModal(row) {
+  const own = row.user_id === currentUser?.id && viewerId() === currentUser?.id;
+  const finished = new Date(row.created_at);
+  const dates = row.started_at
+    ? `${formatDay(new Date(row.started_at))} – ${formatDay(finished)} ${finished.getFullYear()}`
+    : `dodane ${formatDay(finished)} ${finished.getFullYear()}`;
+
+  const facts = el('dl', { class: 'book-facts' }, [
+    el('div', {}, [el('dt', { text: 'Strony' }), el('dd', { text: String(row.pages) })]),
+    el('div', {}, [el('dt', { text: 'Mnożnik' }), el('dd', { text: `${formatMultiplier(row.multiplier)}x` })]),
+    el('div', {}, [el('dt', { text: 'Punkty' }), el('dd', { text: String(bookPoints(row)) })]),
+    el('div', {}, [el('dt', { text: 'Przeczytane' }), el('dd', { text: dates })]),
+  ]);
+
+  const body = [
+    el('div', { class: 'book-modal-top' }, [
+      coverEl(row, 'large'),
+      el('div', { class: 'book-modal-info' }, [
+        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: row.title || 'bez tytułu' }),
+        ...(row.author || row.published_year
+          ? [el('p', { class: 'book-modal-author', text: [row.author, row.published_year].filter(Boolean).join(' · ') })]
+          : []),
+        ...(row.info_url
+          ? [el('a', { class: 'book-modal-link', href: row.info_url, target: '_blank', rel: 'noopener noreferrer', text: row.info_url.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' })]
+          : []),
+      ]),
+    ]),
+    facts,
+    ...(row.description ? [el('p', { class: 'book-modal-desc', text: row.description })] : []),
+  ];
+
+  if (own) {
+    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
+    const picker = el('div', { class: 'cover-picker', hidden: '' });
+    pickBtn.addEventListener('click', () => {
+      pickBtn.hidden = true;
+      picker.hidden = false;
+      renderCoverPicker(picker, row, row.title || '');
+    });
+    body.push(pickBtn, picker);
+  }
+
+  document.getElementById('book-modal-body').replaceChildren(...body);
+  document.getElementById('book-modal').hidden = false;
+  refreshIcons();
+}
+
+function renderCoverPicker(container, row, query) {
+  const input = el('input', { type: 'search', class: 'plain-input', 'aria-label': 'Szukaj książki', placeholder: 'Tytuł, autor…' });
+  input.value = query;
+  const searchBtn = el('button', { type: 'submit', class: 'btn btn-primary' }, [el('span', { text: 'Szukaj' })]);
+  const form = el('form', { class: 'cover-search' }, [input, searchBtn]);
+  const results = el('div', { class: 'cover-results' }, [el('div', { class: 'status-box', text: 'Szukam…' })]);
+  container.replaceChildren(form, results);
+
+  const run = async q => {
+    results.replaceChildren(el('div', { class: 'status-box', text: 'Szukam…' }));
+    const found = await lookupBook(q, 8);
+    const options = found.map(r => {
+      const btn = el('button', { type: 'button', class: 'cover-option' }, [
+        coverEl({ title: r.title, author: r.author, cover_url: r.cover }),
+        el('span', { class: 'book-tile-title', text: r.title }),
+        el('span', { class: 'book-tile-author', text: [r.author, r.year].filter(Boolean).join(' · ') }),
+      ]);
+      btn.addEventListener('click', () => saveBookInfo(row, {
+        cover_url: r.cover, author: r.author?.slice(0, 200) || null, published_year: r.year,
+        info_url: r.infoUrl, description: r.description,
+      }));
+      return btn;
+    });
+    const none = el('button', { type: 'button', class: 'cover-option' }, [
+      coverEl({ title: row.title }),
+      el('span', { class: 'book-tile-title', text: 'Bez okładki' }),
+    ]);
+    none.addEventListener('click', () => saveBookInfo(row, { cover_url: null, author: null, published_year: null, info_url: null, description: null }));
+    results.replaceChildren(...(options.length ? options : [el('div', { class: 'status-box', text: 'Nic nie znaleziono. Spróbuj inaczej, np. z autorem.' })]), none);
+  };
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    run(input.value.trim() || row.title || '');
+  });
+  run(query);
+}
+
+async function saveBookInfo(row, info) {
+  const values = { ...info, info_checked_at: new Date().toISOString() };
+  const { error } = await supabaseClient.from('reads').update(values).eq('id', row.id);
+  if (error) {
+    showToast('Nie udało się zapisać: ' + friendlyError(error));
+    return;
+  }
+  Object.assign(row, values);
+  showToast('Zapisano.');
+  renderShelf();
+  openBookModal(row);
+}
+
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
@@ -1782,6 +2097,17 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
+  document.getElementById('shelf-person').addEventListener('change', e => {
+    shelfUserId = e.target.value === viewerId() ? null : e.target.value;
+    loadShelf();
+  });
+  document.getElementById('book-modal-close').addEventListener('click', closeBookModal);
+  document.getElementById('book-modal').addEventListener('click', e => {
+    if (e.target.id === 'book-modal') closeBookModal();  // kliknięcie w tło
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeBookModal();
+  });
   document.getElementById('started-date').value = todayInputValue();
   document.getElementById('started-date').max = todayInputValue();
   window.addEventListener('hashchange', () => showScreen(currentScreen()));
@@ -1839,6 +2165,7 @@ window.addEventListener('DOMContentLoaded', () => {
         loadProfile();
         loadReads();
         syncPushSubscription();
+        if (currentScreen() === 'polka') loadShelf();
       }, 0);
     }
   });
