@@ -297,7 +297,7 @@ function myReadingNow() {
 }
 
 function selectFinishing(item) {
-  finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at } : null;
+  finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at, item } : null;
   document.getElementById('title').value = item ? item.title : '';
 }
 
@@ -493,6 +493,17 @@ document.getElementById('read-form').addEventListener('submit', async e => {
       : await supabaseClient.from('reads').insert(values).select('id');
     if (error) throw error;
     if (!data?.length) throw new Error('Nie udało się zapisać wpisu (brak uprawnień).');
+
+    // Okładka wybrana w trakcie czytania przechodzi do wpisu (kolumny okładki da się tylko aktualizować)
+    if (finishing?.item.info_checked_at && !editingId) {
+      const { item } = finishing;
+      const info = {
+        cover_url: item.cover_url, author: item.author, published_year: item.published_year,
+        info_url: item.info_url, description: item.description, info_checked_at: item.info_checked_at,
+      };
+      const { error: infoError } = await supabaseClient.from('reads').update(info).eq('id', data[0].id);
+      if (infoError) console.error('Copying book info failed:', infoError);
+    }
 
     // Skończona książka znika z „Teraz czytam” (wpis już jest, więc błąd tu nie jest krytyczny)
     if (finishing) {
@@ -851,7 +862,7 @@ async function loadReads() {
       .order('id', { ascending: true }),
     supabaseClient
       .from('reading_now')
-      .select('id, user_id, title, started_at, profiles(display_name)')
+      .select('id, user_id, title, started_at, cover_url, author, published_year, info_url, description, info_checked_at, profiles(display_name)')
       .order('started_at', { ascending: true }),
   ]);
   const { data: rows, error } = readsResult;
@@ -1839,6 +1850,7 @@ const readingCovers = new Map();
 const readingCoversPending = new Set();
 
 function readingCoverOf(item, onFound) {
+  if (item.info_checked_at) return item;  // okładka wybrana albo zapisana w bazie
   const key = normalizeTitle(item.title);
   if (readingCovers.has(key)) return readingCovers.get(key);
   if (!readingCoversPending.has(key)) {
@@ -1882,7 +1894,14 @@ function openReadingModal(item) {
       await handleDropReading(item);
       if (currentScreen() === 'polka') renderShelf();
     });
-    body.push(done, drop);
+    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
+    const picker = el('div', { class: 'cover-picker', hidden: '' });
+    pickBtn.addEventListener('click', () => {
+      pickBtn.hidden = true;
+      picker.hidden = false;
+      renderCoverPicker(picker, item, item.title, saveReadingInfo);
+    });
+    body.push(pickBtn, picker, done, drop);
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
@@ -2110,7 +2129,7 @@ function openBookModal(row) {
     pickBtn.addEventListener('click', () => {
       pickBtn.hidden = true;
       picker.hidden = false;
-      renderCoverPicker(picker, row, row.title || '');
+      renderCoverPicker(picker, row, row.title || '', saveBookInfo);
     });
     body.push(pickBtn, picker);
   }
@@ -2120,7 +2139,8 @@ function openBookModal(row) {
   refreshIcons();
 }
 
-function renderCoverPicker(container, row, query) {
+// save(row, info) zapisuje wybór: saveBookInfo dla przeczytanych, saveReadingInfo dla „Teraz czytam”
+function renderCoverPicker(container, row, query, save) {
   const input = el('input', { type: 'search', class: 'plain-input', 'aria-label': 'Szukaj książki', placeholder: 'Tytuł, autor…' });
   input.value = query;
   const searchBtn = el('button', { type: 'submit', class: 'btn btn-primary' }, [el('span', { text: 'Szukaj' })]);
@@ -2137,7 +2157,7 @@ function renderCoverPicker(container, row, query) {
         el('span', { class: 'book-tile-title', text: r.title }),
         el('span', { class: 'book-tile-author', text: [r.author, r.year].filter(Boolean).join(' · ') }),
       ]);
-      btn.addEventListener('click', () => saveBookInfo(row, {
+      btn.addEventListener('click', () => save(row, {
         cover_url: r.cover, author: r.author?.slice(0, 200) || null, published_year: r.year,
         info_url: r.infoUrl, description: r.description,
       }));
@@ -2147,7 +2167,7 @@ function renderCoverPicker(container, row, query) {
       coverEl({ title: row.title }),
       el('span', { class: 'book-tile-title', text: 'Bez okładki' }),
     ]);
-    none.addEventListener('click', () => saveBookInfo(row, { cover_url: null, author: null, published_year: null, info_url: null, description: null }));
+    none.addEventListener('click', () => save(row, { cover_url: null, author: null, published_year: null, info_url: null, description: null }));
     results.replaceChildren(...(options.length ? options : [el('div', { class: 'status-box', text: 'Nic nie znaleziono. Spróbuj inaczej, np. z autorem.' })]), none);
   };
 
@@ -2158,17 +2178,30 @@ function renderCoverPicker(container, row, query) {
   run(query);
 }
 
-async function saveBookInfo(row, info) {
+async function updateBookInfo(table, row, info) {
   const values = { ...info, info_checked_at: new Date().toISOString() };
-  const { error } = await supabaseClient.from('reads').update(values).eq('id', row.id);
+  const { error } = await supabaseClient.from(table).update(values).eq('id', row.id);
   if (error) {
     showToast('Nie udało się zapisać: ' + friendlyError(error));
-    return;
+    return false;
   }
   Object.assign(row, values);
   showToast('Zapisano.');
+  return true;
+}
+
+async function saveBookInfo(row, info) {
+  if (!await updateBookInfo('reads', row, info)) return;
   renderShelf();
   openBookModal(row);
+}
+
+async function saveReadingInfo(item, info) {
+  if (!await updateBookInfo('reading_now', item, info)) return;
+  renderReadingNow();
+  if (currentScreen() === 'polka') renderShelf();
+  openReadingModal(item);
+  refreshIcons();
 }
 
 /* ----------------- Init ----------------- */
