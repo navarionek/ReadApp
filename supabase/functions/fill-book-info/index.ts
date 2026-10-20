@@ -31,6 +31,8 @@ function jwtRole(header: string | null): string | null {
 
 const TABLES = ['reads', 'reading_now', 'reading_queue'];
 const FIELDS = 'id, cover_url, author, published_year, info_url, description, info_checked_at';
+// Liczba stron (podpowiedź przy kończeniu książki) jest tylko w reading_now i reading_queue
+const fieldsFor = (table: string) => (table === 'reads' ? FIELDS : `${FIELDS}, page_count`);
 
 type Row = { id: number; title: string; author: string | null; info_checked_at: string | null };
 
@@ -49,14 +51,18 @@ async function fillOne(table: string, row: Row) {
     description: best?.description?.slice(0, 3000) ?? null,
     info_checked_at: new Date().toISOString(),
   };
+  if (table !== 'reads') {
+    const pages = best?.pages;
+    (info as Record<string, unknown>).page_count = Number.isInteger(pages) && pages! >= 1 && pages! <= 20000 ? pages : null;
+  }
   // Zajęcie wpisu atomowo: jeśli ktoś był szybszy, oddajemy jego wynik
-  const { data, error } = await supabase.from(table).update(info).eq('id', row.id).is('info_checked_at', null).select(FIELDS);
+  const { data, error } = await supabase.from(table).update(info).eq('id', row.id).is('info_checked_at', null).select(fieldsFor(table));
   if (error) {
     console.error('update failed', table, row.id, error.message);
     return { id: row.id, pending: true };
   }
   if (data?.length) return data[0];
-  const { data: current } = await supabase.from(table).select(FIELDS).eq('id', row.id).maybeSingle();
+  const { data: current } = await supabase.from(table).select(fieldsFor(table)).eq('id', row.id).maybeSingle();
   return current ?? { id: row.id, pending: true };
 }
 
@@ -97,7 +103,7 @@ Deno.serve(async req => {
   if (!ids.length) return json({ items: [] });
 
   const table = String(body.table);
-  const { data, error } = await supabase.from(table).select(`title, ${FIELDS}`).in('id', ids);
+  const { data, error } = await supabase.from(table).select(`title, ${fieldsFor(table)}`).in('id', ids);
   if (error) return json({ error: error.message }, 500);
   const [unchecked, checked] = [(data ?? []).filter((r: any) => !r.info_checked_at), (data ?? []).filter((r: any) => r.info_checked_at)];
   const filled = await fillRows(table, unchecked as Row[]);

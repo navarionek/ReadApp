@@ -56,7 +56,7 @@ async function enrichBooks(table, items, onBatch) {
   }
 }
 
-const INFO_FIELDS = ['cover_url', 'author', 'published_year', 'info_url', 'description', 'info_checked_at'];
+const INFO_FIELDS = ['cover_url', 'author', 'published_year', 'page_count', 'info_url', 'description', 'info_checked_at'];
 
 function applyInfo(list, it) {
   const row = list.find(r => r.id === it.id);
@@ -288,7 +288,7 @@ export function openQueueModal(item) {
   refreshIcons();
 }
 
-const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, info_url, description, info_checked_at, created_at';
+const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, page_count, info_url, description, info_checked_at, created_at';
 
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
@@ -563,6 +563,7 @@ export function renderCoverPicker(container, row, query, save) {
       // Tekstowe informacje (autor, rok, opis) zostają, zmienia się tylko okładka
       await save(row, {
         cover_url: url, author: row.author ?? null, published_year: row.published_year ?? null,
+        page_count: row.page_count ?? null,
         info_url: row.info_url ?? null, description: row.description ?? null,
       });
     } catch (err) {
@@ -594,7 +595,7 @@ export function renderCoverPicker(container, row, query, save) {
       btn.addEventListener('click', async () => {
         results.replaceChildren(el('div', { class: 'status-box', text: 'Zapisuję okładkę…' }));
         save(row, {
-          cover_url: await ownCover(r.cover), author: r.author?.slice(0, 200) || null, published_year: r.year,
+          cover_url: await ownCover(r.cover), author: r.author?.slice(0, 200) || null, published_year: r.year, page_count: r.pages ?? null,
           info_url: r.infoUrl, description: r.description,
         });
       });
@@ -604,7 +605,7 @@ export function renderCoverPicker(container, row, query, save) {
       coverEl({ title: row.title }),
       el('span', { class: 'book-tile-title', text: 'Bez okładki' }),
     ]);
-    none.addEventListener('click', () => save(row, { cover_url: null, author: null, published_year: null, info_url: null, description: null }));
+    none.addEventListener('click', () => save(row, { cover_url: null, author: null, published_year: null, page_count: null, info_url: null, description: null }));
     results.replaceChildren(...(options.length ? options : [el('div', { class: 'status-box', text: 'Nic nie znaleziono. Spróbuj inaczej, np. z autorem.' })]), none);
   };
 
@@ -617,6 +618,7 @@ export function renderCoverPicker(container, row, query, save) {
 
 export async function updateBookInfo(table, row, info) {
   const values = { ...info, info_checked_at: new Date().toISOString() };
+  if (table === 'reads') delete values.page_count;  // liczba stron jest tylko w „Teraz czytam” i „Do przeczytania”
   const { error } = await supabaseClient.from(table).update(values).eq('id', row.id);
   if (error) {
     showToast('Nie udało się zapisać: ' + friendlyError(error));

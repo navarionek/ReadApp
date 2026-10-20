@@ -1,8 +1,9 @@
 import { renderMultiplierAdmin } from './admin.js';
-import { bookPoints } from '../supabase/functions/_shared/logic.js';
+import { bookPoints, titleMatches } from '../supabase/functions/_shared/logic.js';
 import { loadReads } from './data.js';
 import { goTo } from './shell.js';
 import { showAddSummary, snapshotRanking } from './summary.js';
+import { lookupBook } from './shelf.js';
 import { state } from './state.js';
 import { formatDay } from './stats.js';
 import { supabaseClient } from './supabase.js';
@@ -110,9 +111,10 @@ export function myReadingNow() {
 }
 
 export function selectFinishing(item) {
-  state.finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at } : null;
+  state.finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at, pageCount: item.page_count ?? null } : null;
   document.getElementById('title').value = item ? item.title : '';
   document.getElementById('author').value = item?.author || '';
+  suggestPages();
 }
 
 // Lista „Którą książkę kończysz?”: zaczęte książki + „Inna książka”
@@ -172,6 +174,58 @@ export function updateFormUI() {
   document.getElementById('cancel-edit-btn').hidden = !isEditing;
 }
 
+/* ----------------- Podpowiedź liczby stron ----------------- */
+// Przy kończeniu książki podpowiadamy liczbę stron z baz książek (Google Books / Open Library):
+// z zapisanej przy książce z „Teraz czytam”, a gdy jej nie ma albo tytuł wpisano ręcznie, z wyszukiwania.
+// To tylko podpowiedź (zależy od wydania): wpisujemy ją dopiero po kliknięciu „Wpisz”.
+let pagesHintSeq = 0;
+
+function hidePagesHint() {
+  pagesHintSeq++;
+  document.getElementById('pages-hint').hidden = true;
+}
+
+function showPagesHint(pages) {
+  const hint = document.getElementById('pages-hint');
+  const use = el('button', { type: 'button', class: 'pages-hint-btn', text: `Wpisz ${pages}` });
+  use.addEventListener('click', () => {
+    const input = document.getElementById('pages');
+    input.value = String(pages);
+    hint.hidden = true;
+    input.focus({ preventScroll: true });
+  });
+  hint.replaceChildren(
+    document.createTextNode(`Podpowiedź z baz książek: ${pages} str. (zależy od wydania) `),
+    use,
+  );
+  hint.hidden = false;
+}
+
+export async function suggestPages() {
+  const seq = ++pagesHintSeq;
+  document.getElementById('pages-hint').hidden = true;
+  if (state.editingId || state.entryMode !== 'finished') return;
+
+  if (state.finishing?.pageCount) {
+    showPagesHint(state.finishing.pageCount);
+    return;
+  }
+  const title = state.finishing ? state.finishing.title : document.getElementById('title').value.trim();
+  if (title.length < 3) return;
+
+  const { results } = await lookupBook(title, 3);
+  if (seq !== pagesHintSeq) return;  // w międzyczasie zmieniono tytuł albo tryb
+  const best = results.find(r => r.pages && titleMatches(title, r.title));
+  if (best) showPagesHint(best.pages);
+}
+
+let pagesHintTimer = null;
+document.getElementById('title').addEventListener('input', () => {
+  clearTimeout(pagesHintTimer);
+  hidePagesHint();
+  pagesHintTimer = setTimeout(suggestPages, 700);
+});
+
 export function setEntryMode(mode) {
   state.entryMode = mode;
   if (mode === 'started' || mode === 'queue') {
@@ -183,6 +237,7 @@ export function setEntryMode(mode) {
   }
   hideError();
   updateFormUI();
+  suggestPages();
 }
 
 export function handleFinishPick() {
@@ -203,6 +258,7 @@ export function startFinishing(item) {
 }
 
 export function startEdit(book) {
+  hidePagesHint();
   state.finishing = null;
   state.editingId = book.id;
   document.getElementById('title').value = book.title || '';
@@ -229,6 +285,7 @@ export function startEdit(book) {
 }
 
 export function cancelEdit() {
+  hidePagesHint();
   state.editingId = null;
   state.editingMultiplier = null;
   state.editingLabels = null;

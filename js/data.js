@@ -73,7 +73,7 @@ export async function loadReads() {
       .order('id', { ascending: true }),
     supabaseClient
       .from('reading_now')
-      .select('id, user_id, title, started_at, cover_url, author, published_year, info_url, description, info_checked_at, profiles(display_name)')
+      .select('id, user_id, title, started_at, cover_url, author, published_year, page_count, info_url, description, info_checked_at, profiles(display_name)')
       .order('started_at', { ascending: true }),
   ]);
   const { data: rows, error } = readsResult;
