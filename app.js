@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const AUTH_ONLY_SECTIONS = ['user-panel', 'app-nav', 'app-screens'];
-const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'admin'];
+const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'statystyki', 'admin'];
 
 let currentUser = null;
 let editingId = null;   // id wpisu edytowanego w formularzu, null = dodawanie
@@ -107,6 +107,15 @@ function showScreen(name) {
     else item.removeAttribute('aria-current');
   });
   window.scrollTo(0, 0);
+
+  // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
+  if (name === 'statystyki') {
+    if (hasData) requestAnimationFrame(playRace);
+    else racePending = true;
+  } else if (raceFrame !== null) {
+    cancelAnimationFrame(raceFrame);
+    raceFrame = null;
+  }
 }
 
 function goTo(name) {
@@ -665,7 +674,7 @@ async function loadReads() {
   // Rywalizacja resetuje się co roku: tylko wpisy od 1 stycznia (czas lokalny)
   const { data: rows, error } = await supabaseClient
     .from('reads')
-    .select('id, user_id, title, pages, multiplier, profiles(display_name, in_money_prize)')
+    .select('id, user_id, title, pages, multiplier, created_at, profiles(display_name, in_money_prize)')
     .gte('created_at', new Date(year, 0, 1).toISOString())
     .order('created_at', { ascending: true })
     .order('id', { ascending: true });
@@ -682,6 +691,7 @@ async function loadReads() {
   renderLeaderboard(readers);
   renderGoal(readers);
   renderUserProgress(readers);
+  renderStats(readers, rows || []);
   refreshIcons();
 }
 
@@ -693,6 +703,11 @@ function formatRate(n) {
 
 // Tempo każdego = punkty od 1 stycznia / dni od 1 stycznia. Zakładamy, że rywale utrzymają tempo
 // do końca roku, i liczymy, ile dziennie trzeba czytać, żeby skończyć rok przed najlepszym z nich.
+// Para etykieta + wartość w jednym <div> (dozwolone w <dl>), żeby zajmowała jedną komórkę siatki
+function goalFact(label, value) {
+  return [el('div', { class: 'goal-fact' }, [el('dt', { text: label }), el('dd', { text: value })])];
+}
+
 function renderGoal(readers) {
   const card = document.getElementById('goal-card');
   if (!currentUser) {
@@ -710,13 +725,17 @@ function renderGoal(readers) {
   const myPace = myPoints / daysElapsed;
   const others = readers.filter(r => r.key !== currentUser.id);
 
-  const headline = document.getElementById('goal-headline');
-  const details = document.getElementById('goal-details');
+  const number = document.getElementById('goal-number');
+  const unit = document.getElementById('goal-unit');
+  const sub = document.getElementById('goal-sub');
+  const facts = document.getElementById('goal-facts');
   card.hidden = false;
 
   if (!others.length) {
-    headline.textContent = 'Na razie nie masz rywali w tym roku.';
-    details.textContent = `Twoje tempo: ${formatRate(myPace)} str./dzień.`;
+    number.textContent = '';
+    unit.textContent = 'Na razie nie masz rywali w tym roku.';
+    sub.textContent = '';
+    facts.replaceChildren(...goalFact('Twoje tempo', `${formatRate(myPace)} str./dzień`));
     return;
   }
 
@@ -725,26 +744,379 @@ function renderGoal(readers) {
   const rival = others.reduce((best, r) => (projected(r) > projected(best) ? r : best));
   const rivalFinal = projected(rival);
   const leaderNow = others.reduce((best, r) => (r.points > best.points ? r : best));
-
   const neededPerDay = (rivalFinal - myPoints + 1) / daysLeft;
 
   if (neededPerDay <= 0) {
-    headline.textContent = 'Przy obecnym tempie rywali wygrywasz, nawet jeśli już nic nie przeczytasz.';
+    number.textContent = '';
+    unit.textContent = 'Wygrywasz, nawet jeśli już nic nie przeczytasz';
+    sub.textContent = 'przy obecnym tempie rywali';
   } else {
     const perDay = Math.ceil(neededPerDay);
-    headline.textContent = `Czytaj ok. ${perDay} str. dziennie (${perDay * 7} tygodniowo)`;
+    number.textContent = String(perDay);
+    unit.textContent = 'stron dziennie';
+    sub.textContent = `czyli ok. ${perDay * 7} tygodniowo do końca roku`;
   }
 
   const gapNow = leaderNow.points - myPoints;
-  const position = gapNow >= 0
-    ? `Do 1. miejsca brakuje Ci teraz ${gapNow + 1} pkt (prowadzi ${leaderNow.name}).`
-    : `Prowadzisz o ${-gapNow} pkt.`;
-  const paceInfo = `Twoje tempo: ${formatRate(myPace)} str./dzień, ` +
-    `${rival.name}: ${formatRate(pace(rival))} str./dzień ` +
-    `(prognoza na koniec roku: ${Math.round(rivalFinal)} pkt).`;
-
-  details.textContent = `${position} ${paceInfo} Strony liczone przy mnożniku 1x, książka po angielsku lub naukowa liczy się 1,5x.`;
+  facts.replaceChildren(
+    ...(gapNow >= 0
+      ? goalFact('Do 1. miejsca', `${gapNow + 1} pkt`)
+      : goalFact('Prowadzisz o', `${-gapNow} pkt`)),
+    ...goalFact('Twoje tempo', `${formatRate(myPace)} str./dzień`),
+    ...goalFact(`Rywal: ${rival.name.split(' ')[0]}`, `${formatRate(pace(rival))} str./dzień`),
+    ...goalFact('Prognoza rywala', `${Math.round(rivalFinal)} pkt`),
+  );
 }
+
+/* ----------------- Statystyki i wyścig ----------------- */
+const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const SERIES_SLOTS = 8;
+const RACE_DURATION_MS = 4500;
+
+let statsReaders = [];
+let statsRows = [];
+let race = null;          // narysowany wykres: skale, elementy, serie
+let raceFrame = null;     // id requestAnimationFrame
+let raceProgress = 1;     // 0..1, jak daleko w roku jest animacja
+let racePending = false;  // wejście na Statystyki przed wczytaniem danych
+
+function svgEl(tag, attrs = {}, children = []) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  for (const child of children) node.appendChild(child);
+  return node;
+}
+
+function formatDay(date) {
+  return `${date.getDate()} ${MONTHS_PL[date.getMonth()]}`;
+}
+
+// Kolor idzie za osobą (stała kolejność alfabetyczna), nie za miejscem w rankingu,
+// więc nie zmienia się, gdy ktoś kogoś wyprzedzi
+function seriesColors(readers) {
+  const sorted = [...readers].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  return new Map(sorted.map((r, i) => [r.key, i < SERIES_SLOTS ? `var(--series-${i + 1})` : 'var(--series-other)']));
+}
+
+function niceMax(value) {
+  if (value <= 0) return 100;
+  const power = 10 ** Math.floor(Math.log10(value));
+  for (const m of [1, 2, 2.5, 5, 10]) {
+    if (m * power >= value) return m * power;
+  }
+  return 10 * power;
+}
+
+function compactNumber(n) {
+  if (n < 1000) return String(n);
+  return `${String(Math.round(n / 100) / 10).replace('.', ',')}K`;  // 11000 -> 11K, 12150 -> 12,2K
+}
+
+// Punkty narastająco: schodek przy każdym wpisie (rows są posortowane po created_at)
+function buildRaceSeries(readers, rows) {
+  const colors = seriesColors(readers);
+  const byKey = new Map(readers.map(r => [r.key, { key: r.key, name: r.name, color: colors.get(r.key), steps: [], total: 0 }]));
+  rows.forEach(row => {
+    const s = byKey.get(row.user_id);
+    if (!s) return;
+    s.total += bookPoints(row);
+    s.steps.push({ t: new Date(row.created_at).getTime(), v: s.total });
+  });
+  return [...byKey.values()];
+}
+
+function valueAt(series, t) {
+  let v = 0;
+  for (const step of series.steps) {
+    if (step.t > t) break;
+    v = step.v;
+  }
+  return v;
+}
+
+function renderStats(readers, rows) {
+  statsReaders = readers;
+  statsRows = rows;
+  renderStatTiles(rows);
+  renderBooksChart(readers);
+  if (currentScreen() !== 'statystyki') return;
+  if (racePending) {
+    racePending = false;
+    playRace();
+  } else if (raceFrame === null) {
+    // W tle (np. po powrocie do apki) tylko przerysuj; animacja startuje przy wejściu na ekran
+    drawRace();
+    setRaceProgress(raceProgress);
+  }
+}
+
+function renderStatTiles(rows) {
+  const pages = rows.reduce((sum, r) => sum + r.pages, 0);
+  const longest = rows.reduce((best, r) => (!best || r.pages > best.pages ? r : best), null);
+  document.getElementById('tile-pages').textContent = compactNumber(pages);
+  document.getElementById('tile-books').textContent = String(rows.length);
+  document.getElementById('tile-avg').textContent = rows.length ? String(Math.round(pages / rows.length)) : '0';
+  document.getElementById('tile-longest').textContent = longest ? `${longest.title || 'bez tytułu'} · ${longest.pages} str.` : '—';
+}
+
+function renderBooksChart(readers) {
+  const chart = document.getElementById('books-chart');
+  if (!readers.length) {
+    chart.replaceChildren(el('div', { class: 'status-box', text: 'Brak wpisów w tym roku.' }));
+    return;
+  }
+  const colors = seriesColors(readers);
+  const max = Math.max(...readers.map(r => r.books.length));
+  const sorted = [...readers].sort((a, b) => b.books.length - a.books.length || a.name.localeCompare(b.name, 'pl'));
+
+  chart.replaceChildren(...sorted.map(r => {
+    const count = r.books.length;
+    const bar = el('span', { class: 'bar', title: `${r.name}: ${count}` });
+    bar.style.width = `${(count / max) * 100}%`;
+    bar.style.background = colors.get(r.key);
+    return el('div', { class: 'bar-row' }, [
+      el('span', { class: 'bar-label', text: r.name }),
+      el('span', { class: 'bar-track' }, [bar, el('span', { class: 'bar-value', text: String(count) })]),
+    ]);
+  }));
+}
+
+function renderRaceLegend(series) {
+  document.getElementById('race-legend').replaceChildren(...series.map(s => {
+    const key = el('span', { class: 'legend-line' });
+    key.style.background = s.color;
+    return el('span', { class: 'legend-item' }, [key, el('span', { text: s.name })]);
+  }));
+}
+
+function drawRace() {
+  const container = document.getElementById('race-chart');
+  const width = container.clientWidth;
+  if (!width) return;  // ekran niewidoczny, nie ma czego mierzyć
+
+  const series = buildRaceSeries(statsReaders, statsRows);
+  renderRaceLegend(series);
+  if (!series.length) {
+    race = null;
+    container.replaceChildren(el('div', { class: 'status-box', text: 'Brak wpisów w tym roku.' }));
+    return;
+  }
+
+  const narrow = width < 480;
+  const height = narrow ? 240 : 300;
+  const m = { top: 12, right: narrow ? 92 : 120, bottom: 26, left: 40 };
+  const year = currentYear();
+  const t0 = new Date(year, 0, 1).getTime();
+  const t1 = Math.max(Date.now(), t0 + DAY_MS);
+  const plotRight = width - m.right;
+  const x = t => m.left + ((t - t0) / (t1 - t0)) * (plotRight - m.left);
+
+  const svg = svgEl('svg', { width, height, viewBox: `0 0 ${width} ${height}`, class: 'race-svg', role: 'img', 'aria-label': 'Punkty narastająco w ciągu roku dla każdej osoby' });
+
+  // Siatka i oś Y przerysowywane w każdej klatce, bo skala rośnie razem z wynikami
+  const grid = svgEl('g');
+  svg.appendChild(grid);
+
+  // Oś X: miesiące (na wąskim ekranie co drugi)
+  const lastMonth = new Date(t1).getMonth();
+  for (let month = 0; month <= lastMonth; month += narrow ? 2 : 1) {
+    const label = svgEl('text', { x: x(new Date(year, month, 1).getTime()), y: height - 8, 'text-anchor': 'start', class: 'axis-text' });
+    label.textContent = MONTHS_PL[month];
+    svg.appendChild(label);
+  }
+
+  const lines = svgEl('g');
+  series.forEach(s => {
+    s.path = svgEl('path', { class: 'race-line', style: `stroke: ${s.color}` });
+    lines.appendChild(s.path);
+  });
+  svg.appendChild(lines);
+
+  const crosshair = svgEl('line', { y1: m.top, y2: height - m.bottom, class: 'crosshair', visibility: 'hidden' });
+  svg.appendChild(crosshair);
+
+  const leaders = svgEl('g');
+  const dots = svgEl('g');
+  const labels = svgEl('g');
+  svg.append(leaders, dots, labels);
+
+  series.forEach(s => {
+    s.dot = svgEl('circle', { r: 4.5, class: 'race-dot', style: `fill: ${s.color}` });
+    s.leader = svgEl('line', { class: 'leader-line' });
+    s.label = svgEl('text', { class: 'race-label' });
+    s.labelName = svgEl('tspan', { class: 'race-label-name' });
+    s.labelValue = svgEl('tspan', { class: 'race-label-value', dx: 4 });
+    s.label.append(s.labelName, s.labelValue);
+    dots.appendChild(s.dot);
+    leaders.appendChild(s.leader);
+    labels.appendChild(s.label);
+  });
+
+  // Warstwa do najechania: krzyżyk szuka daty, dymek pokazuje wszystkich
+  const overlay = svgEl('rect', { x: m.left, y: m.top, width: plotRight - m.left, height: height - m.top - m.bottom, class: 'race-overlay', tabindex: 0, 'aria-label': 'Przesuń, aby zobaczyć punkty w danym dniu' });
+  svg.appendChild(overlay);
+
+  const tooltip = el('div', { class: 'chart-tooltip', hidden: '' });
+  container.replaceChildren(svg, tooltip);
+
+  race = { series, x, t0, t1, m, width, height, plotRight, grid, crosshair, tooltip, focusT: t1, vMax: 100 };
+
+  const onPointer = e => {
+    const rect = svg.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    showRaceTooltip(t0 + ((px - m.left) / (plotRight - m.left)) * (t1 - t0));
+  };
+  overlay.addEventListener('pointermove', onPointer);
+  overlay.addEventListener('pointerdown', onPointer);  // stuknięcie na telefonie
+  overlay.addEventListener('pointerleave', hideRaceTooltip);
+  overlay.addEventListener('focus', () => showRaceTooltip(race.focusT));
+  overlay.addEventListener('blur', hideRaceTooltip);
+  overlay.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    race.focusT += (e.key === 'ArrowRight' ? 7 : -7) * DAY_MS;
+    showRaceTooltip(race.focusT);
+  });
+}
+
+function drawRaceGrid(y, vMax) {
+  const { grid, m, plotRight } = race;
+  const step = niceMax(vMax / 4);  // „ładny” krok osi: 1, 2, 2.5, 5 × 10^n
+  const items = [];
+  for (let v = 0; v <= vMax; v += step) {
+    items.push(svgEl('line', { x1: m.left, x2: plotRight, y1: y(v), y2: y(v), class: v === 0 ? 'axis-line' : 'grid-line' }));
+    const label = svgEl('text', { x: m.left - 6, y: y(v) + 4, 'text-anchor': 'end', class: 'axis-text' });
+    label.textContent = compactNumber(Math.round(v));
+    items.push(label);
+  }
+  grid.replaceChildren(...items);
+}
+
+function setRaceProgress(p) {
+  raceProgress = p;
+  if (!race) return;
+  const { series, x, t0, t1, m, plotRight, height } = race;
+  const tCur = t0 + p * (t1 - t0);
+  const xCur = x(tCur);
+  document.getElementById('race-date').textContent = p < 1 ? formatDay(new Date(tCur)) : '';
+
+  // Oś Y rośnie razem z liderem (z zapasem 10%), więc od początku widać, kto ucieka
+  const values = series.map(s => valueAt(s, tCur));
+  const vMax = Math.max(100, Math.max(...values) * 1.1);
+  race.vMax = vMax;
+  const y = v => height - m.bottom - (v / vMax) * (height - m.top - m.bottom);
+  race.y = y;
+  drawRaceGrid(y, vMax);
+
+  // Linie schodkowe do bieżącego dnia
+  series.forEach(s => {
+    let d = `M${x(t0)},${y(0)}`;
+    for (const step of s.steps) {
+      if (step.t > tCur) break;
+      d += ` H${x(step.t)} V${y(step.v)}`;
+    }
+    s.path.setAttribute('d', `${d} H${xCur}`);
+  });
+
+  // Etykiety przy końcach linii; gdy się nakładają, rozsuwamy je i łączymy linią z kropką
+  const items = series.map((s, i) => ({ s, v: values[i], dotY: y(values[i]), labelY: y(values[i]) }))
+    .sort((a, b) => a.dotY - b.dotY);
+
+  const gap = 16;
+  for (let i = 1; i < items.length; i++) {
+    items[i].labelY = Math.max(items[i].labelY, items[i - 1].labelY + gap);
+  }
+  const overflow = items.length ? items[items.length - 1].labelY - (height - m.bottom) : 0;
+  if (overflow > 0) items.forEach(it => { it.labelY -= overflow; });
+  for (let i = items.length - 2; i >= 0; i--) {
+    items[i].labelY = Math.min(items[i].labelY, items[i + 1].labelY - gap);
+  }
+
+  const labelX = Math.min(xCur, plotRight) + 10;
+  items.forEach(({ s, v, dotY, labelY }) => {
+    s.dot.setAttribute('cx', xCur);
+    s.dot.setAttribute('cy', dotY);
+    s.label.setAttribute('x', labelX);
+    s.label.setAttribute('y', labelY + 4);
+    s.labelName.textContent = s.name.split(' ')[0];
+    s.labelValue.textContent = String(v);
+    const moved = Math.abs(labelY - dotY) > 3;
+    s.leader.setAttribute('visibility', moved ? 'visible' : 'hidden');
+    if (moved) {
+      s.leader.setAttribute('x1', xCur + 5);
+      s.leader.setAttribute('y1', dotY);
+      s.leader.setAttribute('x2', labelX - 3);
+      s.leader.setAttribute('y2', labelY);
+    }
+  });
+}
+
+function playRace() {
+  cancelAnimationFrame(raceFrame);
+  raceFrame = null;
+  drawRace();
+  hideRaceTooltip();
+  if (!race) return;
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    setRaceProgress(1);
+    return;
+  }
+
+  const start = performance.now();
+  const step = now => {
+    const p = Math.min(1, (now - start) / RACE_DURATION_MS);
+    setRaceProgress(p);
+    raceFrame = p < 1 ? requestAnimationFrame(step) : null;
+  };
+  setRaceProgress(0);
+  raceFrame = requestAnimationFrame(step);
+}
+
+function showRaceTooltip(t) {
+  if (!race || raceFrame !== null) return;  // w trakcie animacji bez dymka
+  const { series, x, t0, t1, crosshair, tooltip, plotRight, m } = race;
+  t = Math.min(t1, Math.max(t0, t));
+  race.focusT = t;
+  const px = x(t);
+  crosshair.setAttribute('x1', px);
+  crosshair.setAttribute('x2', px);
+  crosshair.setAttribute('visibility', 'visible');
+
+  const rows = series
+    .map(s => ({ s, v: valueAt(s, t) }))
+    .sort((a, b) => b.v - a.v)
+    .map(({ s, v }) => {
+      const key = el('span', { class: 'legend-line' });
+      key.style.background = s.color;
+      return el('div', { class: 'tooltip-row' }, [key, el('strong', { text: String(v) }), el('span', { text: s.name })]);
+    });
+  tooltip.replaceChildren(el('div', { class: 'tooltip-date', text: formatDay(new Date(t)) }), ...rows);
+  tooltip.hidden = false;
+
+  // Dymek po tej stronie krzyżyka, gdzie jest więcej miejsca
+  const tipWidth = tooltip.offsetWidth;
+  const left = px + 12 + tipWidth > race.width ? px - 12 - tipWidth : px + 12;
+  tooltip.style.left = `${Math.max(m.left, Math.min(left, plotRight))}px`;
+  tooltip.style.top = `${m.top}px`;
+}
+
+function hideRaceTooltip() {
+  if (!race) return;
+  race.crosshair.setAttribute('visibility', 'hidden');
+  race.tooltip.hidden = true;
+}
+
+let raceResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(raceResizeTimer);
+  raceResizeTimer = setTimeout(() => {
+    if (currentScreen() !== 'statystyki' || raceFrame !== null) return;
+    drawRace();
+    setRaceProgress(raceProgress);
+  }, 150);
+});
 
 function renderLeaderboard(readers) {
   const ranked = [...readers].sort((a, b) => b.points - a.points);
@@ -852,6 +1224,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
   document.getElementById('multiplier-add-form').addEventListener('submit', handleMultiplierAdd);
+  document.getElementById('race-play').addEventListener('click', playRace);
 
   document.querySelectorAll('.current-year').forEach(span => { span.textContent = currentYear(); });
 

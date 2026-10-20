@@ -58,6 +58,10 @@
         <i data-lucide="library-big"></i>
         <span>Postępy</span>
       </a>
+      <a href="#statystyki" class="nav-item" data-screen="statystyki">
+        <i data-lucide="chart-line"></i>
+        <span>Statystyki</span>
+      </a>
       <a href="#admin" id="nav-admin" class="nav-item" data-screen="admin" hidden>
         <i data-lucide="shield-check"></i>
         <span>Admin</span>
@@ -109,12 +113,16 @@
 
         <!-- Ile trzeba czytać, żeby wygrać -->
         <div id="goal-card" class="goal-card" hidden>
-          <div class="stat-icon"><i data-lucide="target"></i></div>
-          <div class="goal-info">
+          <div class="goal-top">
+            <div class="stat-icon"><i data-lucide="target"></i></div>
             <span class="stat-label">Plan na 1. miejsce w <span class="current-year"></span></span>
-            <span id="goal-headline" class="goal-headline"></span>
-            <span id="goal-details" class="goal-details"></span>
           </div>
+          <div id="goal-main" class="goal-main">
+            <span id="goal-number" class="goal-number"></span>
+            <span id="goal-unit" class="goal-unit"></span>
+          </div>
+          <span id="goal-sub" class="goal-sub"></span>
+          <dl id="goal-facts" class="goal-facts"></dl>
         </div>
 
         <a href="#dodaj" class="btn btn-primary btn-block btn-lg">
@@ -191,6 +199,58 @@
             <h2>Szczegółowe postępy <span class="current-year"></span></h2>
           </div>
           <div id="user-progress-container" class="progress-list"></div>
+        </div>
+      </section>
+
+      <!-- Ekran: Statystyki -->
+      <section class="screen" data-screen="statystyki" hidden>
+        <div class="card">
+          <div class="card-header race-header">
+            <i data-lucide="chart-line" class="card-icon"></i>
+            <h2>Wyścig <span class="current-year"></span></h2>
+            <button type="button" id="race-play" class="btn btn-outline btn-sm race-play">
+              <i data-lucide="rotate-ccw"></i>
+              <span>Odtwórz</span>
+            </button>
+          </div>
+          <p class="card-intro">Punkty narastająco od 1 stycznia. <span id="race-date" class="race-date"></span></p>
+          <div id="race-chart" class="race-chart"></div>
+          <div id="race-legend" class="chart-legend"></div>
+        </div>
+
+        <div class="stats-tiles">
+          <div class="stat-card">
+            <div class="stat-info">
+              <span class="stat-label">Stron razem</span>
+              <span id="tile-pages" class="stat-value">0</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-info">
+              <span class="stat-label">Książek</span>
+              <span id="tile-books" class="stat-value">0</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-info">
+              <span class="stat-label">Średnio stron</span>
+              <span id="tile-avg" class="stat-value">0</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-info">
+              <span class="stat-label">Najdłuższa</span>
+              <span id="tile-longest" class="stat-value stat-value-sm">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="chart-bar" class="card-icon"></i>
+            <h2>Książki na osobę</h2>
+          </div>
+          <div id="books-chart" class="bars-chart"></div>
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 // Podbij wersję przy zmianie listy ASSETS; zwykłe deploye i tak łapie network-first
-const CACHE_NAME = 'czytanko-v8';
+const CACHE_NAME = 'czytanko-v9';
 const ASSETS = [
   './',
   './index.html',
