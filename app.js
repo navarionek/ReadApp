@@ -326,6 +326,7 @@ function updateFormUI() {
   document.getElementById('started-group').hidden = !started;
   document.getElementById('pages-group').hidden = started;
   document.getElementById('multiplier-group').hidden = started;
+  document.getElementById('unfinished-group').hidden = started;
   document.getElementById('pages').required = !started;
 
   const note = document.getElementById('finishing-note');
@@ -373,6 +374,7 @@ function startEdit(book) {
   editingId = book.id;
   document.getElementById('title').value = book.title || '';
   document.getElementById('pages').value = book.pages;
+  document.getElementById('unfinished').checked = !!book.unfinished;
   editingMultiplier = Number(book.multiplier);
   multiplierTouched = false;
   const note = document.getElementById('multiplier-note');
@@ -467,7 +469,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     }
 
     // user_id i created_at ustawia baza (defaulty); przy kończeniu zaczętej idzie też started_at
-    const values = { title, pages, multiplier };
+    const values = { title, pages, multiplier, unfinished: document.getElementById('unfinished').checked };
     if (finishing) values.started_at = finishing.startedAt;
     const { data, error } = editingId
       ? await supabaseClient.from('reads').update(values).eq('id', editingId).select('id')
@@ -826,7 +828,7 @@ async function loadReads() {
   const [readsResult, nowResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, created_at, started_at, profiles(display_name, in_money_prize)')
+      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, profiles(display_name, in_money_prize)')
       .gte('created_at', new Date(year, 0, 1).toISOString())
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),
@@ -1527,7 +1529,10 @@ function renderUserProgress(readers) {
 
     const rows = reader.books.map(book => {
       const cells = [
-        el('td', { text: book.title || '—' }),
+        el('td', {}, [
+          document.createTextNode(book.title || '—'),
+          ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
+        ]),
         // Na telefonie kolumna mnożnika jest schowana, a mnożnik pokazuje się przed stronami,
         // żeby liczby stron były wyrównane do prawej w jednej linii
         el('td', { class: 'text-right pages-cell' }, [
@@ -1867,7 +1872,7 @@ async function loadShelf() {
 
   const { data, error } = await supabaseClient
     .from('reads')
-    .select('id, user_id, title, pages, multiplier, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
+    .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
@@ -1935,6 +1940,7 @@ function bookTile(book, row, reading = false) {
   const tile = el('button', { type: 'button', class: `book-tile${reading ? ' reading' : ''}`, title: book.title || '' }, [
     coverEl(book),
     el('span', { class: 'book-tile-title', text: book.title || 'bez tytułu' }),
+    ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
     ...(book.author ? [el('span', { class: 'book-tile-author', text: book.author })] : []),
   ]);
   if (row) tile.addEventListener('click', () => openBookModal(row));
@@ -1995,7 +2001,7 @@ function openBookModal(row) {
     : `dodane ${formatDay(finished)} ${finished.getFullYear()}`;
 
   const facts = el('dl', { class: 'book-facts' }, [
-    el('div', {}, [el('dt', { text: 'Strony' }), el('dd', { text: String(row.pages) })]),
+    el('div', {}, [el('dt', { text: 'Strony' }), el('dd', { text: row.unfinished ? `${row.pages} (niedokończona)` : String(row.pages) })]),
     el('div', {}, [el('dt', { text: 'Mnożnik' }), el('dd', { text: `${formatMultiplier(row.multiplier)}x` })]),
     el('div', {}, [el('dt', { text: 'Punkty' }), el('dd', { text: String(bookPoints(row)) })]),
     el('div', {}, [el('dt', { text: 'Przeczytane' }), el('dd', { text: dates })]),
