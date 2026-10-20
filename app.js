@@ -192,7 +192,8 @@ async function loadReads() {
   const { data: rows, error } = await supabaseClient
     .from('reads')
     .select('user_id, title, pages, multiplier, profiles(display_name)')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     console.error('Error loading reads:', error);
