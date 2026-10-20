@@ -175,6 +175,11 @@ async function handleRename() {
 }
 
 /* ----------------- Data loading ----------------- */
+// Wynik książki zaokrąglony do całości; sumy liczone z tych samych liczb, żeby wszystko się zgadzało
+function bookPoints(book) {
+  return Math.round(book.pages * book.multiplier);
+}
+
 function groupByReader(rows) {
   const readers = new Map();
   rows.forEach(r => {
@@ -182,7 +187,7 @@ function groupByReader(rows) {
       readers.set(r.user_id, { key: r.user_id, name: r.profiles?.display_name || '?', points: 0, books: [] });
     }
     const reader = readers.get(r.user_id);
-    reader.points += r.pages * r.multiplier;
+    reader.points += bookPoints(r);
     reader.books.push(r);
   });
   return [...readers.values()];
@@ -211,14 +216,14 @@ function renderLeaderboard(readers) {
   document.getElementById('leaderboard-body').replaceChildren(
     ...ranked.map(r => el('tr', {}, [
       el('td', { text: r.name }),
-      el('td', { class: 'text-right', text: r.points.toFixed(0) }),
+      el('td', { class: 'text-right', text: String(r.points) }),
     ]))
   );
 
   if (currentUser) {
     const rankIndex = ranked.findIndex(r => r.key === currentUser.id);
     const me = ranked[rankIndex];
-    document.getElementById('stat-total-points').textContent = me ? me.points.toFixed(0) : '0';
+    document.getElementById('stat-total-points').textContent = me ? String(me.points) : '0';
     document.getElementById('stat-rank').textContent = rankIndex !== -1 ? `#${rankIndex + 1}` : '#--';
   }
 }
@@ -229,7 +234,7 @@ function renderUserProgress(readers) {
       el('td', { text: book.title || '—' }),
       el('td', { class: 'text-right', text: String(book.pages) }),
       el('td', { class: 'text-right', text: `${book.multiplier}x` }),
-      el('td', { class: 'text-right score', text: (book.pages * book.multiplier).toFixed(0) }),
+      el('td', { class: 'text-right score', text: String(bookPoints(book)) }),
     ]));
 
     const table = el('table', {}, [
