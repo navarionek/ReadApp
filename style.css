@@ -2030,3 +2030,11 @@ header {
   .podium-place { animation: none; }
   .rank-fill { transition: none; }
 }
+
+/* „(opcjonalnie)” w etykiecie pola zostaje w tej samej linijce */
+label .hint {
+  display: inline;
+  margin-top: 0;
+  margin-left: 0.25rem;
+  font-weight: 400;
+}
