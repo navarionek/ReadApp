@@ -1,10 +1,23 @@
 // Podbij wersję przy zmianie listy ASSETS; zwykłe deploye i tak łapie network-first
-const CACHE_NAME = 'czytanko-v19';
+const CACHE_NAME = 'czytanko-v20';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './js/main.js',
+  './js/state.js',
+  './js/supabase.js',
+  './js/ui.js',
+  './js/shell.js',
+  './js/auth.js',
+  './js/form.js',
+  './js/admin.js',
+  './js/data.js',
+  './js/stats.js',
+  './js/badges.js',
+  './js/push.js',
+  './js/shelf.js',
+  './supabase/functions/_shared/logic.js',
   './manifest.json',
   './icon-192x192.png',
   './icon-512x512.png'

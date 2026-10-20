@@ -3,6 +3,7 @@
 // wpis musi być świeży (< 5 min) i jeszcze bez powiadomienia (notified_at jest zajmowane atomowo).
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
+import { bookPoints } from '../_shared/logic.js';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -14,8 +15,6 @@ webpush.setVapidDetails(
 
 type Read = { id: number; user_id: string; title: string | null; pages: number; multiplier: number; created_at: string };
 
-// Tak samo jak w aplikacji: wynik książki zaokrąglony, sumy z zaokrąglonych
-const bookPoints = (r: { pages: number; multiplier: number }) => Math.round(r.pages * Number(r.multiplier));
 const firstName = (name: string) => name.split(' ')[0];
 
 function json(body: unknown, status = 200) {
@@ -45,7 +44,8 @@ Deno.serve(async req => {
   if (!read) return json({ skipped: true });
 
   // Punkty w bieżącym roku (rywalizacja resetuje się 1 stycznia, czas polski)
-  const year = new Date(read.created_at).getUTCFullYear();
+  // Rok liczony w czasie polskim, jak w aplikacji (wpis tuż po północy 1 stycznia to już nowy rok)
+  const year = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw', year: 'numeric' }).format(new Date(read.created_at)));
   const { data: rows, error: rowsError } = await supabase
     .from('reads')
     .select('user_id, pages, multiplier')

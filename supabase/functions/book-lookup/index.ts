@@ -3,6 +3,8 @@
 // wspólny limit Google jest zwykle wyczerpany) + Open Library jako uzupełnienie.
 // Wywoływana z aplikacji przez zalogowanych (domyślna weryfikacja JWT).
 
+import { normalizeTitle, titleMatches } from '../_shared/logic.js';
+
 type Result = {
   title: string;
   author: string | null;
@@ -22,23 +24,6 @@ const cors = {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-}
-
-// To samo dopasowanie tytułów co w aplikacji (całe słowa albo większość słów)
-function normalize(s: string) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ł/g, 'l')
-    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function titleMatches(query: string, found: string) {
-  const a = normalize(query);
-  const b = normalize(found);
-  if (!a || !b) return false;
-  if (` ${b} `.includes(` ${a} `) || ` ${a} `.includes(` ${b} `)) return true;
-  const wa = new Set(a.split(' ').filter(w => w.length > 2));
-  const wb = new Set(b.split(' ').filter(w => w.length > 2));
-  if (!wa.size) return false;
-  return [...wa].filter(w => wb.has(w)).length / wa.size >= 0.6;
 }
 
 function yearOf(date: unknown): number | null {
@@ -126,7 +111,7 @@ Deno.serve(async req => {
   const seen = new Set<string>();
   const results = [...(gExact ?? []), ...(gPlain ?? []), ...o]
     .filter(r => {
-      const key = `${normalize(r.title)}|${r.cover ?? ''}`;
+      const key = `${normalizeTitle(r.title)}|${r.cover ?? ''}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -135,7 +120,7 @@ Deno.serve(async req => {
       r,
       i,
       // identyczny tytuł > pasujący tytuł > reszta; przy remisie wygrywa okładka
-      score: (normalize(r.title) === normalize(q) ? 4 : 0) + (titleMatches(q, r.title) ? 2 : 0) + (r.cover ? 1 : 0),
+      score: (normalizeTitle(r.title) === normalizeTitle(q) ? 4 : 0) + (titleMatches(q, r.title) ? 2 : 0) + (r.cover ? 1 : 0),
     }))
     .sort((a, b) => b.score - a.score || a.i - b.i)
     .map(x => x.r)
