@@ -12,6 +12,7 @@ export const BADGES = [
   { id: 'pages1k', icon: 'flame', name: 'Tysiąc stron', desc: '1000 przeczytanych stron', test: s => s.pages >= 1000 },
   { id: 'pages5k', icon: 'rocket', name: 'Pięć tysięcy stron', desc: '5000 przeczytanych stron', test: s => s.pages >= 5000 },
   { id: 'bonus', icon: 'sparkles', name: 'Z bonusem', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
+  { id: 'double', icon: 'zap', name: 'Podwójny bonus', desc: 'Książka z mnożnikiem 2,25x (dwa mnożniki naraz)', test: s => s.doubleBonus >= 1 },
   { id: 'streak', icon: 'calendar-check', name: 'Regularność', desc: 'Wpisy w 3 kolejnych miesiącach', test: s => s.monthStreak >= 3 },
   { id: 'leader', icon: 'crown', name: 'Korona', desc: 'Aktualnie 1. miejsce w rankingu', test: s => s.rank === 1 },
 ];
@@ -29,6 +30,7 @@ export function badgeStats(reader, rank) {
     pages: reader.books.reduce((sum, b) => sum + b.pages, 0),
     longest: reader.books.reduce((max, b) => Math.max(max, b.pages), 0),
     bonus: reader.books.filter(b => Number(b.multiplier) > 1).length,
+    doubleBonus: reader.books.filter(b => Number(b.multiplier) >= 2.25 - 1e-9).length,
     monthStreak,
     rank,
   };
