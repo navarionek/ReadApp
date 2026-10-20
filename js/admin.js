@@ -1,3 +1,4 @@
+import { maybeShowDiscouragement } from './discourage.js';
 import { actionButton, loadReads } from './data.js';
 import { formatMultiplier, loadMultipliers } from './form.js';
 import { currentScreen, goTo, showScreen } from './shell.js';
@@ -30,6 +31,7 @@ export async function loadProfile() {
   if (!data) return;
 
   setHeaderName(data.display_name);
+  maybeShowDiscouragement(data.display_name);
   syncAvatar(data.avatar_url);
   state.isAdmin = data.is_admin;
   document.getElementById('settings-admin').hidden = !state.isAdmin;
