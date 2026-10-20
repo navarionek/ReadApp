@@ -1,9 +1,10 @@
 import { viewerId } from './admin.js';
+import { earnedBadges } from './badges.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { confettiBurst, confettiFountain } from './confetti.js';
 import { currentScreen } from './shell.js';
 import { seriesColors } from './stats.js';
-import { el, icon, refreshIcons, showToast } from './ui.js';
+import { currentYear, el, icon, refreshIcons, showToast } from './ui.js';
 
 /* ----------------- Ranking: podium i paski „książka po książce” ----------------- */
 const PODIUM_ORDER = [1, 0, 2];  // układ na ekranie: 2. miejsce, 1., 3.
@@ -53,7 +54,7 @@ function renderPodium(ranked, colors) {
 }
 
 // Pasek jednej osoby: długość = punkty względem lidera, a w środku kolejne książki jako segmenty
-function renderBar(reader, rank, leaderPoints, colors) {
+function renderBar(reader, rank, leaderPoints, colors, ranked) {
   const pages = reader.books.reduce((sum, b) => sum + b.pages, 0);
   const n = reader.books.length;
   const gap = leaderPoints - reader.points;
@@ -76,14 +77,26 @@ function renderBar(reader, rank, leaderPoints, colors) {
   fill.style.width = `${fill.dataset.width}%`;
   track.appendChild(fill);
 
+  const earned = earnedBadges(reader, rank, ranked);
   const isMe = reader.key === viewerId();
   const row = el('div', { class: `rank-row${isMe ? ' me' : ''}${rank === 1 ? ' leader' : ''}` }, [
     el('div', { class: 'rank-head' }, [
       el('span', { class: 'rank-pos', text: `#${rank}` }),
       avatar(reader, colors),
       el('span', { class: 'rank-name', text: firstName(reader.name) + (isMe ? ' (ty)' : '') }),
+      ...(reader.inMoneyPrize
+        ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
+        : []),
       el('span', { class: 'rank-total', 'data-count': String(reader.points), text: `${reader.points} pkt` }),
     ]),
+    ...(earned.length
+      ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
+          earned.map(b => {
+            const chip = el('button', { type: 'button', class: 'badge-mini', title: `${b.name}: ${b.desc}`, 'aria-label': b.name }, [icon(b.icon)]);
+            chip.addEventListener('click', () => showToast(`${b.name}: ${b.desc}`));
+            return chip;
+          }))]
+      : []),
     track,
     el('div', { class: 'rank-meta' }, [
       el('span', { text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron` }),
@@ -101,12 +114,12 @@ export function renderRankingViz(ranked) {
   const container = document.getElementById('ranking-viz');
   viewerIsFirst = ranked.length > 0 && ranked[0].key === viewerId();
   if (!ranked.length) {
-    container.replaceChildren();
+    container.replaceChildren(el('div', { class: 'status-box', text: `Brak wpisów w ${currentYear()} roku. Dodaj pierwszy!` }));
     return;
   }
   const colors = seriesColors(ranked);
   const leaderPoints = ranked[0].points;
-  const bars = el('div', { class: 'rank-bars' }, ranked.map((r, i) => renderBar(r, i + 1, leaderPoints, colors)));
+  const bars = el('div', { class: 'rank-bars' }, ranked.map((r, i) => renderBar(r, i + 1, leaderPoints, colors, ranked)));
   container.replaceChildren(
     ...(ranked.length > 1 ? [renderPodium(ranked, colors)] : []),
     bars,

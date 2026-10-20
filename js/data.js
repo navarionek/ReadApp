@@ -1,5 +1,5 @@
 import { loadPrize, viewerId } from './admin.js';
-import { earnedBadges, renderBadgesCard } from './badges.js';
+import { renderBadgesCard } from './badges.js';
 import { renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
@@ -39,13 +39,13 @@ export function renderStatus(text, withRetry = false) {
     return btn;
   };
 
-  const cell = el('td', { colspan: '2', class: 'status-cell' }, [el('span', { text })]);
-  if (withRetry) cell.appendChild(retry());
-  document.getElementById('leaderboard-body').replaceChildren(el('tr', {}, [cell]));
-
-  const box = el('div', { class: 'status-box' }, [el('span', { text })]);
-  if (withRetry) box.appendChild(retry());
-  document.getElementById('user-progress-container').replaceChildren(box);
+  const makeBox = () => {
+    const box = el('div', { class: 'status-box' }, [el('span', { text })]);
+    if (withRetry) box.appendChild(retry());
+    return box;
+  };
+  document.getElementById('ranking-viz').replaceChildren(makeBox());
+  document.getElementById('user-progress-container').replaceChildren(makeBox());
 }
 
 // Numer ostatniego żądania: wolniejsza, starsza odpowiedź nie nadpisze nowszych danych
@@ -227,30 +227,6 @@ export function renderGoal(readers) {
 export function renderLeaderboard(readers) {
   const ranked = [...readers].sort((a, b) => b.points - a.points);
   state.lastRanked = ranked.map(r => ({ key: r.key, name: r.name, points: r.points }));
-  const tbody = document.getElementById('leaderboard-body');
-
-  if (!ranked.length) {
-    tbody.replaceChildren(el('tr', {}, [
-      el('td', { colspan: '2', class: 'status-cell', text: `Brak wpisów w ${currentYear()} roku. Dodaj pierwszy!` }),
-    ]));
-  } else {
-    tbody.replaceChildren(...ranked.map((r, i) => {
-      const earned = earnedBadges(r, i + 1, ranked);
-      return el('tr', {}, [
-        el('td', {}, [
-          document.createTextNode(r.name),
-          ...(r.inMoneyPrize
-            ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
-            : []),
-          ...(earned.length
-            ? [el('span', { class: 'badge-row', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
-                earned.map(b => el('span', { class: 'badge-mini', title: `${b.name}: ${b.desc}` }, [icon(b.icon)])))]
-            : []),
-        ]),
-        el('td', { class: 'text-right', text: String(r.points) }),
-      ]);
-    }));
-  }
   renderRankingViz(ranked);
   renderBadgesCard(ranked);
 

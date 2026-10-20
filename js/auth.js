@@ -55,7 +55,7 @@ export function updateUI(user) {
       document.getElementById(id).hidden = true;
     });
     cancelEdit();
-    document.getElementById('leaderboard-body').replaceChildren();
+    document.getElementById('ranking-viz').replaceChildren();
     document.getElementById('user-progress-container').replaceChildren();
   }
 }
