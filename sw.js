@@ -1,58 +1,55 @@
-const CACHE_NAME = 'czytanko-v1';
+// Podbij wersję przy zmianie listy ASSETS; zwykłe deploye i tak łapie network-first
+const CACHE_NAME = 'czytanko-v2';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.json'
+  './manifest.json',
+  './icon-192x192.png',
+  './icon-512x512.png'
 ];
 
 // Install Service Worker
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(ASSETS);
-      })
+      .then(cache => cache.addAll(ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate Service Worker
+// Activate Service Worker: usuń stare cache (m.in. cache-first z v1)
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
-        cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
-            console.log('Deleting old cache:', cache);
-            return caches.delete(cache);
-          }
-        })
+        cacheNames
+          .filter(cache => cache !== CACHE_NAME)
+          .map(cache => caches.delete(cache))
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// Fetching strategy: Cache-First, falling back to Network
+// Fetching strategy: Network-First, cache tylko jako fallback offline
 self.addEventListener('fetch', event => {
+  const req = event.request;
+  // Supabase, CDN itp. idą normalnie przez sieć
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+
+  // Nawigacje (też powrót z OAuth z ?code=...) trzymamy pod jednym kluczem
+  const cacheKey = req.mode === 'navigate' ? './' : req;
+
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
+    fetch(req)
+      .then(res => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
         }
-        return fetch(event.request).then(fetchRes => {
-          // Don't cache unless it's a successful response
-          if (fetchRes.status === 200 && fetchRes.type === 'basic') {
-            const resToCache = fetchRes.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, resToCache);
-            });
-          }
-          return fetchRes;
-        });
+        return res;
       })
+      .catch(() => caches.match(cacheKey))
   );
 });

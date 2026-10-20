@@ -4,19 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon-192x192.png">
+  <link rel="apple-touch-icon" href="icon-192x192.png">
   <meta name="theme-color" content="#6366f1">
   <title>Czytanko</title>
+  <script>
+    // Motyw ustawiany przed renderem, żeby nie migał jasny ekran
+    (function () {
+      let saved = null;
+      try { saved = localStorage.getItem('theme'); } catch (e) {}
+      const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (dark) document.documentElement.classList.add('dark-mode');
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/lucide@1.52.0/dist/umd/lucide.min.js"></script>
 </head>
 <body>
   <main class="container">
     <header>
       <h1 class="app-title">Czytanko</h1>
-      <div id="user-panel" class="user-panel" style="display:none;">
+      <div id="user-panel" class="user-panel" hidden>
         <span id="display-name" class="user-name"></span>
-        <button id="theme-toggle" class="btn btn-outline btn-sm" aria-label="Toggle theme">
+        <button id="theme-toggle" class="btn btn-outline btn-sm" aria-label="Przełącz motyw">
           <i data-lucide="moon" id="theme-icon"></i>
         </button>
         <button id="logout-btn" class="btn btn-outline btn-sm">
@@ -27,12 +38,12 @@
     </header>
 
     <!-- Stats Bar -->
-    <section id="stats-bar" class="stats-grid" style="display:none;">
+    <section id="stats-bar" class="stats-grid" hidden>
       <div class="stat-card">
         <div class="stat-icon"><i data-lucide="book-open"></i></div>
         <div class="stat-info">
-          <span class="stat-label">Twoje strony</span>
-          <span id="stat-total-pages" class="stat-value">0</span>
+          <span class="stat-label">Twoje punkty</span>
+          <span id="stat-total-points" class="stat-value">0</span>
         </div>
       </div>
       <div class="stat-card">
@@ -45,9 +56,9 @@
     </section>
 
     <!-- Login modal -->
-    <div id="login-modal" class="modal">
+    <div id="login-modal" class="modal" hidden>
       <div class="modal-content">
-        <div class="modal-icon"><i data-lucide="user-circle"></i></div>
+        <div class="modal-icon"><i data-lucide="circle-user"></i></div>
         <h2 class="modal-title">Zaloguj się</h2>
         <p>Aby dodawać strony, musisz się zalogować.</p>
         <button id="google-login-btn" class="btn btn-primary btn-lg">
@@ -57,28 +68,27 @@
       </div>
     </div>
 
-
     <div class="dashboard-grid">
       <!-- Left Column: Form -->
       <div class="form-column">
-        <section id="form-section" style="display:none;">
+        <section id="form-section" hidden>
           <form id="read-form" class="card">
             <div class="card-header">
-              <i data-lucide="plus-circle" class="card-icon"></i>
+              <i data-lucide="circle-plus" class="card-icon"></i>
               <h2>Dodaj postęp</h2>
             </div>
             <div class="form-group">
               <label for="title">Tytuł książki</label>
               <div class="input-wrapper">
                 <i data-lucide="book" class="input-icon"></i>
-                <input type="text" id="title" placeholder="Co przeczytałeś?" required />
+                <input type="text" id="title" placeholder="Co przeczytałeś?" maxlength="300" required />
               </div>
             </div>
             <div class="form-group">
               <label for="pages">Liczba stron</label>
               <div class="input-wrapper">
                 <i data-lucide="layers" class="input-icon"></i>
-                <input type="number" id="pages" min="1" required />
+                <input type="number" id="pages" min="1" max="5000" required />
               </div>
             </div>
             <div class="form-group">
@@ -98,14 +108,14 @@
               <i data-lucide="send"></i>
               <span>Dodaj wpis</span>
             </button>
-            <div id="error-message" class="error-msg" style="display:none;"></div>
+            <div id="error-message" class="error-msg" hidden></div>
           </form>
         </section>
       </div>
 
-      <!-- Right Column: Leaderboard & History -->
+      <!-- Right Column: Leaderboard & Progress -->
       <div class="info-column">
-        <section id="leaderboard-section" style="display:none;" class="card">
+        <section id="leaderboard-section" class="card" hidden>
           <div class="card-header">
             <i data-lucide="award" class="card-icon"></i>
             <h2>Leaderboard</h2>
@@ -123,24 +133,20 @@
           </div>
         </section>
 
-        <section id="user-progress-section" style="display:none;" class="card">
+        <section id="user-progress-section" class="card" hidden>
           <div class="card-header">
             <i data-lucide="users" class="card-icon"></i>
             <h2>Szczegółowe postępy</h2>
           </div>
-          <div id="user-progress-container" class="progress-list">
-          </div>
+          <div id="user-progress-container" class="progress-list"></div>
         </section>
-
-
-          </div>
+      </div>
     </div>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
   <script src="app.js"></script>
   <script>
-    // Initialize Lucide icons
     lucide.createIcons();
   </script>
 </body>

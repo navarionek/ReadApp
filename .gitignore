@@ -20,4 +20,6 @@ supabase/.env
 .DS_Store
 Thumbs.db
 
-supabase/
+# Supabase CLI (lokalne pliki; migracje i config.toml są w repo)
+supabase/.temp/
+supabase/.branches/

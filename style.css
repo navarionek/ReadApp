@@ -16,6 +16,7 @@
 
   --error: #ef4444;
   --error-bg: #fef2f2;
+  --error-border: #fecaca;
   --success: #10b981;
 
   /* Shadows & Radii */
@@ -29,7 +30,9 @@
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-body.dark-mode {
+:root.dark-mode {
+  color-scheme: dark;
+
   --bg-body: #0f172a;
   --bg-card: #1e293b;
 
@@ -39,6 +42,14 @@ body.dark-mode {
   --border: #334155;
   --border-focus: #475569;
   --primary-light: #312e81;
+
+  --error: #f87171;
+  --error-bg: #450a0a;
+  --error-border: #7f1d1d;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 * {
@@ -75,11 +86,6 @@ header {
   letter-spacing: -0.025em;
   color: var(--primary);
   margin-bottom: 0.25rem;
-}
-
-.subtitle {
-  color: var(--text-muted);
-  font-size: 1.1rem;
 }
 
 /* Stats Bar */
@@ -207,6 +213,8 @@ input[type="number"] {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   font-size: 1rem;
+  background: var(--bg-card);
+  color: var(--text-main);
   transition: var(--transition);
 }
 
@@ -285,6 +293,12 @@ input:focus {
   transform: translateY(0);
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn-outline {
   background-color: transparent;
   border: 1px solid var(--border);
@@ -302,6 +316,14 @@ input:focus {
 }
 
 /* User Progress Section */
+.user-progress-block {
+  margin-bottom: 2rem;
+}
+
+.user-progress-block:last-child {
+  margin-bottom: 0;
+}
+
 .user-progress-block .user-name {
   font-size: 1.125rem;
   font-weight: 700;
@@ -323,6 +345,10 @@ th, td {
 
 .text-right {
   text-align: right;
+}
+
+.score {
+  font-weight: 600;
 }
 
 th {
@@ -395,5 +421,5 @@ th {
   border-radius: var(--radius-sm);
   margin-top: 1rem;
   font-size: 0.875rem;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--error-border);
 }

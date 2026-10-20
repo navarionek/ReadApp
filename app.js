@@ -1,153 +1,101 @@
 /* ----------------- Configuration ----------------- */
-const SUPABASE_URL   = 'https://ipqjdqvfyfgggykaazug.supabase.co';
+const SUPABASE_URL = 'https://ipqjdqvfyfgggykaazug.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lYoZG-uKAFWKMzyu4YV45Q_64jU7CBW';
 
-// Initialize Supabase client
+// Klient sam dokłada token zalogowanego usera do każdego zapytania
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const READS_ENDPOINT = `${SUPABASE_URL}/rest/v1/reads?apikey=${SUPABASE_ANON_KEY}`;
-const FETCH_HEADERS = {
-  'apikey': SUPABASE_ANON_KEY,
-  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-};
+const AUTH_ONLY_SECTIONS = ['user-panel', 'stats-bar', 'form-section', 'leaderboard-section', 'user-progress-section'];
 
-/* ----------------- Helper functions ----------------- */
-function fetchJSON(url, opts = {}) {
-  return fetch(url, opts)
-    .then(async res => {
-      const raw = await res.text();
-      if (!res.ok) {
-        let msg = `${res.status} ${res.statusText}`;
-        try {
-          const data = JSON.parse(raw);
-          if (data && data.message) msg += `: ${data.message}`;
-          else if (typeof data === 'object') msg += `: ${JSON.stringify(data)}`;
-        } catch {}
-        throw new Error(msg);
-      }
-      if (!raw || raw.trim() === "") return null;
-      try {
-        return JSON.parse(raw);
-      } catch {
-        throw new Error('Invalid JSON response');
-      }
-    });
+let currentUser = null;
+
+/* ----------------- Helpers ----------------- */
+// Buduje element bez innerHTML, tekst zawsze idzie przez textContent
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === 'text') node.textContent = value;
+    else node.setAttribute(key, value);
+  }
+  for (const child of children) node.appendChild(child);
+  return node;
 }
 
-function postJSON(url, data) {
-  return fetchJSON(url, {
-    method: 'POST',
-    headers: {
-      ...FETCH_HEADERS,
-      'Prefer': 'return=representation'
-    },
-    body: JSON.stringify(data),
-  });
+function displayNameOf(user) {
+  return user.user_metadata?.full_name || user.email;
 }
 
-function getJSON(url) {
-  return fetchJSON(url, { headers: FETCH_HEADERS });
+function showError(msg) {
+  const errDiv = document.getElementById('error-message');
+  errDiv.textContent = msg;
+  errDiv.hidden = false;
+}
+
+function hideError() {
+  document.getElementById('error-message').hidden = true;
 }
 
 /* ----------------- Theme handling ----------------- */
 function setTheme(isDark) {
-  if (isDark) {
-    document.body.classList.add('dark-mode');
-    const icon = document.getElementById('theme-icon');
-    if (icon) {
-      icon.setAttribute('data-lucide', 'sun');
-    }
-  } else {
-    document.body.classList.remove('dark-mode');
-    const icon = document.getElementById('theme-icon');
-    if (icon) {
-      icon.setAttribute('data-lucide', 'moon');
-    }
-  }
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  // Re-run lucide to update the icon
-  if (window.lucide) {
-    lucide.createIcons();
-  }
+  document.documentElement.classList.toggle('dark-mode', isDark);
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+  try {
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  } catch {}
+  if (window.lucide) lucide.createIcons();
 }
 
 function toggleTheme() {
-  const isDark = document.body.classList.contains('dark-mode');
-  setTheme(!isDark);
+  setTheme(!document.documentElement.classList.contains('dark-mode'));
 }
 
 /* ----------------- Auth & User handling ----------------- */
-let currentUser = null;
-
 async function handleGoogleLogin() {
-  const redirectUrl = window.location.protocol + '//' + window.location.host + window.location.pathname;
-  console.log('Próba logowania z przekierowaniem do:', redirectUrl);
-
+  const redirectUrl = window.location.origin + window.location.pathname;
   const { error } = await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
-    options: {
-      redirectTo: redirectUrl,
-    },
+    options: { redirectTo: redirectUrl },
   });
   if (error) {
-    showError('Błąd logowania: ' + error.message);
+    alert('Błąd logowania: ' + error.message);
   }
 }
 
 async function handleLogout() {
   const { error } = await supabaseClient.auth.signOut();
   if (error) {
-    showError('Błąd wylogowania: ' + error.message);
+    alert('Błąd wylogowania: ' + error.message);
   }
 }
 
 function updateUI(user) {
-  const loginModal = document.getElementById('login-modal');
-  const userPanel = document.getElementById('user-panel');
-  const displayName = document.getElementById('display-name');
-  const formSection = document.getElementById('form-section');
-  const leaderboardSection = document.getElementById('leaderboard-section');
-  const userProgressSection = document.getElementById('user-progress-section');
+  currentUser = user;
+  document.getElementById('login-modal').hidden = !!user;
+  AUTH_ONLY_SECTIONS.forEach(id => {
+    document.getElementById(id).hidden = !user;
+  });
+  document.getElementById('display-name').textContent = user ? displayNameOf(user) : '';
 
-  if (user) {
-    currentUser = user;
-    loginModal.style.display = 'none';
-    if (userPanel) userPanel.style.display = 'flex';
-    if (formSection) formSection.style.display = 'block';
-    if (leaderboardSection) leaderboardSection.style.display = 'block';
-    if (userProgressSection) userProgressSection.style.display = 'block';
-    const statsBar = document.getElementById('stats-bar');
-    if (statsBar) statsBar.style.display = 'grid';
-    if (displayName) displayName.textContent = user.user_metadata.full_name || user.email;
-  } else {
-    currentUser = null;
-    loginModal.style.display = 'flex';
-    if (userPanel) userPanel.style.display = 'none';
-    if (formSection) formSection.style.display = 'none';
-    if (leaderboardSection) leaderboardSection.style.display = 'none';
-    if (userProgressSection) userProgressSection.style.display = 'none';
-    const statsBar = document.getElementById('stats-bar');
-    if (statsBar) statsBar.style.display = 'none';
-    if (displayName) displayName.textContent = '';
+  if (!user) {
+    document.getElementById('leaderboard-body').replaceChildren();
+    document.getElementById('user-progress-container').replaceChildren();
   }
 }
 
 /* ----------------- Submit handler ----------------- */
-function showError(msg) {
-  const errDiv = document.getElementById('error-message');
-  if (errDiv) {
-    errDiv.textContent = msg;
-    errDiv.style.display = 'block';
-  } else {
-    alert(msg);
-  }
-}
-
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const title = document.getElementById('title').value;
+  hideError();
+
+  if (!currentUser) {
+    showError('Musisz być zalogowany!');
+    return;
+  }
+
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const title = document.getElementById('title').value.trim();
   const pages = parseInt(document.getElementById('pages').value, 10);
 
   let multiplier = 1;
@@ -155,171 +103,141 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     multiplier *= parseFloat(cb.value);
   });
 
-  if (!currentUser) {
-    showError('Musisz być zalogowany!');
+  if (!title) {
+    showError('Podaj tytuł książki.');
     return;
   }
 
-  const username = currentUser.user_metadata.full_name || currentUser.email;
-
+  submitBtn.disabled = true;
   try {
-    await postJSON(READS_ENDPOINT, { username, pages, multiplier, title });
-    await loadLeaderboard();
-    await loadUserProgress();
-    e.target.reset();
-    if (document.getElementById('error-message')) {
-      document.getElementById('error-message').style.display = 'none';
-    }
+    // user_id, username i created_at i tak ustawia serwer (trigger reads_set_owner)
+    const { error } = await supabaseClient.from('reads').insert({
+      username: displayNameOf(currentUser),
+      title,
+      pages,
+      multiplier,
+    });
+    if (error) throw error;
+
+    form.reset();
+    await loadReads();
   } catch (err) {
     console.error('Error posting read:', err);
-    const msg = err.message || 'Wystąpił błąd. Spróbuj ponownie.';
-    showError(msg);
+    showError(err.message || 'Wystąpił błąd. Spróbuj ponownie.');
+  } finally {
+    submitBtn.disabled = false;
   }
 });
 
-/* ----------------- Leaderboard loader ----------------- */
-async function loadLeaderboard() {
-  try {
-    const rows = await getJSON(`${READS_ENDPOINT}&select=*,username,pages,multiplier&order=created_at.desc`);
-    const totals = {};
-    if (rows) {
-      rows.forEach(r => {
-        const pts = r.pages * r.multiplier;
-        totals[r.username] = (totals[r.username] || 0) + pts;
-      });
+/* ----------------- Data loading ----------------- */
+// Wpisy sprzed migracji bez przypisanego konta grupujemy po nazwie
+function readerKey(row) {
+  return row.user_id || `name:${row.username}`;
+}
+
+function groupByReader(rows) {
+  const readers = new Map();
+  rows.forEach(r => {
+    const key = readerKey(r);
+    if (!readers.has(key)) {
+      // Wiersze są od najnowszego, więc pierwsza nazwa jest aktualna
+      readers.set(key, { key, name: r.username, points: 0, books: [] });
     }
+    const reader = readers.get(key);
+    reader.points += r.pages * r.multiplier;
+    reader.books.push(r);
+  });
+  return [...readers.values()];
+}
 
-    const tbody = document.querySelector('#leaderboard tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    const sortedEntries = Object.entries(totals).sort((a,b)=> b[1]-a[1]);
+async function loadReads() {
+  const { data: rows, error } = await supabaseClient
+    .from('reads')
+    .select('user_id, username, title, pages, multiplier')
+    .order('created_at', { ascending: false });
 
-    sortedEntries.forEach(([name, pts]) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="text-left">${name}</td><td class="text-right">${pts.toFixed(1)}</td>`;
-      tbody.appendChild(tr);
-    });
+  if (error) {
+    console.error('Error loading reads:', error);
+    return;
+  }
 
-    if (currentUser) {
-      const username = currentUser.user_metadata.full_name || currentUser.email;
-      const userTotal = totals[username] || 0;
-      const statTotalPages = document.getElementById('stat-total-pages');
-      const statRank = document.getElementById('stat-rank');
+  const readers = groupByReader(rows || []);
+  renderLeaderboard(readers);
+  renderUserProgress(readers);
+}
 
-      if (statTotalPages) statTotalPages.textContent = userTotal.toFixed(0);
+function renderLeaderboard(readers) {
+  const ranked = [...readers].sort((a, b) => b.points - a.points);
 
-      if (statRank) {
-        const rankIndex = sortedEntries.findIndex(([name]) => name === username);
-        statRank.textContent = rankIndex !== -1 ? `#${rankIndex + 1}` : '#--';
-      }
-    }
-  } catch (err) {
-    console.error('Error loading leaderboard:', err);
+  document.getElementById('leaderboard-body').replaceChildren(
+    ...ranked.map(r => el('tr', {}, [
+      el('td', { text: r.name }),
+      el('td', { class: 'text-right', text: r.points.toFixed(1) }),
+    ]))
+  );
+
+  if (currentUser) {
+    const rankIndex = ranked.findIndex(r => r.key === currentUser.id);
+    const me = ranked[rankIndex];
+    document.getElementById('stat-total-points').textContent = me ? me.points.toFixed(0) : '0';
+    document.getElementById('stat-rank').textContent = rankIndex !== -1 ? `#${rankIndex + 1}` : '#--';
   }
 }
 
-/* ----------------- User Progress loader ----------------- */
-async function loadUserProgress() {
-  try {
-    const rows = await getJSON(`${READS_ENDPOINT}&select=username,title,pages,multiplier&order=created_at.desc`);
-    const container = document.getElementById('user-progress-container');
-    if (!container) return;
-    container.innerHTML = '';
+function renderUserProgress(readers) {
+  const blocks = readers.map(reader => {
+    const rows = reader.books.map(book => el('tr', {}, [
+      el('td', { text: book.title || '—' }),
+      el('td', { class: 'text-right', text: String(book.pages) }),
+      el('td', { class: 'text-right', text: `${book.multiplier}x` }),
+      el('td', { class: 'text-right score', text: (book.pages * book.multiplier).toFixed(1) }),
+    ]));
 
-    if (rows) {
-      const grouped = {};
-      rows.forEach(r => {
-        if (!grouped[r.username]) grouped[r.username] = [];
-        grouped[r.username].push(r);
-      });
+    const table = el('table', {}, [
+      el('thead', {}, [
+        el('tr', {}, [
+          el('th', { text: 'Tytuł' }),
+          el('th', { class: 'text-right', text: 'Strony' }),
+          el('th', { class: 'text-right', text: 'Mnożnik' }),
+          el('th', { class: 'text-right', text: 'Wynik' }),
+        ]),
+      ]),
+      el('tbody', {}, rows),
+    ]);
 
-      for (const [username, books] of Object.entries(grouped)) {
-        const userBlock = document.createElement('div');
-        userBlock.className = 'user-progress-block';
-        userBlock.style.marginBottom = '2rem';
-        userBlock.innerHTML = `<h3 class="user-name" style="margin-bottom:0.75rem; color:var(--primary);">${username}</h3>`;
+    return el('div', { class: 'user-progress-block' }, [
+      el('h3', { class: 'user-name', text: reader.name }),
+      el('div', { class: 'table-container' }, [table]),
+    ]);
+  });
 
-        const tableContainer = document.createElement('div');
-        tableContainer.className = 'table-container';
-
-        const table = document.createElement('table');
-        table.innerHTML = `
-          <thead>
-            <tr>
-              <th>Tytuł</th>
-              <th class="text-right">Strony</th>
-              <th class="text-right">Mnożnik</th>
-              <th class="text-right">Wynik</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        `;
-
-        const tbody = table.querySelector('tbody');
-
-        books.forEach(book => {
-          const tr = document.createElement('tr');
-          const score = (book.pages * book.multiplier).toFixed(1);
-          tr.innerHTML = `
-            <td>${book.title}</td>
-            <td class="text-right">${book.pages}</td>
-            <td class="text-right">${book.multiplier}x</td>
-            <td class="text-right" style="font-weight:600;">${score}</td>
-          `;
-          tbody.appendChild(tr);
-        });
-
-        tableContainer.appendChild(table);
-        userBlock.appendChild(tableContainer);
-        container.appendChild(userBlock);
-      }
-    }
-  } catch (err) {
-    console.error('Error loading user progress:', err);
-  }
+  document.getElementById('user-progress-container').replaceChildren(...blocks);
 }
 
 /* ----------------- Init ----------------- */
-window.addEventListener('DOMContentLoaded', async () => {
-  // Setup event listeners
+window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
 
-  // Initialize Theme
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme) {
-    setTheme(savedTheme === 'dark');
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setTheme(prefersDark);
-  }
+  // Klasę motywu ustawia już skrypt w <head>, tu tylko ikona
+  setTheme(document.documentElement.classList.contains('dark-mode'));
 
-  // Register Service Worker for PWA
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js')
-        .then(reg => console.log('SW registered!', reg))
-        .catch(err => console.log('SW registration failed: ', err));
+        .catch(err => console.warn('SW registration failed:', err));
     });
   }
 
-  // Listen for auth changes
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    console.log('Auth state changed:', event, session);
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
     const user = session?.user || null;
+    // Odświeżenie tokenu co godzinę też tu trafia, dane przeładowujemy tylko przy zmianie usera
+    const userChanged = (user?.id || null) !== (currentUser?.id || null);
     updateUI(user);
-    if (user) {
-      loadLeaderboard();
-      loadUserProgress();
-    } else {
-      // Clear tables if logging out
-      const leaderboardBody = document.querySelector('#leaderboard tbody');
-      if (leaderboardBody) leaderboardBody.innerHTML = '';
-      const progressContainer = document.getElementById('user-progress-container');
-      if (progressContainer) progressContainer.innerHTML = '';
+    // setTimeout: nie wołamy Supabase wewnątrz callbacka auth (zalecenie supabase-js, unika deadlocka)
+    if (user && userChanged) {
+      setTimeout(loadReads, 0);
     }
   });
-
-  // Initial load (onAuthStateChange will handle this if session exists)
 });
