@@ -672,21 +672,25 @@ async function fetchPrize(year) {
 async function fetchMoneyPrizeParticipants() {
   const { data, error } = await supabaseClient
     .from('profiles')
-    .select('display_name')
+    .select('id, display_name')
     .eq('in_money_prize', true)
     .order('display_name');
   if (error) throw error;
-  return data.map(p => p.display_name);
+  return data;
 }
 
 async function loadPrize() {
   try {
     const [description, participants] = await Promise.all([fetchPrize(currentYear()), fetchMoneyPrizeParticipants()]);
     document.getElementById('prize-text').textContent = description;
-    document.getElementById('prize-banner').hidden = !description;
+    // Baner tylko dla uczestników nagrody pieniężnej (w podglądzie: dla podglądanej osoby)
+    const takesPart = participants.some(p => p.id === viewerId());
+    document.getElementById('prize-banner').hidden = !description || !takesPart;
 
     const participantsLine = document.getElementById('prize-participants');
-    participantsLine.textContent = participants.length ? `Nagroda pieniężna: ${participants.join(', ')}` : '';
+    participantsLine.textContent = participants.length
+      ? `Nagroda pieniężna: ${participants.map(p => p.display_name).join(', ')}`
+      : '';
     participantsLine.hidden = !participants.length;
   } catch (err) {
     // Baner zostaje taki, jaki był; nagroda nie jest krytyczna
