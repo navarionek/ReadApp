@@ -257,7 +257,7 @@ function startEdit(book) {
   const matched = applyMultiplier(editingMultiplier);
   note.textContent = matched
     ? ''
-    : `Ten wpis ma mnożnik ×${formatMultiplier(editingMultiplier)}, którego nie da się złożyć z obecnych opcji. Zostanie zachowany, jeśli nie zmienisz zaznaczenia.`;
+    : `Ten wpis ma mnożnik ${formatMultiplier(editingMultiplier)}x, którego nie da się złożyć z obecnych opcji. Zostanie zachowany, jeśli nie zmienisz zaznaczenia.`;
   note.hidden = matched;
   hideError();
   setFormMode(true);
@@ -794,7 +794,7 @@ function renderUserProgress(readers) {
         // Na telefonie kolumna mnożnika jest schowana, a mnożnik pokazuje się przed stronami,
         // żeby liczby stron były wyrównane do prawej w jednej linii
         el('td', { class: 'text-right pages-cell' }, [
-          ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'mult-inline', text: `×${book.multiplier}` })] : []),
+          ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'mult-inline', text: `${formatMultiplier(book.multiplier)}x` })] : []),
           document.createTextNode(String(book.pages)),
         ]),
         el('td', { class: 'text-right col-mult', text: `${book.multiplier}x` }),
