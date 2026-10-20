@@ -3,11 +3,11 @@
 // ({ url } -> { url: nasz adres albo null }), a z kluczem service_role także jako jednorazowe
 // uzupełnienie starych wpisów ({ backfill: true, limit }).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
+import { copyCover, OWN_PREFIX } from '../_shared/covers.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
-const OWN_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/covers/`;
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -17,51 +17,6 @@ const cors = {
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
-}
-
-// Pobieramy tylko z tych serwisów (pierwszy adres); Open Library przekierowuje na archive.org
-const START_HOSTS = ['books.google.com', 'books.googleusercontent.com', 'covers.openlibrary.org'];
-const isFinalHostOk = (host: string) => START_HOSTS.includes(host) || host === 'archive.org' || host.endsWith('.archive.org');
-
-async function sha256Hex(text: string) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Zwraca adres u nas albo null, gdy się nie da (zły serwis, nie obrazek, za duży, błąd sieci)
-async function copyCover(url: string): Promise<string | null> {
-  if (url.startsWith(OWN_PREFIX)) return url;
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return null;
-  }
-  if (parsed.protocol !== 'https:' || !START_HOSTS.includes(parsed.hostname)) return null;
-
-  try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'Czytanko (https://czytanko.com)' }, redirect: 'follow' });
-    if (!res.ok || !isFinalHostOk(new URL(res.url).hostname)) return null;
-    const type = (res.headers.get('content-type') ?? '').split(';')[0].trim();
-    const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/webp' ? 'webp' : null;
-    if (!ext) return null;  // m.in. szary „brak okładki” od Google (gif)
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (!bytes.length || bytes.length > 1_000_000) return null;
-
-    // Ten sam adres źródłowy = ten sam plik, więc książki z tą samą okładką dzielą kopię
-    const path = `ext/${await sha256Hex(url)}.${ext}`;
-    const { error } = await supabase.storage.from('covers').upload(path, bytes, {
-      contentType: type, upsert: true, cacheControl: '31536000',
-    });
-    if (error) {
-      console.error('upload failed', error.message);
-      return null;
-    }
-    return supabase.storage.from('covers').getPublicUrl(path).data.publicUrl;
-  } catch (err) {
-    console.error('copy failed', (err as Error).message);
-    return null;
-  }
 }
 
 // Jednorazowe uzupełnienie: okładki już zapisane w bazie jako linki zewnętrzne
@@ -81,7 +36,7 @@ async function backfill(limit: number) {
     const queue = [...(data ?? [])];
     const worker = async () => {
       for (let row = queue.shift(); row; row = queue.shift()) {
-        const ours = await copyCover(row.cover_url);
+        const ours = await copyCover(supabase, row.cover_url);
         if (!ours) { failed++; continue; }
         const { error: updError } = await supabase.from(table).update({ cover_url: ours }).eq('id', row.id);
         if (updError) { console.error('update failed', updError.message); failed++; } else copied++;
@@ -120,5 +75,5 @@ Deno.serve(async req => {
 
   const url = String(body.url ?? '').slice(0, 2000);
   if (!url) return json({ error: 'bad request' }, 400);
-  return json({ url: await copyCover(url) });
+  return json({ url: await copyCover(supabase, url) });
 });

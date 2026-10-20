@@ -2,7 +2,7 @@ import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
 import { handleDropReading, renderReadingNow } from './data.js';
 import { daysSince, formatMultiplier, startFinishing } from './form.js';
-import { bookPoints, normalizeTitle, titleMatches } from '../supabase/functions/_shared/logic.js';
+import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { currentScreen } from './shell.js';
 import { state } from './state.js';
 import { formatDay } from './stats.js';
@@ -31,13 +31,40 @@ export function lookupBook(q, limit = 6) {
   return lookupCache.get(key);
 }
 
-// Okładki książek „Teraz czytam”: szukane w locie i trzymane w pamięci sesji (tytuł -> info albo null)
-export const readingCovers = new Map();
-export const readingCoversPending = new Set();
+// Uzupełnianie okładek robi serwer (funkcja fill-book-info): znajduje je, kopiuje do naszego bucketa
+// i zapisuje w bazie dla wszystkich, więc cudza półka też ładuje się szybko, a wyszukiwanie dzieje się raz.
+// Tu tylko o to prosimy i podstawiamy wynik. onBatch dostaje każdą gotową paczkę (po 5 książek).
+const enrichInFlight = new Set();  // `${table}:${id}`: nie pytamy dwa razy o to samo naraz
 
-// Okładka książki „Teraz czytam”: z bazy albo z wyszukiwania w locie. Gdy wyszukiwanie się skończy,
-// odrysowujemy wszystkie miejsca, w których ta okładka może być widoczna (Start, półka, okno),
-// niezależnie od tego, który ekran je zainicjował.
+async function enrichBooks(table, items, onBatch) {
+  const todo = items.filter(i => !i.info_checked_at && !enrichInFlight.has(`${table}:${i.id}`));
+  todo.forEach(i => enrichInFlight.add(`${table}:${i.id}`));
+  try {
+    for (let i = 0; i < todo.length; i += 5) {
+      const ids = todo.slice(i, i + 5).map(r => r.id);
+      try {
+        const { data, error } = await supabaseClient.functions.invoke('fill-book-info', { body: { table, ids } });
+        if (error) throw error;
+        const done = (data?.items || []).filter(it => !it.pending && it.info_checked_at);
+        if (done.length) onBatch(done);
+      } catch (err) {
+        console.error('fill-book-info failed:', err);
+      }
+    }
+  } finally {
+    todo.forEach(i => enrichInFlight.delete(`${table}:${i.id}`));  // niepowodzenia spróbujemy przy następnej wizycie
+  }
+}
+
+const INFO_FIELDS = ['cover_url', 'author', 'published_year', 'info_url', 'description', 'info_checked_at'];
+
+function applyInfo(list, it) {
+  const row = list.find(r => r.id === it.id);
+  if (row) INFO_FIELDS.forEach(f => { row[f] = it[f]; });
+}
+
+// Okładka książki „Teraz czytam”: z bazy; jeśli jej jeszcze nie ma, prosimy serwer i po odpowiedzi
+// odrysowujemy wszystkie miejsca, w których może być widoczna (Start, półka, okno).
 let openReadingId = null;  // id książki z „Teraz czytam” otwartej w oknie (null = okno pokazuje coś innego)
 
 function redrawReadingCovers() {
@@ -52,18 +79,10 @@ function redrawReadingCovers() {
 
 export function readingCoverOf(item) {
   if (item.info_checked_at) return item;  // okładka wybrana albo zapisana w bazie
-  const key = normalizeTitle(item.title);
-  if (readingCovers.has(key)) return readingCovers.get(key);
-  if (!readingCoversPending.has(key)) {
-    readingCoversPending.add(key);
-    lookupBook(item.title, 3).then(({ results, failed }) => {
-      const best = results.find(r => r.cover && titleMatches(item.title, r.title));
-      // Nieudane wyszukiwanie nie zostaje zapamiętane jako „brak okładki”
-      if (!failed) readingCovers.set(key, best ? { cover_url: best.cover, author: best.author } : null);
-      readingCoversPending.delete(key);
-      if (best) redrawReadingCovers();
-    });
-  }
+  enrichBooks('reading_now', [item], items => {
+    items.forEach(it => applyInfo(state.readingNow, it));
+    redrawReadingCovers();
+  });
   return null;
 }
 
@@ -249,44 +268,13 @@ export function bookTile(book, onOpen, reading = false) {
   return tile;
 }
 
-// Uzupełnianie okładek: po 2 naraz. Własne wpisy zapisujemy w bazie (raz na zawsze),
-// cudze tylko pokazujemy (baza i tak nie pozwala ich zmieniać).
+// Okładki wpisów na półce, których jeszcze nie ma w bazie (patrz enrichBooks)
 export async function fillMissingBookInfo(userId) {
-  const missing = state.shelfRows.filter(r => !r.info_checked_at);
-  const own = userId === state.currentUser?.id;
-  let rerender = false;
-  const worker = async () => {
-    while (missing.length) {
-      if ((state.shelfUserId || viewerId()) !== userId) return;  // ktoś przełączył półkę
-      const row = missing.shift();
-      const { results, google, failed } = await lookupBook(row.title || '', 3);
-      const best = results.find(r => titleMatches(row.title, r.title) && r.cover)
-        || results.find(r => titleMatches(row.title, r.title));
-      // Bez Google Books „nie znaleziono” nie jest pewne: nie zapisujemy, spróbujemy przy następnym otwarciu
-      if (failed || (!best && !google)) continue;
-      const info = {
-        cover_url: own ? await ownCover(best?.cover) : (best?.cover || null),
-        author: best?.author?.slice(0, 200) || null,
-        published_year: best?.year || null,
-        info_url: best?.infoUrl || null,
-        description: best?.description || null,
-        info_checked_at: new Date().toISOString(),
-      };
-      Object.assign(row, info);
-      if (own) {
-        const { error } = await supabaseClient.from('reads').update(info).eq('id', row.id);
-        if (error) console.error('Saving book info failed:', error);
-      }
-      rerender = true;
-      requestAnimationFrame(() => {
-        if (rerender && currentScreen() === 'polka') {
-          rerender = false;
-          renderShelf();
-        }
-      });
-    }
-  };
-  await Promise.all([worker(), worker()]);
+  await enrichBooks('reads', state.shelfRows, items => {
+    if ((state.shelfUserId || viewerId()) !== userId) return;  // ktoś przełączył półkę
+    items.forEach(it => applyInfo(state.shelfRows, it));
+    if (currentScreen() === 'polka') renderShelf();
+  });
 }
 
 /* ----------------- Szczegóły książki ----------------- */
@@ -501,7 +489,6 @@ export async function saveReadingInfo(item, info) {
 export function resetShelfCaches() {
   shelfSignature = null;
   lookupCache.clear();
-  readingCovers.clear();
-  readingCoversPending.clear();
+  enrichInFlight.clear();
   shelfSeq++;
 }
