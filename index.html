@@ -182,8 +182,13 @@
             <button type="button" class="mode-btn active" data-mode="finished" aria-pressed="true">Skończona książka</button>
             <button type="button" class="mode-btn" data-mode="started" aria-pressed="false">Zaczynam czytać</button>
           </div>
+          <!-- Skończona książka: wybór z zaczętych („Teraz czytam”) albo nowy tytuł -->
+          <div id="finish-pick-group" class="form-group" hidden>
+            <label for="finish-pick">Którą książkę kończysz?</label>
+            <select id="finish-pick" class="plain-input"></select>
+          </div>
           <p id="finishing-note" class="hint finishing-note" hidden></p>
-          <div class="form-group">
+          <div id="title-group" class="form-group">
             <label for="title">Tytuł książki</label>
             <div class="input-wrapper">
               <i data-lucide="book" class="input-icon"></i>

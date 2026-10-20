@@ -258,6 +258,7 @@ function applyMultiplier(multiplier) {
 /* ----------------- Tryb formularza: skończona / zaczęta / kończenie zaczętej ----------------- */
 let entryMode = 'finished';  // 'finished' albo 'started' (dodaj do „Teraz czytam”)
 let finishing = null;        // { id, title, startedAt } gdy kończymy książkę z „Teraz czytam”
+let finishPickedNew = false; // ktoś świadomie wybrał „Inna książka” zamiast zaczętej
 
 function todayInputValue() {
   const d = new Date();
@@ -268,47 +269,94 @@ function daysSince(iso) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS));
 }
 
+function myReadingNow() {
+  return readingNow.filter(item => item.user_id === currentUser?.id);
+}
+
+function selectFinishing(item) {
+  finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at } : null;
+  document.getElementById('title').value = item ? item.title : '';
+}
+
+// Lista „Którą książkę kończysz?”: zaczęte książki + „Inna książka”
+function renderFinishPick() {
+  const select = document.getElementById('finish-pick');
+  const items = myReadingNow();
+  select.replaceChildren(
+    ...items.map(item => el('option', { value: String(item.id), text: `${item.title} (od ${formatDay(new Date(item.started_at))})` })),
+    el('option', { value: 'new', text: 'Inna książka (wpisz tytuł)' }),
+  );
+  select.value = finishing ? String(finishing.id) : 'new';
+}
+
+// Domyślnie kończymy pierwszą zaczętą książkę, jeśli formularz jest „pusty”
+function applyFinishDefault() {
+  if (editingId || entryMode !== 'finished' || finishing || finishPickedNew) return;
+  const first = myReadingNow()[0];
+  if (first) selectFinishing(first);
+}
+
 function updateFormUI() {
   const isEditing = !!editingId;
-  const started = entryMode === 'started' && !isEditing && !finishing;
+  const started = entryMode === 'started' && !isEditing;
+  const canPick = !isEditing && !started && myReadingNow().length > 0;
 
   document.getElementById('form-title').textContent =
-    isEditing ? 'Edytuj wpis' : finishing ? 'Skończona książka' : started ? 'Zaczynam czytać' : 'Dodaj postęp';
+    isEditing ? 'Edytuj wpis' : started ? 'Zaczynam czytać' : 'Dodaj postęp';
   document.getElementById('submit-label').textContent =
-    isEditing ? 'Zapisz zmiany' : finishing ? 'Dodaj skończoną książkę' : started ? 'Zacznij czytać' : 'Dodaj wpis';
+    isEditing ? 'Zapisz zmiany' : started ? 'Zacznij czytać' : finishing ? 'Dodaj skończoną książkę' : 'Dodaj wpis';
 
-  document.getElementById('mode-toggle').hidden = isEditing || !!finishing;
+  document.getElementById('mode-toggle').hidden = isEditing;
   document.querySelectorAll('.mode-btn').forEach(btn => {
     const active = btn.dataset.mode === entryMode;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', String(active));
   });
 
+  document.getElementById('finish-pick-group').hidden = !canPick;
+  if (canPick) renderFinishPick();
+  // Tytuł bierze się z wybranej zaczętej książki, więc pole jest wtedy schowane
+  document.getElementById('title-group').hidden = !!finishing && !started;
   document.getElementById('started-group').hidden = !started;
   document.getElementById('pages-group').hidden = started;
   document.getElementById('multiplier-group').hidden = started;
   document.getElementById('pages').required = !started;
 
   const note = document.getElementById('finishing-note');
-  note.hidden = !finishing;
+  note.hidden = !finishing || started;
   if (finishing) {
     const days = daysSince(finishing.startedAt);
     note.textContent = `Zaczęte ${formatDay(new Date(finishing.startedAt))} (${days} ${days === 1 ? 'dzień' : 'dni'} temu). Wpisz liczbę stron.`;
   }
 
-  document.getElementById('cancel-edit-btn').hidden = !isEditing && !finishing;
+  document.getElementById('cancel-edit-btn').hidden = !isEditing;
 }
 
 function setEntryMode(mode) {
   entryMode = mode;
+  if (mode === 'started') {
+    // Nowa zaczęta książka: zaczynamy od pustego tytułu; po powrocie znowu podpowiemy zaczętą
+    selectFinishing(null);
+    finishPickedNew = false;
+  } else {
+    applyFinishDefault();
+  }
   hideError();
   updateFormUI();
 }
 
+function handleFinishPick() {
+  const value = document.getElementById('finish-pick').value;
+  finishPickedNew = value === 'new';
+  selectFinishing(myReadingNow().find(item => String(item.id) === value) || null);
+  hideError();
+  updateFormUI();
+  if (finishPickedNew) document.getElementById('title').focus({ preventScroll: true });
+}
+
 function startFinishing(item) {
   cancelEdit();
-  finishing = { id: item.id, title: item.title, startedAt: item.started_at };
-  document.getElementById('title').value = item.title;
+  selectFinishing(item);
   updateFormUI();
   goTo('dodaj');
   document.getElementById('pages').focus({ preventScroll: true });
@@ -338,10 +386,12 @@ function cancelEdit() {
   editingMultiplier = null;
   multiplierTouched = false;
   finishing = null;
+  finishPickedNew = false;
   entryMode = 'finished';
   document.getElementById('multiplier-note').hidden = true;
   document.getElementById('read-form').reset();
   document.getElementById('started-date').value = todayInputValue();
+  applyFinishDefault();
   hideError();
   updateFormUI();
 }
@@ -785,6 +835,12 @@ async function loadReads() {
   }
   if (nowResult.error) console.error('Error loading reading_now:', nowResult.error);
   readingNow = nowResult.data || [];
+  // Formularz nie jest w trakcie edycji: odśwież listę zaczętych i domyślny wybór
+  if (!editingId) {
+    if (finishing && !myReadingNow().some(item => item.id === finishing.id)) selectFinishing(null);
+    applyFinishDefault();
+    updateFormUI();
+  }
 
   hasData = true;
   const readers = groupByReader(rows || []);
@@ -1717,11 +1773,11 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
   document.getElementById('rename-btn').addEventListener('click', handleRename);
   document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-    const back = finishing ? 'start' : 'postepy';
     cancelEdit();
-    goTo(back);
+    goTo('postepy');
   });
   document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
+  document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
   document.getElementById('started-date').value = todayInputValue();
   document.getElementById('started-date').max = todayInputValue();
   window.addEventListener('hashchange', () => showScreen(currentScreen()));
