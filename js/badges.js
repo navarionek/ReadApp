@@ -19,7 +19,7 @@ export const BADGES = [
   { id: 'leader', icon: 'crown', name: 'Korona', desc: 'Aktualnie 1. miejsce w rankingu', test: s => s.rank === 1 },
   { id: 'dominator', icon: 'swords', name: 'Dominator', desc: '1. miejsce z przewagą co najmniej 500 punktów', test: s => s.rank === 1 && s.lead >= 500 },
   { id: 'deadline', icon: 'timer', name: 'Rzutem na taśmę', desc: 'Książka dodana w ostatnim tygodniu roku (25–31 grudnia)', test: s => s.lastWeek >= 1 },
-  { id: 'thin', icon: 'feather', name: 'Na jedno posiedzenie', desc: 'Skończona książka do 150 stron (ulotki też się liczą)', test: s => s.thin >= 1 },
+  { id: 'thin', icon: 'feather', name: 'Ulotka', desc: 'Skończona książka do 150 stron', test: s => s.thin >= 1 },
   { id: 'jackpot', icon: 'gem', name: 'Jackpot', desc: 'Jedna książka warta 1000 punktów', test: s => s.bestBook >= 1000 },
   { id: 'hamster', icon: 'squirrel', name: 'Chomik', desc: '3 zaczęte książki naraz w „Teraz czytam”', test: s => s.reading >= 3 },
   { id: 'lightning', icon: 'zap', name: 'Błyskawica', desc: 'Książka przeczytana w mniej niż tydzień', test: s => s.fast >= 1 },
