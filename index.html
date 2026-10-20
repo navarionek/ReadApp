@@ -14,9 +14,16 @@
   <main class="container">
     <header>
       <h1 class="app-title">Czytanko</h1>
-      <button id="theme-toggle" class="btn btn-outline btn-sm" aria-label="Toggle theme">
-        <i data-lucide="moon" id="theme-icon"></i>
-      </button>
+      <div id="user-panel" class="user-panel" style="display:none;">
+        <span id="display-name" class="user-name"></span>
+        <button id="theme-toggle" class="btn btn-outline btn-sm" aria-label="Toggle theme">
+          <i data-lucide="moon" id="theme-icon"></i>
+        </button>
+        <button id="logout-btn" class="btn btn-outline btn-sm">
+          <i data-lucide="log-out"></i>
+          <span>Wyloguj</span>
+        </button>
+      </div>
     </header>
 
     <!-- Stats Bar -->
@@ -50,18 +57,6 @@
       </div>
     </div>
 
-    <!-- User info / Logout -->
-    <div id="user-info" style="display:none;">
-      <div class="user-header">
-        <div class="user-profile">
-          <span id="display-name"></span>
-        </div>
-        <button id="logout-btn" class="btn btn-outline btn-sm">
-          <i data-lucide="log-out"></i>
-          <span>Wyloguj</span>
-        </button>
-      </div>
-    </div>
 
     <div class="dashboard-grid">
       <!-- Left Column: Form -->

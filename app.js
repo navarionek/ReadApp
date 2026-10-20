@@ -105,7 +105,7 @@ async function handleLogout() {
 
 function updateUI(user) {
   const loginModal = document.getElementById('login-modal');
-  const userInfo = document.getElementById('user-info');
+  const userPanel = document.getElementById('user-panel');
   const displayName = document.getElementById('display-name');
   const formSection = document.getElementById('form-section');
   const leaderboardSection = document.getElementById('leaderboard-section');
@@ -114,23 +114,23 @@ function updateUI(user) {
   if (user) {
     currentUser = user;
     loginModal.style.display = 'none';
-    userInfo.style.display = 'block';
+    if (userPanel) userPanel.style.display = 'flex';
     if (formSection) formSection.style.display = 'block';
     if (leaderboardSection) leaderboardSection.style.display = 'block';
     if (userProgressSection) userProgressSection.style.display = 'block';
     const statsBar = document.getElementById('stats-bar');
     if (statsBar) statsBar.style.display = 'grid';
-    displayName.textContent = user.user_metadata.full_name || user.email;
+    if (displayName) displayName.textContent = user.user_metadata.full_name || user.email;
   } else {
     currentUser = null;
     loginModal.style.display = 'flex';
-    userInfo.style.display = 'none';
+    if (userPanel) userPanel.style.display = 'none';
     if (formSection) formSection.style.display = 'none';
     if (leaderboardSection) leaderboardSection.style.display = 'none';
     if (userProgressSection) userProgressSection.style.display = 'none';
     const statsBar = document.getElementById('stats-bar');
     if (statsBar) statsBar.style.display = 'none';
-    displayName.textContent = '';
+    if (displayName) displayName.textContent = '';
   }
 }
 

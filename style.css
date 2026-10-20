@@ -63,7 +63,9 @@ body {
 
 /* Header */
 header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 2.5rem;
 }
 
@@ -372,20 +374,14 @@ th {
   color: var(--text-muted);
 }
 
-/* User Header */
-.user-header {
+/* User Panel */
+.user-panel {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
-  padding: 0.75rem 1rem;
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  gap: 0.75rem;
 }
 
-.user-profile {
+.user-name {
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--text-main);
