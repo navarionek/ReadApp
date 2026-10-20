@@ -58,6 +58,25 @@
       </div>
     </section>
 
+    <!-- Nagroda roku (ustawia admin) -->
+    <section id="prize-banner" class="prize-banner" hidden>
+      <div class="stat-icon"><i data-lucide="gift"></i></div>
+      <div class="prize-info">
+        <span class="stat-label">Nagroda <span class="current-year"></span></span>
+        <span id="prize-text" class="prize-text"></span>
+      </div>
+    </section>
+
+    <!-- Ile trzeba czytać, żeby wygrać -->
+    <section id="goal-card" class="goal-card" hidden>
+      <div class="stat-icon"><i data-lucide="target"></i></div>
+      <div class="goal-info">
+        <span class="stat-label">Plan na 1. miejsce w <span class="current-year"></span></span>
+        <span id="goal-headline" class="goal-headline"></span>
+        <span id="goal-details" class="goal-details"></span>
+      </div>
+    </section>
+
     <!-- Login modal -->
     <div id="login-modal" class="modal" hidden>
       <div class="modal-content">
@@ -78,7 +97,7 @@
           <form id="read-form" class="card">
             <div class="card-header">
               <i data-lucide="circle-plus" class="card-icon"></i>
-              <h2>Dodaj postęp</h2>
+              <h2 id="form-title">Dodaj postęp</h2>
             </div>
             <div class="form-group">
               <label for="title">Tytuł książki</label>
@@ -105,13 +124,45 @@
                   <input type="checkbox" class="multiplier-checkbox" value="1.5">
                   <span class="check-text">1.5x Naukowa</span>
                 </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" class="multiplier-checkbox" value="0.5">
+                  <span class="check-text">0.5x Obrazkowa</span>
+                </label>
               </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-block btn-lg">
+            <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">
               <i data-lucide="send"></i>
-              <span>Dodaj wpis</span>
+              <span id="submit-label">Dodaj wpis</span>
+            </button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-outline btn-block cancel-btn" hidden>
+              <i data-lucide="x"></i>
+              <span>Anuluj edycję</span>
             </button>
             <div id="error-message" class="error-msg" hidden></div>
+          </form>
+        </section>
+
+        <!-- Panel admina: nagroda roku -->
+        <section id="admin-section" hidden>
+          <form id="prize-form" class="card">
+            <div class="card-header">
+              <i data-lucide="shield-check" class="card-icon"></i>
+              <h2>Panel admina</h2>
+            </div>
+            <div class="form-group">
+              <label for="prize-year">Rok</label>
+              <input type="number" id="prize-year" class="plain-input" min="2000" max="2100" required />
+            </div>
+            <div class="form-group">
+              <label for="prize-description">Nagroda</label>
+              <textarea id="prize-description" class="plain-input" rows="3" maxlength="500" placeholder="Np. kolacja stawiana przez resztę"></textarea>
+              <small class="hint">Puste pole usuwa nagrodę na ten rok.</small>
+            </div>
+            <button type="submit" id="prize-submit-btn" class="btn btn-primary btn-block">
+              <i data-lucide="save"></i>
+              <span>Zapisz nagrodę</span>
+            </button>
+            <div id="prize-message" class="form-msg" hidden></div>
           </form>
         </section>
       </div>
@@ -121,7 +172,7 @@
         <section id="leaderboard-section" class="card" hidden>
           <div class="card-header">
             <i data-lucide="award" class="card-icon"></i>
-            <h2>Leaderboard</h2>
+            <h2>Leaderboard <span class="current-year"></span></h2>
           </div>
           <div class="table-container">
             <table id="leaderboard">
@@ -139,7 +190,7 @@
         <section id="user-progress-section" class="card" hidden>
           <div class="card-header">
             <i data-lucide="users" class="card-icon"></i>
-            <h2>Szczegółowe postępy</h2>
+            <h2>Szczegółowe postępy <span class="current-year"></span></h2>
           </div>
           <div id="user-progress-container" class="progress-list"></div>
         </section>

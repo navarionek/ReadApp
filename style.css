@@ -141,14 +141,14 @@ header {
 /* Dashboard Grid */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
 }
 
 @media (min-width: 850px) {
   .dashboard-grid {
-    grid-template-columns: 350px 1fr;
+    grid-template-columns: 350px minmax(0, 1fr);
   }
 }
 
@@ -458,4 +458,156 @@ th {
   margin-top: 1rem;
   font-size: 0.875rem;
   border: 1px solid var(--error-border);
+}
+
+/* Nagroda roku i plan na 1. miejsce */
+.prize-banner,
+.goal-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: var(--bg-card);
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1rem;
+}
+
+.prize-banner {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.prize-info,
+.goal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.prize-text {
+  font-size: 1.125rem;
+  font-weight: 700;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.goal-headline {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.goal-details {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+/* Edycja wpisów */
+.table-container {
+  overflow-x: auto;
+}
+
+.actions-cell {
+  white-space: nowrap;
+  text-align: right;
+  width: 1%;
+}
+
+.btn-icon {
+  padding: 0.35rem;
+  margin-left: 0.25rem;
+}
+
+.btn-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.cancel-btn {
+  margin-top: 0.75rem;
+}
+
+/* Stany ładowania / błędu / pustej listy */
+.status-cell,
+.status-box {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+}
+
+.status-cell .btn,
+.status-box .btn {
+  margin-left: 0.75rem;
+}
+
+/* Panel admina */
+input.plain-input,
+textarea.plain-input {
+  width: 100%;
+  padding: 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 1rem;
+  background: var(--bg-card);
+  color: var(--text-main);
+  transition: var(--transition);
+}
+
+textarea.plain-input {
+  resize: vertical;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.hint {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.form-msg {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  background: var(--primary-light);
+  border: 1px solid var(--border);
+}
+
+.mult-inline {
+  display: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+@media (max-width: 600px) {
+  .card {
+    padding: 1.125rem;
+  }
+
+  th, td {
+    padding: 0.625rem 0.375rem;
+  }
+
+  .col-mult {
+    display: none;
+  }
+
+  .mult-inline {
+    display: inline;
+  }
+
+  /* Przyciski edycji jeden pod drugim, żeby tabela mieściła się w ekranie */
+  .actions-cell .btn-icon {
+    display: flex;
+    margin: 0.125rem 0 0.125rem auto;
+  }
 }
