@@ -25,6 +25,10 @@ function displayNameOf(user) {
   return user.user_metadata?.full_name || user.email;
 }
 
+function setHeaderName(name) {
+  document.getElementById('display-name').textContent = name;
+}
+
 function showError(msg) {
   const errDiv = document.getElementById('error-message');
   errDiv.textContent = msg;
@@ -75,7 +79,10 @@ function updateUI(user) {
   AUTH_ONLY_SECTIONS.forEach(id => {
     document.getElementById(id).hidden = !user;
   });
-  document.getElementById('display-name').textContent = user ? displayNameOf(user) : '';
+  // Nazwa z Google tylko do czasu wczytania profilu (nie nadpisuj jej przy odświeżeniu tokenu)
+  const header = document.getElementById('display-name');
+  if (!user) setHeaderName('');
+  else if (!header.textContent) setHeaderName(displayNameOf(user));
 
   if (!user) {
     document.getElementById('leaderboard-body').replaceChildren();
@@ -110,9 +117,8 @@ document.getElementById('read-form').addEventListener('submit', async e => {
 
   submitBtn.disabled = true;
   try {
-    // user_id, username i created_at i tak ustawia serwer (trigger reads_set_owner)
+    // user_id i created_at ustawia baza (defaulty), klient może podać tylko te trzy pola
     const { error } = await supabaseClient.from('reads').insert({
-      username: displayNameOf(currentUser),
       title,
       pages,
       multiplier,
@@ -129,21 +135,53 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   }
 });
 
-/* ----------------- Data loading ----------------- */
-// Wpisy sprzed migracji bez przypisanego konta grupujemy po nazwie
-function readerKey(row) {
-  return row.user_id || `name:${row.username}`;
+/* ----------------- Profile ----------------- */
+async function loadProfile() {
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('display_name')
+    .eq('id', currentUser.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error loading profile:', error);
+    return;
+  }
+  if (data) setHeaderName(data.display_name);
 }
 
+async function handleRename() {
+  const current = document.getElementById('display-name').textContent;
+  const input = prompt('Twoja nazwa w rankingu:', current);
+  if (input === null) return;
+
+  const displayName = input.trim();
+  if (!displayName || displayName.length > 50) {
+    alert('Nazwa musi mieć od 1 do 50 znaków.');
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from('profiles')
+    .update({ display_name: displayName })
+    .eq('id', currentUser.id);
+
+  if (error) {
+    alert('Nie udało się zmienić nazwy: ' + error.message);
+    return;
+  }
+  setHeaderName(displayName);
+  await loadReads();
+}
+
+/* ----------------- Data loading ----------------- */
 function groupByReader(rows) {
   const readers = new Map();
   rows.forEach(r => {
-    const key = readerKey(r);
-    if (!readers.has(key)) {
-      // Wiersze są od najnowszego, więc pierwsza nazwa jest aktualna
-      readers.set(key, { key, name: r.username, points: 0, books: [] });
+    if (!readers.has(r.user_id)) {
+      readers.set(r.user_id, { key: r.user_id, name: r.profiles?.display_name || '?', points: 0, books: [] });
     }
-    const reader = readers.get(key);
+    const reader = readers.get(r.user_id);
     reader.points += r.pages * r.multiplier;
     reader.books.push(r);
   });
@@ -153,7 +191,7 @@ function groupByReader(rows) {
 async function loadReads() {
   const { data: rows, error } = await supabaseClient
     .from('reads')
-    .select('user_id, username, title, pages, multiplier')
+    .select('user_id, title, pages, multiplier, profiles(display_name)')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -219,6 +257,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+  document.getElementById('rename-btn').addEventListener('click', handleRename);
 
   // Klasę motywu ustawia już skrypt w <head>, tu tylko ikona
   setTheme(document.documentElement.classList.contains('dark-mode'));
@@ -237,7 +276,10 @@ window.addEventListener('DOMContentLoaded', () => {
     updateUI(user);
     // setTimeout: nie wołamy Supabase wewnątrz callbacka auth (zalecenie supabase-js, unika deadlocka)
     if (user && userChanged) {
-      setTimeout(loadReads, 0);
+      setTimeout(() => {
+        loadProfile();
+        loadReads();
+      }, 0);
     }
   });
 });
