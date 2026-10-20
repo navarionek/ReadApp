@@ -47,6 +47,8 @@ export function updateUI(user) {
     state.shelfUserId = null;
     state.shelfRows = [];
     state.shelfQueue = [];
+    state.myQueue = [];
+    state.startingFromQueue = null;
     state.readingNow = [];
     state.multipliers = [];
     invalidateReads();

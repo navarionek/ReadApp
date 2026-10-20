@@ -1,7 +1,7 @@
 import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, setViewAs, viewerId } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { loadReads } from './data.js';
-import { cancelEdit, handleFinishPick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
+import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme } from './shell.js';
@@ -37,6 +37,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
+  document.getElementById('queue-pick').addEventListener('change', handleQueuePick);
   document.getElementById('shelf-person').addEventListener('change', e => {
     state.shelfUserId = e.target.value === viewerId() ? null : e.target.value;
     loadShelf();

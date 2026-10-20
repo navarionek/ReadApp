@@ -154,10 +154,14 @@ export function updateFormUI() {
     btn.setAttribute('aria-pressed', String(active));
   });
 
+  const canPickQueue = started && state.myQueue.length > 0;
+  document.getElementById('queue-pick-group').hidden = !canPickQueue;
+  if (canPickQueue) renderQueuePick();
   document.getElementById('finish-pick-group').hidden = !canPick;
   if (canPick) renderFinishPick();
   // Tytuł bierze się z wybranej zaczętej książki, więc pole jest wtedy schowane
-  document.getElementById('title-group').hidden = !!state.finishing && !slim;
+  document.getElementById('title-group').hidden = (!!state.finishing && !slim) || (started && !!state.startingFromQueue);
+  document.getElementById('author-group').hidden = started && !!state.startingFromQueue;
   document.getElementById('started-group').hidden = !started;
   document.getElementById('pages-group').hidden = slim;
   document.getElementById('multiplier-group').hidden = slim;
@@ -228,6 +232,7 @@ document.getElementById('title').addEventListener('input', () => {
 
 export function setEntryMode(mode) {
   state.entryMode = mode;
+  if (mode !== 'started') state.startingFromQueue = null;
   if (mode === 'started' || mode === 'queue') {
     // Nowa zaczęta książka: zaczynamy od pustego tytułu; po powrocie znowu podpowiemy zaczętą
     selectFinishing(null);
@@ -238,6 +243,27 @@ export function setEntryMode(mode) {
   hideError();
   updateFormUI();
   suggestPages();
+}
+
+// „Zaczynam czytać”: lista „Do przeczytania” + „Inna książka”
+export function renderQueuePick() {
+  const select = document.getElementById('queue-pick');
+  select.replaceChildren(
+    el('option', { value: 'new', text: 'Inna książka (wpisz tytuł)' }),
+    ...state.myQueue.map(item => el('option', { value: String(item.id), text: item.author ? `${item.title} (${item.author})` : item.title })),
+  );
+  select.value = state.startingFromQueue ? String(state.startingFromQueue.id) : 'new';
+}
+
+export function handleQueuePick() {
+  const value = document.getElementById('queue-pick').value;
+  const item = state.myQueue.find(q => String(q.id) === value) || null;
+  state.startingFromQueue = item;
+  document.getElementById('title').value = item ? item.title : '';
+  document.getElementById('author').value = item?.author || '';
+  hideError();
+  updateFormUI();
+  if (!item) document.getElementById('title').focus({ preventScroll: true });
 }
 
 export function handleFinishPick() {
@@ -285,6 +311,7 @@ export function startEdit(book) {
 }
 
 export function cancelEdit() {
+  state.startingFromQueue = null;
   hidePagesHint();
   state.editingId = null;
   state.editingMultiplier = null;
@@ -404,12 +431,24 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   try {
     if (queueing) {
       // „Do przeczytania”: tylko tytuł i autor; zostajemy w formularzu, żeby dało się dodać kolejne
-      const { error } = await supabaseClient.from('reading_queue').insert({ title, author: author || null });
+      const { data: added, error } = await supabaseClient.from('reading_queue').insert({ title, author: author || null }).select('id, title, author');
       if (error) throw error;
+      if (added?.length) state.myQueue.push(added[0]);
       document.getElementById('title').value = '';
       document.getElementById('author').value = '';
       showToast('Dodano do kolejki.');
       document.getElementById('title').focus({ preventScroll: true });
+      return;
+    }
+
+    if (startingNow && state.startingFromQueue) {
+      // Z listy „Do przeczytania” do „Teraz czytam” w jednej transakcji (autor i okładka jadą razem)
+      const { error } = await supabaseClient.rpc('start_from_queue', { p_id: state.startingFromQueue.id, p_started_at: startedAt });
+      if (error) throw error;
+      cancelEdit();
+      await loadReads();
+      showToast('Zaczęte! Książka jest w „Teraz czytam”.');
+      goTo('start');
       return;
     }
 

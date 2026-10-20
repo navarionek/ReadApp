@@ -16,6 +16,8 @@ export const state = {
   finishPickedNew: false,  // ktoś świadomie wybrał „Inna książka” zamiast zaczętej
 
   readingNow: [],          // zaczęte książki wszystkich: [{ id, user_id, title, started_at, profiles }]
+  myQueue: [],             // moja lista „Do przeczytania”: [{ id, title, author }]
+  startingFromQueue: null, // { id, title, author } gdy zaczynamy książkę z listy „Do przeczytania”
   viewAs: null,            // { id, name } albo null (podgląd jako inna osoba, admin)
 
   // Półka

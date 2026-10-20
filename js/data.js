@@ -64,7 +64,7 @@ export async function loadReads() {
   loadPrize();
 
   // Rywalizacja resetuje się co roku: tylko wpisy od 1 stycznia (czas lokalny)
-  const [readsResult, nowResult] = await Promise.all([
+  const [readsResult, nowResult, queueResult] = await Promise.all([
     supabaseClient
       .from('reads')
       .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize, avatar_url)')
@@ -75,6 +75,12 @@ export async function loadReads() {
       .from('reading_now')
       .select('id, user_id, title, started_at, cover_url, author, published_year, page_count, info_url, description, info_checked_at, profiles(display_name)')
       .order('started_at', { ascending: true }),
+    supabaseClient
+      .from('reading_queue')
+      .select('id, title, author')
+      .eq('user_id', state.currentUser.id)
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true }),
   ]);
   const { data: rows, error } = readsResult;
   if (seq !== readsSeq) return;
@@ -87,6 +93,9 @@ export async function loadReads() {
   }
   if (nowResult.error) console.error('Error loading reading_now:', nowResult.error);
   state.readingNow = nowResult.data || [];
+  if (queueResult.error) console.error('Error loading reading queue:', queueResult.error);
+  state.myQueue = queueResult.data || [];
+  if (state.startingFromQueue && !state.myQueue.some(q => q.id === state.startingFromQueue.id)) state.startingFromQueue = null;
   // Formularz nie jest w trakcie edycji: odśwież listę zaczętych i domyślny wybór
   if (!state.editingId) {
     if (state.finishing && !myReadingNow().some(item => item.id === state.finishing.id)) selectFinishing(null);

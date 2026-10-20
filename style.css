@@ -2450,3 +2450,9 @@ img.rank-avatar {
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Błysk na pasku nie może wychodzić poza sam pasek (przy krótkich paskach było go widać na tle toru) */
+.rank-fill {
+  overflow: hidden;
+  border-radius: 999px;
+}
