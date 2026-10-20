@@ -14,7 +14,7 @@ export const BADGES = [
   { id: 'pages5k', icon: 'rocket', name: 'Pięć tysięcy stron', desc: '5000 przeczytanych stron', test: s => s.pages >= 5000 },
   { id: 'brick', icon: 'brick-wall', name: 'Cegła', desc: 'Książka mająca co najmniej 500 stron', test: s => s.longest >= 500 },
   { id: 'gigabrick', icon: 'castle', name: 'GIGA cegła', desc: 'Książka mająca co najmniej 800 stron', test: s => s.longest >= 800 },
-  { id: 'bonus', icon: 'sparkles', name: 'Z bonusem', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
+  { id: 'bonus', icon: 'sparkles', name: 'Bonusmaxxxing', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
   { id: 'double', icon: 'badge-percent', name: 'Podwójny bonus', desc: 'Książka z mnożnikiem 2,25x (dwa mnożniki naraz)', test: s => s.doubleBonus >= 1 },
   { id: 'streak', icon: 'calendar-check', name: 'Regularność', desc: 'Wpisy w 3 kolejnych miesiącach', test: s => s.monthStreak >= 3 },
   { id: 'leader', icon: 'crown', name: 'Korona', desc: 'Aktualnie 1. miejsce w rankingu', test: s => s.rank === 1 },
