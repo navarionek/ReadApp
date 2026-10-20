@@ -225,6 +225,7 @@ export function renderGoal(readers) {
 
 export function renderLeaderboard(readers) {
   const ranked = [...readers].sort((a, b) => b.points - a.points);
+  state.lastRanked = ranked.map(r => ({ key: r.key, name: r.name, points: r.points }));
   const tbody = document.getElementById('leaderboard-body');
 
   if (!ranked.length) {

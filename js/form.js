@@ -1,6 +1,8 @@
 import { renderMultiplierAdmin } from './admin.js';
+import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { loadReads } from './data.js';
 import { goTo } from './shell.js';
+import { showAddSummary, snapshotRanking } from './summary.js';
 import { state } from './state.js';
 import { formatDay } from './stats.js';
 import { supabaseClient } from './supabase.js';
@@ -350,6 +352,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
       return;
     }
 
+    const rankingBefore = snapshotRanking();
     if (state.finishing && !state.editingId) {
       // Wpis, okładka i usunięcie z „Teraz czytam” w jednej transakcji w bazie
       const { error } = await supabaseClient.rpc('finish_reading', {
@@ -374,8 +377,13 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     const wasEditing = !!state.editingId;
     cancelEdit();
     await loadReads();
-    showToast(wasEditing ? 'Zapisano zmiany.' : 'Dodano wpis!');
     goTo(wasEditing ? 'postepy' : 'start');
+    if (wasEditing) {
+      showToast('Zapisano zmiany.');
+    } else {
+      // Nowa książka: podsumowanie, co zmieniło się w rankingu (miejsce, wyprzedzone osoby, konfetti)
+      showAddSummary(rankingBefore, { title, pts: bookPoints({ pages, multiplier }) });
+    }
   } catch (err) {
     console.error('Error saving read:', err);
     showError(friendlyError(err));

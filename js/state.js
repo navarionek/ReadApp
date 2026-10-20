@@ -25,6 +25,7 @@ export const state = {
   // Statystyki i wyścig
   statsReaders: [],
   statsRows: [],
+  lastRanked: [],          // ostatni ranking: [{ key, name, points }] (do podsumowania po dodaniu książki)
   race: null,              // narysowany wykres: skale, elementy, serie
   raceFrame: null,         // id requestAnimationFrame
   raceProgress: 1,         // 0..1, jak daleko w roku jest animacja

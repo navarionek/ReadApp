@@ -1,3 +1,4 @@
+import { playRankingIntro } from './ranking.js';
 import { cancelEdit } from './form.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { state } from './state.js';
@@ -31,6 +32,7 @@ export function showScreen(name) {
   window.scrollTo(0, 0);
 
   if (name === 'polka' && state.currentUser) loadShelf();
+  if (name === 'ranking') playRankingIntro();
   if (name !== 'polka') closeBookModal();
 
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
