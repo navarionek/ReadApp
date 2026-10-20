@@ -364,7 +364,7 @@ export function renderShelf() {
   const current = state.readingNow.filter(item => item.user_id === userId);
   if (current.length) {
     sections.push(el('section', { class: 'shelf-section' }, [
-      el('h3', { class: 'shelf-year', text: 'Czyta teraz' }),
+      el('h3', { class: 'shelf-year' }, [document.createTextNode('Czyta teraz'), el('span', { class: 'shelf-year-count', text: ` · ${current.length}` })]),
       el('div', { class: 'shelf-grid' }, current.map(item => {
         const info = readingCoverOf(item);
         const book = { title: item.title, cover_url: info?.cover_url, author: item.author || info?.author };

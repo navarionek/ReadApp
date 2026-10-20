@@ -486,16 +486,6 @@ th {
   gap: 0.5rem;
 }
 
-.goal-top {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.goal-top .stat-icon {
-  padding: 0.5rem;
-}
-
 .goal-main {
   display: flex;
   align-items: baseline;
@@ -2538,4 +2528,13 @@ img.rank-avatar {
 
 @media (prefers-reduced-motion: reduce) {
   .discourage-card { animation: none; }
+}
+
+/* „Plan na 1. miejsce” ma ten sam nagłówek i wcięcie co pozostałe karty */
+.goal-card {
+  padding: 1.5rem;
+}
+
+.goal-card .card-header {
+  margin-bottom: 0.5rem;
 }
