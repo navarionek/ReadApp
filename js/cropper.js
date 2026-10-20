@@ -19,7 +19,7 @@ export async function cropImage(file) {
   const bitmap = await decode(file);
 
   return new Promise(resolve => {
-    const W0 = Math.min(window.innerWidth - 32, 520);
+    const W0 = Math.min(window.innerWidth - 64, 520);
     const H0 = Math.round(window.innerHeight * 0.6);
     const scale = Math.min(W0 / bitmap.width, H0 / bitmap.height, 1);
     const W = Math.round(bitmap.width * scale);
@@ -30,8 +30,8 @@ export async function cropImage(file) {
     canvas.height = H;
     canvas.getContext('2d').drawImage(bitmap, 0, 0, W, H);
 
-    // Ramka startuje z lekkim marginesem, żeby od razu było widać uchwyty
-    const inset = 0.06;
+    // Domyślnie ramka obejmuje całe zdjęcie (uchwyty wystają poza nie, więc overlay ma zapas po bokach)
+    const inset = 0;
     let rect = { x: W * inset, y: H * inset, w: W * (1 - 2 * inset), h: H * (1 - 2 * inset) };
 
     const dim = el('div', { class: 'crop-dim' });
