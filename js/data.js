@@ -1,5 +1,6 @@
 import { loadPrize, viewerId } from './admin.js';
 import { earnedBadges, renderBadgesCard } from './badges.js';
+import { renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { coverEl, readingCoverOf } from './shelf.js';
@@ -248,6 +249,7 @@ export function renderLeaderboard(readers) {
       ]);
     }));
   }
+  renderRankingViz(ranked);
   renderBadgesCard(ranked);
 
   if (state.currentUser) {
