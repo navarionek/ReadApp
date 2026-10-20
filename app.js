@@ -211,7 +211,7 @@ function renderLeaderboard(readers) {
   document.getElementById('leaderboard-body').replaceChildren(
     ...ranked.map(r => el('tr', {}, [
       el('td', { text: r.name }),
-      el('td', { class: 'text-right', text: r.points.toFixed(1) }),
+      el('td', { class: 'text-right', text: r.points.toFixed(0) }),
     ]))
   );
 
@@ -229,7 +229,7 @@ function renderUserProgress(readers) {
       el('td', { text: book.title || '—' }),
       el('td', { class: 'text-right', text: String(book.pages) }),
       el('td', { class: 'text-right', text: `${book.multiplier}x` }),
-      el('td', { class: 'text-right score', text: (book.pages * book.multiplier).toFixed(1) }),
+      el('td', { class: 'text-right score', text: (book.pages * book.multiplier).toFixed(0) }),
     ]));
 
     const table = el('table', {}, [
