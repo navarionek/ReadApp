@@ -396,7 +396,7 @@ function askEssay(bookTitle) {
     const area = el('textarea', { class: 'essay-text', rows: '8', 'aria-label': 'Referat', placeholder: 'Rozwinięcie, wnioski, ulubiony cytat…' });
     const counter = el('span', { class: 'essay-counter', text: `0 / ${ESSAY_MIN}` });
     const ok = el('button', { type: 'button', class: 'btn btn-primary', text: 'Dodaj książkę' });
-    const skip = el('button', { type: 'button', class: 'btn btn-outline', text: 'Dodaj bez referatu' });
+    const skip = el('button', { type: 'button', class: 'btn btn-outline', text: 'Dodaj bez referatu (-1000 pkt)' });
     const cancel = el('button', { type: 'button', class: 'btn btn-outline', text: 'Jednak nie' });
     ok.disabled = true;
 
