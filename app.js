@@ -95,6 +95,8 @@ function currentScreen() {
 
 function showScreen(name) {
   if (name === 'admin' && !isAdmin) name = 'start';
+  // Wyjście z formularza w trakcie edycji = porzucenie edycji, żeby „Dodaj” było znowu puste
+  if (name !== 'dodaj' && editingId) cancelEdit();
   document.querySelectorAll('.screen').forEach(screen => {
     screen.hidden = screen.dataset.screen !== name;
   });
@@ -842,6 +844,10 @@ window.addEventListener('DOMContentLoaded', () => {
     goTo('postepy');
   });
   window.addEventListener('hashchange', () => showScreen(currentScreen()));
+  // Kliknięcie „Dodaj” w menu zawsze otwiera pusty formularz, także w trakcie edycji
+  document.querySelector('.nav-item[data-screen="dodaj"]').addEventListener('click', () => {
+    if (editingId) cancelEdit();
+  });
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
