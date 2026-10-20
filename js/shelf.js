@@ -248,7 +248,7 @@ export async function fillMissingBookInfo(userId) {
       // Bez Google Books „nie znaleziono” nie jest pewne: nie zapisujemy, spróbujemy przy następnym otwarciu
       if (failed || (!best && !google)) continue;
       const info = {
-        cover_url: best?.cover || null,
+        cover_url: own ? await ownCover(best?.cover) : (best?.cover || null),
         author: best?.author?.slice(0, 200) || null,
         published_year: best?.year || null,
         info_url: best?.infoUrl || null,
@@ -344,6 +344,20 @@ export function openBookModal(row) {
   refreshIcons();
 }
 
+// Okładkę z Google/Open Library kopiujemy do naszego bucketa (funkcja cover-copy), żeby ładowała się
+// szybko i nie znikała razem ze źródłem. Gdy kopiowanie się nie uda, zostaje link zewnętrzny.
+async function ownCover(url) {
+  if (!url) return null;
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('cover-copy', { body: { url } });
+    if (error) throw error;
+    return data?.url || url;
+  } catch (err) {
+    console.error('Cover copy failed:', err);
+    return url;
+  }
+}
+
 // Zdjęcie z aparatu może mieć kilka MB: zmniejszamy do JPEG-a o dłuższym boku max 900 px (~100 KB)
 async function resizeToJpeg(file, maxSide = 900, quality = 0.85) {
   let bitmap;
@@ -418,10 +432,13 @@ export function renderCoverPicker(container, row, query, save) {
         el('span', { class: 'book-tile-title', text: r.title }),
         el('span', { class: 'book-tile-author', text: [r.author, r.year].filter(Boolean).join(' · ') }),
       ]);
-      btn.addEventListener('click', () => save(row, {
-        cover_url: r.cover, author: r.author?.slice(0, 200) || null, published_year: r.year,
-        info_url: r.infoUrl, description: r.description,
-      }));
+      btn.addEventListener('click', async () => {
+        results.replaceChildren(el('div', { class: 'status-box', text: 'Zapisuję okładkę…' }));
+        save(row, {
+          cover_url: await ownCover(r.cover), author: r.author?.slice(0, 200) || null, published_year: r.year,
+          info_url: r.infoUrl, description: r.description,
+        });
+      });
       return btn;
     });
     const none = el('button', { type: 'button', class: 'cover-option' }, [
