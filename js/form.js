@@ -420,7 +420,7 @@ function askEssay(bookTitle) {
     const overlay = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'essay-title' }, [
       el('div', { class: 'modal-content essay-content' }, [
         el('div', { class: 'modal-icon' }, [icon('pen-line')]),
-        el('h2', { id: 'essay-title', class: 'modal-title', text: 'Referat, Krystian!' }),
+        el('h2', { id: 'essay-title', class: 'modal-title', text: 'Chwileczkę, Krystian!'}),
         el('p', { text: `Angielski i naukowa naraz? Napisz referat o „${bookTitle}” (min. ${ESSAY_MIN} znaków).` }),
         area,
         counter,
