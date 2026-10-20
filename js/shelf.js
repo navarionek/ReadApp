@@ -329,6 +329,34 @@ export function openBookModal(row) {
   refreshIcons();
 }
 
+// Zdjęcie z aparatu może mieć kilka MB: zmniejszamy do JPEG-a o dłuższym boku max 900 px (~100 KB)
+async function resizeToJpeg(file, maxSide = 900, quality = 0.85) {
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    bitmap = await createImageBitmap(file);
+  }
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Nie udało się przetworzyć zdjęcia.'))), 'image/jpeg', quality);
+  });
+}
+
+// Wysyła zdjęcie do własnego folderu w buckecie „covers” i zwraca jego publiczny adres
+async function uploadCoverPhoto(file) {
+  const blob = await resizeToJpeg(file);
+  const path = `${state.currentUser.id}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabaseClient.storage.from('covers').upload(path, blob, { contentType: 'image/jpeg' });
+  if (error) throw error;
+  return supabaseClient.storage.from('covers').getPublicUrl(path).data.publicUrl;
+}
+
 // save(row, info) zapisuje wybór: saveBookInfo dla przeczytanych, saveReadingInfo dla „Teraz czytam”
 export function renderCoverPicker(container, row, query, save) {
   const input = el('input', { type: 'search', class: 'plain-input', 'aria-label': 'Szukaj książki', placeholder: 'Tytuł, autor…' });
@@ -336,7 +364,35 @@ export function renderCoverPicker(container, row, query, save) {
   const searchBtn = el('button', { type: 'submit', class: 'btn btn-primary' }, [el('span', { text: 'Szukaj' })]);
   const form = el('form', { class: 'cover-search' }, [input, searchBtn]);
   const results = el('div', { class: 'cover-results' }, [el('div', { class: 'status-box', text: 'Szukam…' })]);
-  container.replaceChildren(form, results);
+
+  // Własne zdjęcie okładki: aparat albo galeria (telefon sam pyta, skąd wziąć plik)
+  const photoInput = el('input', { type: 'file', accept: 'image/*', hidden: '' });
+  const photoBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block cover-photo-btn' }, [icon('camera'), el('span', { text: 'Zrób zdjęcie okładki' })]);
+  photoBtn.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files[0];
+    photoInput.value = '';
+    if (!file) return;
+    photoBtn.disabled = true;
+    results.replaceChildren(el('div', { class: 'status-box', text: 'Wysyłam zdjęcie…' }));
+    try {
+      const url = await uploadCoverPhoto(file);
+      // Tekstowe informacje (autor, rok, opis) zostają, zmienia się tylko okładka
+      await save(row, {
+        cover_url: url, author: row.author ?? null, published_year: row.published_year ?? null,
+        info_url: row.info_url ?? null, description: row.description ?? null,
+      });
+    } catch (err) {
+      console.error('Cover upload failed:', err);
+      showToast('Nie udało się wysłać zdjęcia: ' + friendlyError(err));
+      run(input.value.trim() || row.title || '');
+    } finally {
+      photoBtn.disabled = false;
+    }
+  });
+
+  container.replaceChildren(form, photoBtn, photoInput, results);
+  refreshIcons();
 
   const run = async q => {
     results.replaceChildren(el('div', { class: 'status-box', text: 'Szukam…' }));

@@ -1738,3 +1738,7 @@ header {
 #book-modal-body > * + .cover-picker {
   margin-top: 0.75rem;
 }
+
+.cover-photo-btn {
+  margin-bottom: 1rem;
+}
