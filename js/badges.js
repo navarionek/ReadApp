@@ -27,7 +27,7 @@ export const BADGES = [
   { id: 'turtle', icon: 'turtle', name: 'Żółw', desc: 'Książka czytana ponad 60 dni', test: s => s.slow >= 1 },
   { id: 'english', icon: 'languages', name: 'Anglofil', desc: '5 książek z mnożnikiem „Angielski”', test: s => s.english >= 5 },
   { id: 'scientist', icon: 'flask-conical', name: 'Naukowiec', desc: '5 książek z mnożnikiem „Naukowa”', test: s => s.science >= 5 },
-  { id: 'loyal', icon: 'pen-line', name: 'Wierny autor', desc: '2 książki tego samego autora', test: s => s.sameAuthor >= 2 },
+  { id: 'loyal', icon: 'pen-line', name: 'Wierny fan', desc: '2 książki tego samego autora', test: s => s.sameAuthor >= 2 },
   { id: 'classic', icon: 'scroll-text', name: 'Klasyka', desc: 'Książka wydana przed 1950 rokiem', test: s => s.classic >= 1 },
   { id: 'nonstop', icon: 'calendar-range', name: 'Bez przerw', desc: 'Wpis w każdym miesiącu od stycznia (co najmniej 4 pełne miesiące)', test: s => s.fromJanuary },
   { id: 'giant', icon: 'mountain', name: 'Gigant', desc: 'Najdłuższa skończona książka w całej grupie w tym roku', test: s => s.giant },
