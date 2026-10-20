@@ -4,7 +4,7 @@ import { goTo } from './shell.js';
 import { state } from './state.js';
 import { formatDay } from './stats.js';
 import { supabaseClient } from './supabase.js';
-import { DAY_MS, el, friendlyError, hideError, refreshIcons, showError, showToast } from './ui.js';
+import { DAY_MS, el, friendlyError, hideError, icon, refreshIcons, showError, showToast } from './ui.js';
 
 /* ----------------- Mnożniki (z tabeli, zarządza admin) ----------------- */
 
@@ -110,6 +110,7 @@ export function myReadingNow() {
 export function selectFinishing(item) {
   state.finishing = item ? { id: item.id, title: item.title, startedAt: item.started_at } : null;
   document.getElementById('title').value = item ? item.title : '';
+  document.getElementById('author').value = item?.author || '';
 }
 
 // Lista „Którą książkę kończysz?”: zaczęte książki + „Inna książka”
@@ -201,6 +202,7 @@ export function startEdit(book) {
   state.finishing = null;
   state.editingId = book.id;
   document.getElementById('title').value = book.title || '';
+  document.getElementById('author').value = book.author || '';
   document.getElementById('pages').value = book.pages;
   document.getElementById('unfinished').checked = !!book.unfinished;
   state.editingMultiplier = Number(book.multiplier);
@@ -255,6 +257,48 @@ export async function handleDelete(book) {
   await loadReads();
 }
 
+/* ----------------- Przysięga Krystiana ----------------- */
+// Żart: Krystian, który dodaje książkę z obydwoma mnożnikami naraz (Angielski + Naukowa),
+// musi najpierw obiecać, że cokolwiek z niej zrozumiał.
+function needsOath() {
+  const firstName = (document.getElementById('display-name').textContent || '').trim().split(/\s+/)[0].toLowerCase();
+  if (firstName !== 'krystian') return false;
+  const labels = readMultiplierLabels().map(l => l.toLowerCase());
+  return labels.includes('angielski') && labels.includes('naukowa');
+}
+
+function askOath() {
+  return new Promise(resolve => {
+    const check = el('input', { type: 'checkbox' });
+    const ok = el('button', { type: 'button', class: 'btn btn-primary', text: 'Dodaj książkę' });
+    const cancel = el('button', { type: 'button', class: 'btn btn-outline', text: 'Jednak nie' });
+    ok.disabled = true;
+    check.addEventListener('change', () => { ok.disabled = !check.checked; });
+
+    const finish = answer => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+      resolve(answer);
+    };
+    const onKey = e => { if (e.key === 'Escape') finish(false); };
+    ok.addEventListener('click', () => finish(true));
+    cancel.addEventListener('click', () => finish(false));
+
+    const overlay = el('div', { class: 'modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'oath-title' }, [
+      el('div', { class: 'modal-content' }, [
+        el('div', { class: 'modal-icon' }, [icon('scale')]),
+        el('h2', { id: 'oath-title', class: 'modal-title', text: 'Chwileczkę, Krystian' }),
+        el('p', { text: 'Po angielsku i do tego naukowa? Zanim dostaniesz podwójny bonus, złóż przysięgę.' }),
+        el('label', { class: 'checkbox-label' }, [check, el('span', { class: 'check-text', text: 'Obiecuję, że cokolwiek zrozumiałem z tej książki' })]),
+        el('div', { class: 'oath-actions' }, [cancel, ok]),
+      ]),
+    ]);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    refreshIcons();
+  });
+}
+
 document.getElementById('read-form').addEventListener('submit', async e => {
   e.preventDefault();
   hideError();
@@ -267,6 +311,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   const submitBtn = document.getElementById('submit-btn');
   const submitLabel = document.getElementById('submit-label');
   const title = document.getElementById('title').value.trim();
+  const author = document.getElementById('author').value.trim().slice(0, 200);
   const pages = parseInt(document.getElementById('pages').value, 10);
   const multiplier = readMultiplier();
   const startingNow = state.entryMode === 'started' && !state.editingId && !state.finishing;
@@ -275,6 +320,9 @@ document.getElementById('read-form').addEventListener('submit', async e => {
     showError('Podaj tytuł książki.');
     return;
   }
+
+  // Przysięga tylko przy dodawaniu skończonej książki (nie przy edycji ani „Zaczynam czytać”)
+  if (!startingNow && !state.editingId && needsOath() && !await askOath()) return;
 
   // Data rozpoczęcia: dziś = teraz, wcześniejszy dzień = jego południe (bez kłopotów ze strefą)
   let startedAt = null;
@@ -293,7 +341,7 @@ document.getElementById('read-form').addEventListener('submit', async e => {
   submitLabel.textContent = 'Zapisywanie…';
   try {
     if (startingNow) {
-      const { error } = await supabaseClient.from('reading_now').insert({ title, started_at: startedAt });
+      const { error } = await supabaseClient.from('reading_now').insert({ title, started_at: startedAt, author: author || null });
       if (error) throw error;
       cancelEdit();
       await loadReads();
@@ -310,11 +358,12 @@ document.getElementById('read-form').addEventListener('submit', async e => {
         p_multiplier: multiplier,
         p_unfinished: document.getElementById('unfinished').checked,
         p_labels: readMultiplierLabels(),
+        p_author: author,
       });
       if (error) throw error;
     } else {
       // user_id i created_at ustawia baza (defaulty)
-      const values = { title, pages, multiplier, multiplier_labels: readMultiplierLabels(), unfinished: document.getElementById('unfinished').checked };
+      const values = { title, author: author || null, pages, multiplier, multiplier_labels: readMultiplierLabels(), unfinished: document.getElementById('unfinished').checked };
       const { data, error } = state.editingId
         ? await supabaseClient.from('reads').update(values).eq('id', state.editingId).select('id')
         : await supabaseClient.from('reads').insert(values).select('id');

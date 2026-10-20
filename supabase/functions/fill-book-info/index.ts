@@ -32,7 +32,7 @@ function jwtRole(header: string | null): string | null {
 const TABLES = ['reads', 'reading_now'];
 const FIELDS = 'id, cover_url, author, published_year, info_url, description, info_checked_at';
 
-type Row = { id: number; title: string; info_checked_at: string | null };
+type Row = { id: number; title: string; author: string | null; info_checked_at: string | null };
 
 // Zwraca aktualne dane wpisu; pending = nie udało się ustalić (Google nie odpowiedział), spróbujemy następnym razem
 async function fillOne(table: string, row: Row) {
@@ -43,7 +43,7 @@ async function fillOne(table: string, row: Row) {
   const cover = best?.cover ? (await copyCover(supabase, best.cover)) ?? best.cover : null;
   const info = {
     cover_url: cover,
-    author: best?.author?.slice(0, 200) ?? null,
+    author: row.author ?? best?.author?.slice(0, 200) ?? null,  // ręcznie wpisany autor ma pierwszeństwo
     published_year: best?.year ?? null,
     info_url: best?.infoUrl ?? null,
     description: best?.description?.slice(0, 3000) ?? null,
@@ -85,7 +85,7 @@ Deno.serve(async req => {
     const limit = Math.min(60, Math.max(1, Number(body.limit) || 30));
     const summary: Record<string, unknown> = {};
     for (const table of TABLES) {
-      const { data } = await supabase.from(table).select('id, title, info_checked_at').is('info_checked_at', null).order('id').limit(limit);
+      const { data } = await supabase.from(table).select('id, title, author, info_checked_at').is('info_checked_at', null).order('id').limit(limit);
       const done = await fillRows(table, (data ?? []) as Row[]);
       summary[table] = { tried: done.length, pending: done.filter((d: any) => d.pending).length };
     }
