@@ -1724,30 +1724,38 @@ async function savePushSubscription(sub) {
   if (error) throw error;
 }
 
+// Pozycja „Powiadomienia” w menu ustawień: przełącznik albo podpowiedź, czemu się nie da
 async function refreshNotifyCard() {
-  const text = document.getElementById('notify-text');
-  const btn = document.getElementById('notify-btn');
-  const label = document.getElementById('notify-btn-label');
-  btn.hidden = true;
+  const item = document.getElementById('notify-toggle');
+  const hint = document.getElementById('notify-hint');
+  const toggle = document.getElementById('notify-switch');
+
+  const unavailable = reason => {
+    item.dataset.state = 'unavailable';
+    item.setAttribute('aria-disabled', 'true');
+    item.setAttribute('aria-checked', 'false');
+    toggle.hidden = true;
+    hint.textContent = reason;
+  };
 
   if (!pushSupported()) {
-    text.textContent = isIos() && !isStandalone()
-      ? 'Na iPhonie: dodaj Czytanko do ekranu początkowego (Udostępnij → Do ekranu początkowego) i otwórz z ikony. Wtedy da się tu włączyć powiadomienia.'
-      : 'Ta przeglądarka nie obsługuje powiadomień.';
+    unavailable(isIos() && !isStandalone()
+      ? 'Na iPhonie: Udostępnij → Do ekranu początkowego, potem otwórz z ikony'
+      : 'Ta przeglądarka nie obsługuje powiadomień');
     return;
   }
   if (Notification.permission === 'denied') {
-    text.textContent = 'Powiadomienia są zablokowane w ustawieniach przeglądarki lub telefonu dla tej strony.';
+    unavailable('Zablokowane w ustawieniach przeglądarki lub telefonu');
     return;
   }
 
   const sub = await currentPushSubscription();
-  text.textContent = sub
-    ? 'Włączone na tym urządzeniu. Dostaniesz powiadomienie, gdy ktoś doda książkę albo cię wyprzedzi.'
-    : 'Dostaniesz powiadomienie, gdy ktoś doda książkę albo cię wyprzedzi.';
-  label.textContent = sub ? 'Wyłącz powiadomienia' : 'Włącz powiadomienia';
-  btn.dataset.state = sub ? 'on' : 'off';
-  btn.hidden = false;
+  item.dataset.state = sub ? 'on' : 'off';
+  item.removeAttribute('aria-disabled');
+  item.setAttribute('aria-checked', String(!!sub));
+  toggle.hidden = false;
+  toggle.classList.toggle('on', !!sub);
+  hint.textContent = 'Nowe książki i wyprzedzenia';
 }
 
 async function enablePush() {
@@ -1776,7 +1784,8 @@ async function disablePush({ quiet = false } = {}) {
 }
 
 async function handleNotifyToggle() {
-  const btn = document.getElementById('notify-btn');
+  const btn = document.getElementById('notify-toggle');
+  if (btn.dataset.state === 'unavailable' || btn.disabled) return;
   btn.disabled = true;
   try {
     if (btn.dataset.state === 'on') await disablePush();
@@ -2214,7 +2223,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);
   document.getElementById('multiplier-add-form').addEventListener('submit', handleMultiplierAdd);
   document.getElementById('race-play').addEventListener('click', playRace);
-  document.getElementById('notify-btn').addEventListener('click', handleNotifyToggle);
+  document.getElementById('notify-toggle').addEventListener('click', handleNotifyToggle);  // menu zostaje otwarte, widać przełącznik
   document.getElementById('view-as-btn').addEventListener('click', handleViewAs);
   document.getElementById('view-as-exit').addEventListener('click', () => setViewAs(null));
 

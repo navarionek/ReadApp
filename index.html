@@ -42,6 +42,14 @@
               <span>Ciemny motyw</span>
               <span id="theme-switch" class="switch" aria-hidden="true"></span>
             </button>
+            <button type="button" id="notify-toggle" class="settings-item" role="menuitemcheckbox" aria-checked="false">
+              <i data-lucide="bell"></i>
+              <span class="settings-text">
+                <span>Powiadomienia</span>
+                <small id="notify-hint" class="settings-hint"></small>
+              </span>
+              <span id="notify-switch" class="switch" aria-hidden="true"></span>
+            </button>
             <button type="button" id="settings-admin" class="settings-item" role="menuitem" hidden>
               <i data-lucide="shield-check"></i>
               <span>Panel admina</span>
@@ -171,18 +179,6 @@
           <div id="badges-grid" class="badges-grid"></div>
         </div>
 
-        <!-- Powiadomienia push -->
-        <div class="card notify-card">
-          <div class="card-header">
-            <i data-lucide="bell" class="card-icon"></i>
-            <h2>Powiadomienia</h2>
-          </div>
-          <p id="notify-text" class="card-intro"></p>
-          <button type="button" id="notify-btn" class="btn btn-outline btn-block" hidden>
-            <i data-lucide="bell-ring"></i>
-            <span id="notify-btn-label">Włącz powiadomienia</span>
-          </button>
-        </div>
       </section>
 
       <!-- Ekran: Dodaj / edytuj wpis -->
