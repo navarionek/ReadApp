@@ -202,12 +202,6 @@ export async function loadPrize() {
     // Baner tylko dla uczestników nagrody pieniężnej (w podglądzie: dla podglądanej osoby)
     const takesPart = participants.some(p => p.id === viewerId());
     document.getElementById('prize-banner').hidden = !description || !takesPart;
-
-    const participantsLine = document.getElementById('prize-participants');
-    participantsLine.textContent = participants.length
-      ? `Nagroda pieniężna: ${participants.map(p => p.display_name).join(', ')}`
-      : '';
-    participantsLine.hidden = !participants.length;
   } catch (err) {
     // Baner zostaje taki, jaki był; nagroda nie jest krytyczna
     console.error('Error loading prize:', err);

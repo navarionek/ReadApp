@@ -680,11 +680,6 @@ textarea:focus {
   height: 1rem;
 }
 
-.prize-participants {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
 .admin-subsection {
   margin-top: 1.5rem;
   padding-top: 1.25rem;
@@ -2047,4 +2042,31 @@ label .hint {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.5rem;
+}
+
+/* Baner nagrody: mały i spokojny (kto bierze udział, nie jest tu potrzebne) */
+.prize-banner {
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.prize-banner .stat-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.prize-banner .stat-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.prize-info {
+  gap: 0;
+}
+
+.prize-text {
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
