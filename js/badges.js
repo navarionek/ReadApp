@@ -11,6 +11,7 @@ export const BADGES = [
   { id: 'ten', icon: 'library-big', name: 'Dycha', desc: '10 książek', test: s => s.books >= 10 },
   { id: 'twenty', icon: 'landmark', name: 'Dwudziestka', desc: '20 książek', test: s => s.books >= 20 },
   { id: 'brick', icon: 'brick-wall', name: 'Cegła', desc: 'Książka mająca co najmniej 500 stron', test: s => s.longest >= 500 },
+  { id: 'gigabrick', icon: 'castle', name: 'GIGA cegła', desc: 'Książka mająca co najmniej 800 stron', test: s => s.longest >= 800 },
   { id: 'pages1k', icon: 'flame', name: 'Tysiąc stron', desc: '1000 przeczytanych stron', test: s => s.pages >= 1000 },
   { id: 'pages5k', icon: 'rocket', name: 'Pięć tysięcy stron', desc: '5000 przeczytanych stron', test: s => s.pages >= 5000 },
   { id: 'bonus', icon: 'sparkles', name: 'Z bonusem', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
