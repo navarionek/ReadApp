@@ -772,7 +772,9 @@ function renderGoal(readers) {
 const MONTHS_PL = ['sty', 'lut', 'mar', 'kwi', 'maj', 'cze', 'lip', 'sie', 'wrz', 'paź', 'lis', 'gru'];
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const SERIES_SLOTS = 8;
-const RACE_DURATION_MS = 4500;
+const RACE_DURATION_MS = 6000;
+const RACE_LOOKAHEAD_DAYS = 45;     // skala „widzi” wpisy z najbliższych ~6 tygodni
+const RACE_SCALE_SMOOTH_MS = 400;   // jak szybko skala dojeżdża do celu (stała czasowa)
 
 let statsReaders = [];
 let statsRows = [];
@@ -993,7 +995,8 @@ function drawRaceGrid(y, vMax) {
   grid.replaceChildren(...items);
 }
 
-function setRaceProgress(p) {
+// dt = czas od poprzedniej klatki animacji; null = narysuj od razu (bez wygładzania skali)
+function setRaceProgress(p, dt = null) {
   raceProgress = p;
   if (!race) return;
   const { series, x, t0, t1, m, plotRight, height } = race;
@@ -1001,10 +1004,22 @@ function setRaceProgress(p) {
   const xCur = x(tCur);
   document.getElementById('race-date').textContent = p < 1 ? formatDay(new Date(tCur)) : '';
 
-  // Oś Y rośnie razem z liderem (z zapasem 10%), więc od początku widać, kto ucieka
+  // Oś Y rośnie razem z liderem, ale płynnie: cel liczymy z wyprzedzeniem (wpis za kilka
+  // tygodni już jest w skali), a pokazana skala dojeżdża do celu z wygładzaniem zamiast skakać
   const values = series.map(s => valueAt(s, tCur));
-  const vMax = Math.max(100, Math.max(...values) * 1.1);
-  race.vMax = vMax;
+  const tAhead = Math.min(t1, tCur + RACE_LOOKAHEAD_DAYS * DAY_MS);
+  // Minimum 20% wyniku końcowego: na początku roku nie robimy zbliżenia na prawie pusty wykres
+  const floor = Math.max(100, Math.max(...series.map(s => s.total)) * 0.2);
+  const target = Math.max(floor, Math.max(...series.map(s => valueAt(s, tAhead))) * 1.1);
+  if (dt === null || !race.vMax) {
+    race.vMax = target;
+  } else {
+    race.vMax += (target - race.vMax) * (1 - Math.exp(-dt / RACE_SCALE_SMOOTH_MS));
+  }
+  // Nigdy mniej niż bieżący lider, żeby linia nie wyszła ponad wykres
+  race.vMax = Math.max(race.vMax, Math.max(...values) * 1.02);
+  race.vMaxTarget = Math.max(target, race.vMax);
+  const vMax = race.vMax;
   const y = v => height - m.bottom - (v / vMax) * (height - m.top - m.bottom);
   race.y = y;
   drawRaceGrid(y, vMax);
@@ -1065,10 +1080,14 @@ function playRace() {
   }
 
   const start = performance.now();
+  let last = start;
   const step = now => {
     const p = Math.min(1, (now - start) / RACE_DURATION_MS);
-    setRaceProgress(p);
-    raceFrame = p < 1 ? requestAnimationFrame(step) : null;
+    setRaceProgress(p, now - last);
+    last = now;
+    // Po dojściu do dziś skala jeszcze chwilę dojeżdża do celu, zamiast przeskoczyć na koniec
+    const settled = Math.abs(race.vMaxTarget - race.vMax) < race.vMaxTarget * 0.002;
+    raceFrame = p < 1 || !settled ? requestAnimationFrame(step) : null;
   };
   setRaceProgress(0);
   raceFrame = requestAnimationFrame(step);
@@ -1159,7 +1178,11 @@ function renderUserProgress(readers) {
     return;
   }
 
-  const blocks = readers.map(reader => {
+  // Najpierw moje postępy, potem pozostałe osoby w dotychczasowej kolejności
+  const mineFirst = [...readers].sort((a, b) =>
+    (b.key === currentUser?.id) - (a.key === currentUser?.id));
+
+  const blocks = mineFirst.map(reader => {
     const isMine = currentUser && reader.key === currentUser.id;
 
     const rows = reader.books.map(book => {
