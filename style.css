@@ -1646,6 +1646,31 @@ header {
   color: var(--error);
 }
 
+/* Wybór własnego koloru w menu */
+#color-btn {
+  position: relative;
+}
+
+.color-swatch {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: auto;
+  border-radius: 50%;
+  border: 2px solid var(--border-focus);
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.color-input {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* Przełącznik motywu */
 .switch {
   position: relative;

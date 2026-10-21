@@ -25,10 +25,10 @@ export function formatDay(date) {
 }
 
 // Kolor idzie za osobą (stała kolejność alfabetyczna), nie za miejscem w rankingu,
-// więc nie zmienia się, gdy ktoś kogoś wyprzedzi
+// więc nie zmienia się, gdy ktoś kogoś wyprzedzi. Własny kolor osoby (z profilu) ma pierwszeństwo.
 export function seriesColors(readers) {
   const sorted = [...readers].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
-  return new Map(sorted.map((r, i) => [r.key, i < SERIES_SLOTS ? `var(--series-${i + 1})` : 'var(--series-other)']));
+  return new Map(sorted.map((r, i) => [r.key, r.color || (i < SERIES_SLOTS ? `var(--series-${i + 1})` : 'var(--series-other)')]));
 }
 
 export function niceMax(value) {

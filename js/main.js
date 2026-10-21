@@ -1,4 +1,4 @@
-import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, setViewAs, viewerId } from './admin.js';
+import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs, viewerId } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { loadReads } from './data.js';
 import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
@@ -18,6 +18,15 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('rename-btn').addEventListener('click', () => {
     closeSettings();
     handleRename();
+  });
+  const colorInput = document.getElementById('color-input');
+  document.getElementById('color-btn').addEventListener('click', e => {
+    if (e.target !== colorInput) colorInput.showPicker();
+  });
+  colorInput.addEventListener('change', () => saveMyColor(colorInput.value));
+  document.getElementById('color-reset').addEventListener('click', () => {
+    closeSettings();
+    saveMyColor(null);
   });
   document.getElementById('settings-admin').addEventListener('click', () => {
     closeSettings();

@@ -17,10 +17,29 @@ async function syncAvatar(saved) {
   if (error) console.error('Error syncing avatar:', error);
 }
 
+/* ----------------- Własny kolor ----------------- */
+function showMyColor(color) {
+  const swatch = document.getElementById('color-swatch');
+  swatch.style.background = color || '';
+  if (color) document.getElementById('color-input').value = color;
+  document.getElementById('color-reset').hidden = !color;
+}
+
+// color = null wraca do koloru automatycznego z palety
+export async function saveMyColor(color) {
+  const { error } = await supabaseClient.from('profiles').update({ color }).eq('id', state.currentUser.id);
+  if (error) {
+    alert('Nie udało się zapisać koloru: ' + friendlyError(error));
+    return;
+  }
+  showMyColor(color);
+  await loadReads();
+}
+
 export async function loadProfile() {
   const { data, error } = await supabaseClient
     .from('profiles')
-    .select('display_name, is_admin, avatar_url')
+    .select('display_name, is_admin, avatar_url, color')
     .eq('id', state.currentUser.id)
     .maybeSingle();
 
@@ -33,6 +52,7 @@ export async function loadProfile() {
   setHeaderName(data.display_name);
   maybeShowDiscouragement(data.display_name);
   syncAvatar(data.avatar_url);
+  showMyColor(data.color);
   state.isAdmin = data.is_admin;
   document.getElementById('settings-admin').hidden = !state.isAdmin;
   // Wejście prosto na #admin: ekran pokazujemy dopiero, gdy wiadomo, że to admin

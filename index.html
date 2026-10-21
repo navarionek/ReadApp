@@ -37,6 +37,16 @@
               <i data-lucide="pencil"></i>
               <span>Zmień nazwę</span>
             </button>
+            <button type="button" id="color-btn" class="settings-item" role="menuitem">
+              <i data-lucide="palette"></i>
+              <span>Mój kolor</span>
+              <span id="color-swatch" class="color-swatch" aria-hidden="true"></span>
+              <input type="color" id="color-input" class="color-input" tabindex="-1" aria-label="Mój kolor">
+            </button>
+            <button type="button" id="color-reset" class="settings-item" role="menuitem" hidden>
+              <i data-lucide="rotate-ccw"></i>
+              <span>Kolor automatyczny</span>
+            </button>
             <button type="button" id="theme-toggle" class="settings-item" role="menuitemcheckbox" aria-checked="false">
               <i data-lucide="moon" id="theme-icon"></i>
               <span>Ciemny motyw</span>
