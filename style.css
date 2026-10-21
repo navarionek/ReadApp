@@ -2885,3 +2885,29 @@ input[type="date"].plain-input {
   background: rgba(245, 158, 11, 0.16);
   color: #d97706;
 }
+
+/* Pigułki na Postępach: pełne, nasycone kolory, żeby były dobrze widoczne w obu motywach */
+.pp-reading-chip {
+  background: var(--primary);
+  border-color: transparent;
+  color: #fff;
+}
+
+.pp-reading-chip svg {
+  color: #fff;
+}
+
+.pp-reading-meta {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pp-mult {
+  padding: 0.0625rem 0.5rem;
+  background: #d97706;
+  color: #fff;
+}
+
+.pp-meta .unfinished-tag {
+  border-color: var(--text-muted);
+  color: var(--text-main);
+}
