@@ -2670,3 +2670,13 @@ img.rank-avatar {
 @media (prefers-reduced-motion: reduce) {
   .badge-pop { animation: none; }
 }
+
+/* Pola daty (iOS rysuje je jako małą „pigułkę”): pełna szerokość i wysokość jak inne pola */
+input[type="date"].plain-input {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
