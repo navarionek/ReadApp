@@ -11,6 +11,12 @@ export function normalizeTitle(s) {
     .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// Dokładnie ten sam tytuł (bez wielkości liter, polskich znaków i interpunkcji); do automatycznych okładek
+export function titleEquals(query, found) {
+  const a = normalizeTitle(query);
+  return !!a && a === normalizeTitle(found);
+}
+
 // Czy wynik z bazy to ta sama książka: tytuł zawiera się w drugim albo większość słów się zgadza.
 // Lepiej zastępcza okładka niż cudza.
 export function titleMatches(query, found) {

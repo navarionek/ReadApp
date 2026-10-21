@@ -6,7 +6,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2';
 import { copyCover } from '../_shared/covers.ts';
 import { searchBooks } from '../_shared/lookup.ts';
-import { titleMatches } from '../_shared/logic.js';
+import { titleEquals } from '../_shared/logic.js';
 
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
@@ -39,7 +39,8 @@ type Row = { id: number; title: string; author: string | null; info_checked_at: 
 // Zwraca aktualne dane wpisu; pending = nie udało się ustalić (Google nie odpowiedział), spróbujemy następnym razem
 async function fillOne(table: string, row: Row) {
   const { results, google } = await searchBooks(row.title, 3);
-  const best = results.find(r => titleMatches(row.title, r.title) && r.cover) ?? results.find(r => titleMatches(row.title, r.title));
+  // Automatycznie tylko dokładny tytuł; inne wydania użytkownik wybierze ręcznie w wyborze okładki
+  const best = results.find(r => titleEquals(row.title, r.title) && r.cover) ?? results.find(r => titleEquals(row.title, r.title));
   if (!best && !google) return { id: row.id, pending: true };
 
   const cover = best?.cover ? (await copyCover(supabase, best.cover)) ?? best.cover : null;
