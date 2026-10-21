@@ -4,7 +4,7 @@ import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { confettiBurst, confettiFountain } from './confetti.js';
 import { currentScreen } from './shell.js';
 import { seriesColors } from './stats.js';
-import { currentYear, el, icon, refreshIcons, showToast } from './ui.js';
+import { currentYear, el, icon, refreshIcons } from './ui.js';
 
 /* ----------------- Ranking: podium i paski „książka po książce” ----------------- */
 const PODIUM_ORDER = [1, 0, 2];  // układ na ekranie: 2. miejsce, 1., 3.
@@ -62,13 +62,18 @@ function closeBadgePop() {
 }
 
 function toggleBadgePop(chip, badge) {
+  toggleBubble(chip, badge.name, badge.desc);
+}
+
+// Dymek nad dowolnym elementem (medal, segment książki): tytuł + opis
+function toggleBubble(chip, title, text) {
   const reopenSame = badgePop && badgePop.chip === chip;
   closeBadgePop();
-  if (reopenSame) return;  // drugie stuknięcie w ten sam medal zamyka dymek
+  if (reopenSame) return;  // drugie stuknięcie w ten sam element zamyka dymek
 
   const bubble = el('div', { class: 'badge-pop', role: 'tooltip' }, [
-    el('strong', { text: badge.name }),
-    el('span', { text: badge.desc }),
+    el('strong', { text: title }),
+    el('span', { text }),
   ]);
   document.body.appendChild(bubble);
 
@@ -103,12 +108,14 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
     const seg = el('button', {
       type: 'button',
       class: `rank-seg${i % 2 ? ' alt' : ''}`,
-      title: `${book.title || 'bez tytułu'}: ${pts} pkt`,
       'aria-label': `${book.title || 'bez tytułu'}, ${pts} punktów`,
     });
     seg.style.flexGrow = String(Math.max(pts, 1));
     seg.style.background = colors.get(reader.key);
-    seg.addEventListener('click', () => showToast(`${book.title || 'bez tytułu'}: ${pts} pkt`));
+    seg.addEventListener('click', e => {
+      e.stopPropagation();  // globalny klik zamykałby dymek od razu
+      toggleBubble(seg, book.title || 'bez tytułu', `${pts} pkt`);
+    });
     return seg;
   }));
   fill.dataset.width = String(leaderPoints ? Math.max(4, (reader.points / leaderPoints) * 100) : 0);
