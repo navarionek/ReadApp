@@ -2864,3 +2864,24 @@ input[type="date"].plain-input {
   width: 0.9375rem;
   height: 0.9375rem;
 }
+
+/* Chipy na ekranie Postępy: bez niebieskiego na niebieskim (słaby kontrast w ciemnym motywie) */
+.pp-reading-chip {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+.pp-reading-chip svg {
+  color: var(--primary);
+}
+
+.pp-reading-meta {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.pp-mult {
+  background: rgba(245, 158, 11, 0.16);
+  color: #d97706;
+}
