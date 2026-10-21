@@ -2911,3 +2911,9 @@ input[type="date"].plain-input {
   border-color: var(--text-muted);
   color: var(--text-main);
 }
+
+/* Mnożnik: spokojna, neutralna pigułka zamiast krzykliwej pomarańczowej */
+.pp-mult {
+  background: var(--border);
+  color: var(--text-main);
+}
