@@ -19,7 +19,7 @@ function googleAvatarUrl(url, size) {
   return `${url.replace(/=s\d+(-c)?$/, '')}=s${size}-c`;
 }
 
-function avatar(reader, colors, extraClass = '') {
+export function avatar(reader, colors, extraClass = '') {
   const classes = `rank-avatar ${extraClass}`.trim();
   const initial = () => {
     const node = el('span', { class: classes, 'aria-hidden': 'true', text: firstName(reader.name).charAt(0).toUpperCase() });

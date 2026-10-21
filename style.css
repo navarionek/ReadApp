@@ -2680,3 +2680,187 @@ input[type="date"].plain-input {
   appearance: none;
   text-align: left;
 }
+
+/* ----------------- Postępy: rozwijane karty osób ----------------- */
+.pp-person {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-body);
+  overflow: hidden;
+}
+
+.pp-person + .pp-person {
+  margin-top: 0.75rem;
+}
+
+.pp-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pp-summary::-webkit-details-marker { display: none; }
+
+.pp-who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pp-name {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pp-points {
+  font-size: 1.25rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-points small,
+.pp-score small {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.pp-chevron {
+  display: inline-flex;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.pp-chevron svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.pp-person[open] .pp-chevron {
+  transform: rotate(180deg);
+}
+
+.pp-reading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding: 0 0.875rem 0.625rem;
+}
+
+.pp-reading-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  max-width: 100%;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 0.75rem;
+}
+
+.pp-reading-chip svg {
+  flex-shrink: 0;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.pp-reading-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pp-reading-meta {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.pp-books {
+  margin: 0;
+  padding: 0 0.5rem 0.5rem;
+  list-style: none;
+}
+
+.pp-book {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.625rem 0.75rem;
+  border-left: 3px solid var(--accent, var(--primary));
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.pp-book + .pp-book {
+  margin-top: 0.375rem;
+}
+
+.pp-book-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.pp-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pp-mult {
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.pp-book-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.pp-score {
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pp-actions .btn-icon {
+  padding: 0.25rem;
+}
+
+.pp-actions .btn-icon svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}

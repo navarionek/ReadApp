@@ -1,12 +1,12 @@
 import { goalJokeThisOpen, isKrystian } from './discourage.js';
 import { loadPrize, viewerId } from './admin.js';
 import { renderBadgesCard } from './badges.js';
-import { renderRankingViz } from './ranking.js';
+import { avatar, renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { coverEl, readingCoverOf } from './shelf.js';
 import { state } from './state.js';
-import { formatDay, renderStats } from './stats.js';
+import { formatDay, renderStats, seriesColors } from './stats.js';
 import { supabaseClient } from './supabase.js';
 import { currentYear, DAY_MS, el, friendlyError, icon, refreshIcons } from './ui.js';
 
@@ -269,6 +269,8 @@ export function actionButton(iconName, label, onClick) {
   return btn;
 }
 
+// Postępy: każda osoba to rozwijana karta (moja otwarta, reszta zwinięta) z awatarem, sumą i listą książek
+// od najnowszej. Książka: tytuł, data, strony i mnożnik po lewej, wynik (oraz własne akcje) po prawej.
 export function renderUserProgress(readers) {
   const container = document.getElementById('user-progress-container');
   if (!readers.length) {
@@ -276,60 +278,72 @@ export function renderUserProgress(readers) {
     return;
   }
 
+  const colors = seriesColors(readers);
+  const year = currentYear();
+
   // Najpierw moje postępy, potem pozostałe osoby w dotychczasowej kolejności
   const mineFirst = [...readers].sort((a, b) =>
     (b.key === viewerId()) - (a.key === viewerId()));
 
   const blocks = mineFirst.map(reader => {
     const isMine = state.currentUser && reader.key === state.currentUser.id;
+    const isViewer = reader.key === viewerId();
+    const color = colors.get(reader.key);
+    const pages = reader.books.reduce((sum, b) => sum + b.pages, 0);
+    const n = reader.books.length;
 
-    const rows = reader.books.map(book => {
-      const cells = [
-        el('td', {}, [
-          document.createTextNode(book.title || '—'),
-          ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
-        ]),
-        // Na telefonie kolumna mnożnika jest schowana, a mnożnik pokazuje się przed stronami,
-        // żeby liczby stron były wyrównane do prawej w jednej linii
-        el('td', { class: 'text-right pages-cell' }, [
-          ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'mult-inline', text: `${formatMultiplier(book.multiplier)}x` })] : []),
-          document.createTextNode(String(book.pages)),
-        ]),
-        el('td', { class: 'text-right col-mult', text: `${book.multiplier}x` }),
-        el('td', { class: 'text-right score', text: String(bookPoints(book)) }),
+    const books = [...reader.books].reverse().map(book => {
+      const when = new Date(book.created_at);
+      const meta = [
+        el('span', { text: `${formatDay(when)}${when.getFullYear() !== year ? ` ${when.getFullYear()}` : ''}` }),
+        el('span', { text: `${book.pages} str.` }),
+        ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'pp-mult', text: `×${formatMultiplier(book.multiplier).replace('.', ',')}` })] : []),
+        ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
       ];
-      if (isMine) {
-        cells.push(el('td', { class: 'actions-cell' }, [
-          actionButton('pencil', 'Edytuj wpis', () => startEdit(book)),
-          actionButton('trash-2', 'Usuń wpis', () => handleDelete(book)),
-        ]));
-      }
-      return el('tr', {}, cells);
+      const side = [
+        el('span', { class: 'pp-score' }, [document.createTextNode(String(bookPoints(book))), el('small', { text: ' pkt' })]),
+        ...(isMine
+          ? [el('span', { class: 'pp-actions' }, [
+              actionButton('pencil', 'Edytuj wpis', () => startEdit(book)),
+              actionButton('trash-2', 'Usuń wpis', () => handleDelete(book)),
+            ])]
+          : []),
+      ];
+      const row = el('li', { class: 'pp-book' }, [
+        el('div', { class: 'pp-book-main' }, [
+          el('span', { class: 'pp-title', text: book.title || '—' }),
+          el('span', { class: 'pp-meta' }, meta),
+        ]),
+        el('div', { class: 'pp-book-side' }, side),
+      ]);
+      row.style.setProperty('--accent', color);
+      return row;
     });
 
-    const headers = [
-      el('th', { text: 'Tytuł' }),
-      el('th', { class: 'text-right', text: 'Strony' }),
-      el('th', { class: 'text-right col-mult', text: 'Mnożnik' }),
-      el('th', { class: 'text-right', text: 'Wynik' }),
-    ];
-    if (isMine) headers.push(el('th', { class: 'actions-cell', 'aria-label': 'Akcje' }));
-
-    const table = el('table', {}, [
-      el('thead', {}, [el('tr', {}, headers)]),
-      el('tbody', {}, rows),
-    ]);
-
     const current = state.readingNow.filter(item => item.user_id === reader.key);
-    return el('div', { class: 'user-progress-block' }, [
-      el('h3', { class: 'user-name', text: reader.name }),
-      ...current.map(item => el('p', { class: 'reading-now-line' }, [
-        icon('book-open'),
-        el('span', { text: `Czyta teraz: ${item.title}` }),
-        el('span', { class: 'reading-now-meta', text: ` (${readingNowLabel(item)})` }),
-      ])),
-      el('div', { class: 'table-container' }, [table]),
+    const summary = el('summary', { class: 'pp-summary' }, [
+      avatar(reader, colors, 'rank-avatar-lg'),
+      el('span', { class: 'pp-who' }, [
+        el('span', { class: 'pp-name', text: reader.name }),
+        el('span', { class: 'pp-sub', text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron` }),
+      ]),
+      el('span', { class: 'pp-points' }, [document.createTextNode(String(reader.points)), el('small', { text: ' pkt' })]),
+      el('span', { class: 'pp-chevron' }, [icon('chevron-down')]),
     ]);
+
+    const details = el('details', { class: 'pp-person' }, [
+      summary,
+      ...(current.length
+        ? [el('div', { class: 'pp-reading' }, current.map(item => el('span', { class: 'pp-reading-chip' }, [
+            icon('book-open'),
+            el('span', { class: 'pp-reading-title', text: item.title }),
+            el('span', { class: 'pp-reading-meta', text: readingNowLabel(item) }),
+          ])))]
+        : []),
+      el('ul', { class: 'pp-books' }, books),
+    ]);
+    if (isViewer) details.setAttribute('open', '');
+    return details;
   });
 
   container.replaceChildren(...blocks);
