@@ -4,6 +4,8 @@ import { renderBadgesCard } from './badges.js';
 import { avatar, renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
+import { ratingControl, renderBookRanking } from './ratings.js';
+import { renderWrapped } from './wrapped.js';
 import { coverEl, readingCoverOf } from './shelf.js';
 import { state } from './state.js';
 import { formatDay, renderStats, seriesColors } from './stats.js';
@@ -69,7 +71,7 @@ export async function loadReads() {
   const [readsResult, nowResult, queueResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
+      .select('id, user_id, title, pages, multiplier, unfinished, rating, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
       .gte('created_at', new Date(year, 0, 1).toISOString())
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),
@@ -112,6 +114,8 @@ export async function loadReads() {
   renderReadingNow();
   renderUserProgress(readers);
   renderStats(readers, rows || []);
+  renderBookRanking();
+  renderWrapped();
   refreshIcons();
 }
 
@@ -302,6 +306,7 @@ export function renderUserProgress(readers) {
         ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
       ];
       const side = [
+        ...[ratingControl(book, isMine)].filter(Boolean),
         el('span', { class: 'pp-score' }, [document.createTextNode(String(bookPoints(book))), el('small', { text: ' pkt' })]),
         ...(isMine
           ? [el('span', { class: 'pp-actions' }, [
@@ -326,7 +331,7 @@ export function renderUserProgress(readers) {
       avatar(reader, colors, 'rank-avatar-lg'),
       el('span', { class: 'pp-who' }, [
         el('span', { class: 'pp-name', text: reader.name }),
-        el('span', { class: 'pp-sub', text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron` }),
+        el('span', { class: 'pp-sub', text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron${n ? ` · śr. ${Math.round(pages / n)} str.` : ''}` }),
       ]),
       el('span', { class: 'pp-points' }, [document.createTextNode(String(reader.points)), el('small', { text: ' pkt' })]),
       el('span', { class: 'pp-chevron' }, [icon('chevron-down')]),

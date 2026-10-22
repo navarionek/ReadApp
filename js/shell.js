@@ -3,10 +3,11 @@ import { cancelEdit } from './form.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { state } from './state.js';
 import { drawTimeline, playRace } from './stats.js';
+import { renderWrapped } from './wrapped.js';
 import { icon, refreshIcons } from './ui.js';
 
 export const AUTH_ONLY_SECTIONS = ['user-panel', 'app-nav', 'app-screens'];
-export const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'polka', 'statystyki', 'admin'];
+export const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'polka', 'statystyki', 'wrapped', 'admin'];
 /* ----------------- Ekrany (menu) ----------------- */
 // Ekran wynika z #hash w adresie, więc działa przycisk Wstecz.
 // Nieznany hash (np. #access_token po powrocie z logowania Google) = Start; nie nadpisujemy go,
@@ -33,6 +34,7 @@ export function showScreen(name) {
 
   if (name === 'polka' && state.currentUser) loadShelf();
   if (name === 'ranking') playRankingIntro();
+  if (name === 'wrapped') renderWrapped();
   if (name !== 'polka') closeBookModal();
 
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)

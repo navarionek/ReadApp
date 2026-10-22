@@ -141,6 +141,14 @@
           </a>
         </div>
 
+        <a href="#wrapped" class="stat-card stat-link wrapped-link">
+          <div class="stat-icon"><i data-lucide="sparkles"></i></div>
+          <div class="stat-info">
+            <span class="stat-label">Twój rok w książkach</span>
+            <span class="stat-value stat-value-sm">Czytanko Wrapped <span class="current-year"></span></span>
+          </div>
+        </a>
+
         <!-- Nagroda roku (ustawia admin) -->
         <div id="prize-banner" class="prize-banner" hidden>
           <div class="stat-icon"><i data-lucide="gift"></i></div>
@@ -272,6 +280,27 @@
             <h2>Ranking <span class="current-year"></span></h2>
           </div>
           <div id="ranking-viz" class="ranking-viz"></div>
+        </div>
+
+        <!-- Książki roku ułożone według ocen (kciuk w górę / w dół) -->
+        <div id="book-ranking-card" class="card" hidden>
+          <div class="card-header">
+            <i data-lucide="thumbs-up" class="card-icon"></i>
+            <h2>Najfajniejsze książki <span class="current-year"></span></h2>
+          </div>
+          <p id="book-ranking-hint" class="card-intro"></p>
+          <ol id="book-ranking-list" class="book-rank-list"></ol>
+        </div>
+      </section>
+
+      <!-- Ekran: Czytanko Wrapped (podsumowanie roku) -->
+      <section class="screen" data-screen="wrapped" hidden>
+        <div class="card">
+          <div class="card-header">
+            <i data-lucide="sparkles" class="card-icon"></i>
+            <h2>Czytanko Wrapped <span class="current-year"></span></h2>
+          </div>
+          <div id="wrapped-content" class="wrapped-grid"></div>
         </div>
       </section>
 
