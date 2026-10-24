@@ -226,7 +226,7 @@ async function ensureMounted() {
   r3 = {
     renderer, scene, camera, hemi, sun, canvas, host, composer, bloom,
     raf: null, last: 0, size: { w: 1, h: 1 },
-    cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, spread: 0, tz: null, tx: null, offZ: 0, offX: 0 },
+    cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
     shake: 0,
     tmpV: new THREE.Vector3(), tmpColor: new THREE.Color(), dummy: new THREE.Object3D(),
@@ -988,10 +988,12 @@ function buildWorld(series, rows, sig) {
   const zMid = (zNear + zFar) / 2;
 
   // Podłoga, dywan, złote krawędzie i linie torów
-  const floorW = halfW * 2 + 30;
-  mats.floor.map.repeat.set(floorW / 4, len / 4);
+  // Podłoga z dużym zapasem: przy oddalonej kamerze (duży odstęp między osobami) nie widać jej krawędzi
+  const floorW = 400;
+  const floorL = len + 200;
+  mats.floor.map.repeat.set(floorW / 4, floorL / 4);
   mats.carpet.map.repeat.set(1, (len - 8) / (halfW * 2));
-  group.add(flat(new THREE.PlaneGeometry(floorW, len), mats.floor, 0, 0, zMid));
+  group.add(flat(new THREE.PlaneGeometry(floorW, floorL), mats.floor, 0, 0, zMid));
   group.add(flat(new THREE.PlaneGeometry(halfW * 2, len - 8), mats.carpet, 0, 0.01, zMid - 4));
   for (const side of [-1, 1]) group.add(boxAt(mats.gold, 0.16, 0.05, len - 8, side * halfW, 0.03, zMid - 4));
   for (let i = 1; i < n; i++) group.add(flat(new THREE.PlaneGeometry(0.05, len - 8), mats.lane, (i - n / 2) * LANE_W, 0.018, zMid - 4));
@@ -1054,7 +1056,7 @@ function buildWorld(series, rows, sig) {
   world.evIdx = events.filter(e => e.t <= world.t).length;
   crown.position.set(world.leader.root.position.x, HOVER + 0.9, world.leader.z);
   setCamMode(view.mode, true);
-  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0 });
+  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
   applyTheme();
   setPlayIcon();
   r3.scrub.value = String(Math.round(view.p * 1000));
@@ -1082,7 +1084,7 @@ function replay() {
   r3.rings.forEach(ring => { ring.age = Infinity; ring.mesh.visible = false; });
   r3.rockets = [];
   setCamMode(view.mode, true);
-  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, spread: 0 });
+  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
   setPlayIcon();
 }
 
@@ -1239,7 +1241,12 @@ const SHOTS = {
   chase: { yaw: 0.3, pitch: 0.34, dist: 0.85 },
   side: { yaw: 1.05, pitch: 0.22, dist: 0.95 },
 };
-const PACK_GAP = 20;  // kto jest dalej za liderem, wypada z kadru czołówki
+// Dalej za liderem: poza kadrem, bo kamera musiałaby odjechać tak daleko, że książek nie widać.
+// Pierwsza dwójka jest w kadrze zawsze, niezależnie od odstępu.
+const PACK_MAX_GAP = TRACK_LEN * 0.22;
+// Obszar kadru (współrzędne ekranu −1..1), w którym mają się mieścić książki z etykietami:
+// między datą/tabelą u góry a paskiem sterowania na dole
+const FRAME = { top: 0.5, bottom: -0.62, side: 0.82 };
 
 function setCamMode(mode, snap = false) {
   view.mode = mode;
@@ -1254,19 +1261,34 @@ function setCamMode(mode, snap = false) {
   r3.camLabel.textContent = CAM_LABELS[mode];
 }
 
-// Cel kamery: czołówka (wszyscy w zasięgu PACK_GAP od lidera).
-// key zmienia się, gdy ktoś wypada z czołówki albo do niej dołącza (wtedy płynny przejazd).
+// Kogo kamera trzyma w kadrze: zawsze dwie pierwsze osoby na torze, a kolejne, jeśli nie są
+// dalej niż PACK_MAX_GAP za liderem. key zmienia się przy zmianie składu (wtedy płynny przejazd).
 function packTarget() {
-  let lead = 0;
-  for (const r of world.racers) lead = Math.min(lead, r.z);
-  const pack = world.racers.filter(r => r.z - lead <= PACK_GAP);
-  let back = lead;
-  let x = 0;
+  const byPos = [...world.racers].sort((a, b) => a.z - b.z);
+  const lead = byPos[0].z;
+  const pack = byPos.filter((r, i) => i < 2 || r.z - lead <= PACK_MAX_GAP);
+  const back = pack[pack.length - 1].z;
+  const x = pack.reduce((sum, r) => sum + r.root.position.x, 0) / pack.length;
+  return { key: `pack:${pack.map(r => r.s.key).join()}`, pack, x: x * 0.4, z: (lead + back) / 2 };
+}
+
+// Gdzie grupa wypada na ekranie: zakres pionowy i największe wychylenie w poziomie
+// (liczone dla książki i dla etykiety nad nią). Za kamerą = daleko poza kadrem.
+function packOnScreen(pack) {
+  const { camera } = r3;
+  camera.updateMatrixWorld();
+  const v = r3.tmpV;
+  const out = { minY: Infinity, maxY: -Infinity, maxX: 0 };
   for (const r of pack) {
-    back = Math.max(back, r.z);
-    x += r.root.position.x;
+    for (const dy of [0, 1.6]) {
+      v.set(r.root.position.x, r.body.position.y + dy, r.z).project(camera);
+      const y = v.z > 1 ? -3 : v.y;
+      out.minY = Math.min(out.minY, y);
+      out.maxY = Math.max(out.maxY, y);
+      out.maxX = Math.max(out.maxX, v.z > 1 ? 3 : Math.abs(v.x));
+    }
   }
-  return { key: `pack:${pack.map(r => r.s.key).join()}`, x: (x / pack.length) * 0.4, z: (lead + back) / 2, spread: back - lead };
+  return out;
 }
 
 function updateCamera(dt) {
@@ -1290,19 +1312,24 @@ function updateCamera(dt) {
   cam.tx = target.x;
   cam.offZ *= Math.exp(-dt / 700);
   cam.offX *= Math.exp(-dt / 700);
-  cam.focus = target.z + cam.offZ;
+  cam.focus = target.z + cam.offZ + cam.fitZ;
   cam.focusX = target.x + cam.offX;
-  cam.spread += (target.spread - cam.spread) * ease(dt, 700);
-  const dist = cam.dist + Math.min(r3.portrait ? 14 : 20, cam.spread * 0.5);
+  const dist = cam.dist * cam.fit;
+  // Przy dużym odstępie (kamera daleko) widok przechodzi w prawie pionowy, jak mapa: z ukosa
+  // daleka książka byłaby kropką na horyzoncie. Mgła odsuwa się razem z kamerą.
+  const pitch = cam.pitch + (1.42 - cam.pitch) * smoothstep(1.6, 5, cam.fit);
+  const t = r3.theme;
+  r3.scene.fog.near = Math.max(t.fogNear, dist * 0.9);
+  r3.scene.fog.far = Math.max(t.fogFar, dist * 1.8 + 40);
 
   r3.shake *= Math.exp(-dt / 260);
   const jitter = () => (Math.random() - 0.5) * r3.shake;
   // W pionie górę kadru zajmuje HUD, więc celujemy wyżej i stawka ląduje niżej na ekranie.
   const look = r3.tmpV.set(cam.focusX, r3.portrait ? 2.4 : 1.3, cam.focus - 1);
   camera.position.set(
-    look.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist + jitter(),
-    look.y + Math.sin(cam.pitch) * dist + jitter(),
-    look.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * dist + jitter(),
+    look.x + Math.sin(cam.yaw) * Math.cos(pitch) * dist + jitter(),
+    look.y + Math.sin(pitch) * dist + jitter(),
+    look.z + Math.cos(cam.yaw) * Math.cos(pitch) * dist + jitter(),
   );
   // Kamera zostaje nad korytarzem między regałami, zamiast filmować tył półek
   const wall = world.halfW + 2.7;
@@ -1317,6 +1344,18 @@ function updateCamera(dt) {
   cam.lift = (cam.lift || 0) + (lift - (cam.lift || 0)) * ease(dt, 160);
   camera.position.y = Math.max(0.4, camera.position.y + cam.lift);
   camera.lookAt(look);
+
+  // Dopasowanie kadru: patrzymy, gdzie grupa wypadła na ekranie, i na następną klatkę
+  // płynnie odsuwamy/przybliżamy kamerę (fit) oraz przesuwamy cel (fitZ), żeby wszyscy
+  // mieścili się w FRAME. Nigdy bliżej niż ujęcie bazowe.
+  const seen = packOnScreen(target.pack);
+  const s = dt / 1000;
+  const fill = Math.max((seen.maxY - seen.minY) / (FRAME.top - FRAME.bottom), seen.maxX / FRAME.side);
+  const err = fill - 0.85;
+  cam.fit = clamp(cam.fit * Math.exp(clamp(err, -0.4, 1.5) * (err > 0.15 ? 5 : 2) * s), 1, 14);
+  // Środek grupy na środku obszaru; za wysoko na ekranie = za daleko, więc cel do przodu (−z)
+  const centerErr = (seen.minY + seen.maxY) / 2 - (FRAME.top + FRAME.bottom) / 2;
+  cam.fitZ = clamp(cam.fitZ - clamp(centerErr, -1, 1) * dist * 0.9 * s, -TRACK_LEN * 0.3, TRACK_LEN * 0.3);
 }
 
 /* ----------------- Kartki i konfetti ----------------- */
