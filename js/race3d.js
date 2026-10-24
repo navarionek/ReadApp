@@ -959,19 +959,27 @@ function makeRacer(s, i, n, group) {
   return {
     s, first, css, root, body, wings, ribbon, shadow, glow, glowMat, trail, trailMat, coverMat,
     tag, tagRank, boardRow, boardPts,
-    z: 0, v: 0, speed: 0, phase: rand(0, 6), seed: rand(0, 100), sparkAcc: 0,
+    z: 0, v: 0, vel: 0, speed: 0, phase: rand(0, 6), seed: rand(0, 100), sparkAcc: 0,
     rank: i, shownV: -1, shownRank: -1,
   };
 }
 
 function buildWorld(series, rows, sig) {
   clearWorld();
-  const ordered = [...series].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+  const t0 = new Date(currentYear(), 0, 1).getTime();
+  const t1 = Math.max(Date.now(), t0 + DAY_MS);
+  // Książka bez daty rozpoczęcia na wykresie wskakuje w całości w dniu dodania. Tu rozkładamy ją
+  // na kilka–kilkanaście dni przed końcem (więcej punktów = dłużej), żeby książka leciała, a nie skakała.
+  // Wynik w dniu skończenia jest ten sam.
+  const ordered = [...series]
+    .map(s => ({
+      ...s,
+      books: s.books.map(b => (b.end > b.start ? b : { ...b, start: Math.max(t0, b.end - clamp(b.pts / 35, 4, 21) * DAY_MS) })),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   const n = ordered.length;
   const halfW = (n * LANE_W) / 2 + 0.5;
   const finalMax = Math.max(...ordered.map(s => s.total));
-  const t0 = new Date(currentYear(), 0, 1).getTime();
-  const t1 = Math.max(Date.now(), t0 + DAY_MS);
   const { mats, geo } = r3;
   const group = new THREE.Group();
   const zNear = 24;
@@ -1064,6 +1072,7 @@ function replay() {
     r.z = 0;
     r.v = 0;
     r.speed = 0;
+    r.vel = 0;
     r.rank = i;
   });
   r3.particles.life.fill(0);
@@ -1115,10 +1124,17 @@ function updateRacers(dt, now) {
   for (const r of racers) {
     r.v = exactValue(r.s, world.t);
     const target = -(r.v / finalMax) * TRACK_LEN;
-    const prevZ = r.z;
-    r.z += (target - r.z) * ease(dt, 140);  // schodek (książka bez daty startu) = krótki zryw
-    const speed = Math.abs(r.z - prevZ) / Math.max(1, dt);
-    r.speed += (speed - r.speed) * ease(dt, 180);
+    // Tłumiona sprężyna (bez odbicia): książka płynnie rusza i hamuje, zamiast zmieniać
+    // prędkość skokowo na początku i końcu każdej czytanej książki
+    const s = dt / 1000;
+    const omega = 2 / 0.35;
+    const x = omega * s;
+    const decay = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const offset = r.z - target;
+    const pull = (r.vel + omega * offset) * s;
+    r.vel = (r.vel - omega * pull) * decay;
+    r.z = target + (offset + pull) * decay;
+    r.speed = Math.abs(r.vel) / 1000;  // jednostki na ms, jak reszta animacji
 
     r.root.position.z = r.z;
     // Machanie okładkami: szybciej, gdy książka przyspiesza
