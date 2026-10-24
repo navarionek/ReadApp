@@ -7,7 +7,14 @@ import { currentYear, DAY_MS, el, icon, refreshIcons } from './ui.js';
 // Te same punkty co na wykresie wyścigu, tylko jako lot książek przez bibliotekę:
 // odległość od startu = punkty narastająco, meta = dzisiejszy wynik lidera.
 // Three.js dociągamy z CDN dopiero przy pierwszym wejściu, reszta apki go nie potrzebuje.
-const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js';
+// Adresy 'three' i 'three/addons/' są w import mapie w index.html (dodatki importują 'three').
+const ADDON_PATHS = [
+  'three/addons/postprocessing/EffectComposer.js',
+  'three/addons/postprocessing/RenderPass.js',
+  'three/addons/postprocessing/UnrealBloomPass.js',
+  'three/addons/postprocessing/OutputPass.js',
+  'three/addons/environments/RoomEnvironment.js',
+];
 const PLAY_MS = 18000;       // cały rok przy prędkości 1×
 const TRACK_LEN = 160;       // od startu do mety, jednostki sceny
 const LANE_W = 2.4;
@@ -16,21 +23,26 @@ const SPEEDS = [1, 2, 4];
 const CAM_MODES = ['top', 'chase', 'side'];
 const CAM_LABELS = { top: 'Z góry', chase: 'Pościg', side: 'Z boku' };
 const BOARD_ROW = 22;        // px, wysokość wiersza tabeli wyników
-const PARTICLES = 600;
+const PARTICLES = 600;       // kartki i konfetti
+const SPARKS = 2400;         // świecące iskry: pył za książkami, fale, fajerwerki
+const RINGS = 8;             // fale światła po skończonej książce
 const SPINE_COLORS = ['#8c2f39', '#2f4b7c', '#3d6b45', '#b08d2a', '#5a3d6e', '#a0522d', '#2e6f73', '#c4b49a', '#6b4226', '#7d8c97', '#9c3d54', '#d0c3a5'];
 
+// lampBoost > 1: kolory jaśniejsze niż biel (HDR), to one „świecą” w bloomie
 const THEMES = {
   dark: {
-    bg: 0x0b1020, fogNear: 26, fogFar: 120,
-    sky: 0x9fb0ff, ground: 0x24170c, hemi: 1.1, sun: 0xffe2b0, sunI: 1.7,
-    floor: 0x8a7b70, carpet: 0x7a1d2c, wood: 0x6b4630, books: 0.75,
-    lamp: 0xffd98a, glow: 0.9, dust: 0.75, trail: 0.5,
+    bg: 0x0b0d18, fogNear: 30, fogFar: 125,
+    sky: 0x9fb0ff, ground: 0x24170c, hemi: 0.75, sun: 0xffd9a0, sunI: 1.3, env: 0.35, exposure: 1.05,
+    floor: 0x9a8576, carpet: 0xb59a9a, wood: 0x6b4630, books: 0.75,
+    lamp: 0xffc977, lampBoost: 4, dust: 0.8, trail: 0.85, pool: 0.55, spark: 1,
+    bloom: { strength: 0.85, radius: 0.55, threshold: 0.92 },
   },
   light: {
-    bg: 0xf1e6d2, fogNear: 34, fogFar: 150,
-    sky: 0xfff6e8, ground: 0x8a6a4a, hemi: 1.9, sun: 0xffffff, sunI: 2.3,
-    floor: 0xffffff, carpet: 0xa82e3e, wood: 0x8a5a3a, books: 1,
-    lamp: 0xffe0a0, glow: 0.45, dust: 0.35, trail: 0.6,
+    bg: 0xf1e6d2, fogNear: 38, fogFar: 160,
+    sky: 0xfff6e8, ground: 0x8a6a4a, hemi: 1, sun: 0xfff4e0, sunI: 1.6, env: 0.4, exposure: 0.95,
+    floor: 0xcfc2b6, carpet: 0xd6c4c4, wood: 0x8a5a3a, books: 0.95,
+    lamp: 0xffe0a0, lampBoost: 1.6, dust: 0.35, trail: 0.6, pool: 0.18, spark: 0.7,
+    bloom: { strength: 0.3, radius: 0.4, threshold: 0.95 },
   },
 };
 
@@ -45,7 +57,18 @@ const smoothstep = (a, b, x) => {
 const firstName = name => (name || '?').split(' ')[0];
 
 let THREE = null;
+let GOLD = null;    // THREE.Color, gotowy po załadowaniu silnika
+let ADDONS = null;  // bloom i środowisko; bez nich scena też działa, tylko płaściej
 let threeLoad = null;
+
+async function loadThree() {
+  THREE = await import('three');
+  try {
+    ADDONS = Object.assign({}, ...(await Promise.all(ADDON_PATHS.map(path => import(path)))));
+  } catch (err) {
+    console.warn('three addons unavailable, rendering without bloom:', err);
+  }
+}
 let r3 = null;     // renderer, kamera, stała część sceny i HUD (tworzone raz)
 let world = null;  // tor i zawodnicy dla bieżących danych (przebudowywane, gdy dane się zmienią)
 
@@ -141,7 +164,7 @@ async function ensureMounted() {
   if (!host) return false;
   if (!threeLoad) {
     host.replaceChildren(el('div', { class: 'r3d-status', text: 'Ładowanie sceny 3D…' }));
-    threeLoad = import(THREE_URL).then(mod => { THREE = mod; });
+    threeLoad = loadThree();
   }
   try {
     await threeLoad;
@@ -161,7 +184,7 @@ async function ensureMounted() {
     host.replaceChildren(el('div', { class: 'r3d-status', text: 'Ta przeglądarka nie obsługuje grafiki 3D (WebGL).' }));
     return false;
   }
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
   const canvas = renderer.domElement;
   canvas.classList.add('r3d-canvas');
 
@@ -174,8 +197,34 @@ async function ensureMounted() {
   sun.position.set(-8, 18, 12);
   scene.add(hemi, sun);
 
+  // Bloom (poświata) przez postprocessing; MSAA w buforze, bo composer omija antialias canvasa
+  let composer = null;
+  let bloom = null;
+  if (ADDONS) {
+    try {
+      const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+      composer = new ADDONS.EffectComposer(renderer, target);
+      composer.addPass(new ADDONS.RenderPass(scene, camera));
+      bloom = new ADDONS.UnrealBloomPass(new THREE.Vector2(1, 1), 0.8, 0.5, 0.8);
+      composer.addPass(bloom);
+      composer.addPass(new ADDONS.OutputPass());
+      // Odbicia na złocie, drewnie i okładkach z prostego „pokoju” zamiast mapy HDR z sieci
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new ADDONS.RoomEnvironment(), 0.04).texture;
+      pmrem.dispose();
+    } catch (err) {
+      console.warn('bloom setup failed, rendering without it:', err);
+      composer = null;
+      bloom = null;
+    }
+  }
+  // Z bloomem każdy piksel liczony jest kilka razy, więc na telefonach trochę mniejsza rozdzielczość
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, composer ? 1.5 : 2);
+  renderer.setPixelRatio(pixelRatio);
+  composer?.setPixelRatio(pixelRatio);
+
   r3 = {
-    renderer, scene, camera, hemi, sun, canvas, host,
+    renderer, scene, camera, hemi, sun, canvas, host, composer, bloom,
     raf: null, last: 0, size: { w: 1, h: 1 },
     cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, spread: 0, tz: null, tx: null, offZ: 0, offX: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
@@ -185,6 +234,8 @@ async function ensureMounted() {
   buildShared();
   buildHud();
   buildParticles();
+  buildSparks();
+  buildRings();
   applyTheme();
 
   new ResizeObserver(resize).observe(host);
@@ -206,6 +257,7 @@ function resize() {
   r3.size = { w, h };
   r3.portrait = w / h < 1;
   renderer.setSize(w, h, false);
+  r3.composer?.setSize(w, h);
   camera.aspect = w / h;
   camera.fov = r3.portrait ? 62 : 50;  // pionowy telefon: szerszy kadr, żeby tor się mieścił
   camera.updateProjectionMatrix();
@@ -226,29 +278,85 @@ function buildShared() {
   const dustTex = canvasTexture(32, 32, g => radial(g, 32, ['rgba(255,255,255,1)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)']));
   const checkerTex = repeat(canvasTexture(128, 32, g => {
     for (let x = 0; x < 8; x++) for (let y = 0; y < 2; y++) {
-      g.fillStyle = (x + y) % 2 ? '#111' : '#f5f5f5';
+      g.fillStyle = (x + y) % 2 ? '#151515' : '#c9c9c9';  // nie czysta biel, żeby meta nie świeciła w bloomie
       g.fillRect(x * 16, y * 16, 16, 16);
     }
   }));
+  const carpetTex = repeat(canvasTexture(256, 256, carpet));
+  carpetTex.anisotropy = 4;
+  // Ślad na dywanie: jasny przy książce, wygasa w stronę startu (v = 1 to czoło śladu)
+  const trailTex = canvasTexture(4, 256, (g, w, h) => {
+    const grad = g.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.15, 'rgba(255,255,255,0.75)');
+    grad.addColorStop(1, 'rgba(255,255,255,0.08)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+  });
+  const flameTex = canvasTexture(64, 64, g => {
+    const grad = g.createRadialGradient(32, 38, 0, 32, 34, 30);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.25, 'rgba(255,220,140,0.9)');
+    grad.addColorStop(0.6, 'rgba(255,140,40,0.25)');
+    grad.addColorStop(1, 'rgba(255,120,20,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  });
+  const ringTex = canvasTexture(128, 128, g => {
+    const grad = g.createRadialGradient(64, 64, 40, 64, 64, 64);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.75, 'rgba(255,255,255,1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 128, 128);
+  });
+  // Grzbiety książek na dalszych regałach: paski różnej szerokości i wysokości, z ciemnymi etykietami
+  const spinesTex = canvasTexture(512, 128, (g, w, h) => {
+    g.fillStyle = '#2a1a10';
+    g.fillRect(0, 0, w, h);
+    let x = 0;
+    while (x < w) {
+      const bw = rand(7, 16);
+      const top = rand(0, 26);
+      g.fillStyle = SPINE_COLORS[Math.floor(Math.random() * SPINE_COLORS.length)];
+      g.fillRect(x, top, bw - 1, h - top);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(x, top + rand(14, 40), bw - 1, rand(6, 12));
+      g.fillStyle = 'rgba(255,215,140,0.35)';
+      g.fillRect(x, top + rand(48, 80), bw - 1, 2);
+      x += bw;
+    }
+  });
+  r3.tex = { trail: trailTex, glow: glowTex, spines: spinesTex };
 
   r3.mats = {
-    floor: keep(new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8 })),
-    carpet: keep(new THREE.MeshStandardMaterial({ roughness: 0.95 })),
+    floor: keep(new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.45 })),  // lakierowany parkiet
+    carpet: keep(new THREE.MeshStandardMaterial({ map: carpetTex, roughness: 0.95 })),
     wood: keep(new THREE.MeshStandardMaterial({ roughness: 0.7 })),
     books: keep(new THREE.MeshStandardMaterial({ roughness: 0.75 })),
+    spines: keep(new THREE.MeshStandardMaterial({ map: spinesTex, roughness: 0.8 })),
     gold: keep(new THREE.MeshStandardMaterial({ color: 0xf0c75e, metalness: 0.75, roughness: 0.28, emissive: 0x6b4a00, emissiveIntensity: 0.35 })),
     goldFlat: keep(new THREE.MeshBasicMaterial({ color: 0xf0c75e, transparent: true, opacity: 0.75 })),
-    white: keep(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })),
+    white: keep(new THREE.MeshBasicMaterial({ color: 0xcfcfcf, transparent: true, opacity: 0.85 })),
     lane: keep(new THREE.MeshBasicMaterial({ color: 0xf3e3c0, transparent: true, opacity: 0.35 })),
     metal: keep(new THREE.MeshStandardMaterial({ color: 0x2b2b30, metalness: 0.6, roughness: 0.4 })),
     lamp: keep(new THREE.MeshBasicMaterial({ color: 0xffd98a })),
-    glow: keep(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })),
     shadow: keep(new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })),
     dust: keep(new THREE.PointsMaterial({ map: dustTex, size: 0.14, color: 0xffe3b0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
-    pages: keep(new THREE.MeshStandardMaterial({ color: 0xf6eedb, roughness: 0.9 })),
+    pages: keep(new THREE.MeshStandardMaterial({ color: 0xe2d6bc, roughness: 0.9 })),
     ribbon: keep(new THREE.MeshStandardMaterial({ color: 0xf0c75e, side: THREE.DoubleSide, roughness: 0.5 })),
     checker: keep(new THREE.MeshBasicMaterial({ map: checkerTex })),
     paper: keep(new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })),
+    // Plamy ciepłego światła na podłodze (pod lampami i świecami)
+    pool: keep(new THREE.MeshBasicMaterial({ map: glowTex, color: 0xffb860, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
+    candle: keep(new THREE.MeshStandardMaterial({ color: 0xf3ead2, roughness: 0.6, emissive: 0xffd9a0, emissiveIntensity: 0.15 })),
+    flame: keep(new THREE.PointsMaterial({ map: flameTex, size: 0.55, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
+    shade: keep(new THREE.MeshStandardMaterial({ color: 0x1f6b45, roughness: 0.35, metalness: 0.1, emissive: 0x2f9a60, emissiveIntensity: 0.35 })),
+    plant: keep(new THREE.MeshStandardMaterial({ color: 0x3f7d3a, roughness: 0.8 })),
+    globe: keep(new THREE.MeshStandardMaterial({ color: 0x3b6e8f, roughness: 0.4, metalness: 0.1 })),
+    pot: keep(new THREE.MeshStandardMaterial({ color: 0x9a5a3a, roughness: 0.8 })),
+    spark: keep(new THREE.PointsMaterial({ map: dustTex, size: 0.3, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
+    ring: keep(new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
   };
 
   const trail = new THREE.PlaneGeometry(1, 1);
@@ -258,7 +366,12 @@ function buildShared() {
   ribbon.translate(0, -0.55, 0);
   const shadow = new THREE.PlaneGeometry(1.6, 1.9);
   shadow.rotateX(-Math.PI / 2);
+  const decal = new THREE.PlaneGeometry(1, 1);
+  decal.rotateX(-Math.PI / 2);
   r3.geo = {
+    decal: keep(decal),
+    cyl: keep(new THREE.CylinderGeometry(0.5, 0.5, 1, 14)),
+    ball: keep(new THREE.SphereGeometry(0.5, 18, 12)),
     spine: keep(new THREE.CylinderGeometry(0.09, 0.09, 1.42, 12)),
     cover: keep(new THREE.BoxGeometry(0.94, 0.05, 1.42)),
     pages: keep(new THREE.BoxGeometry(0.86, 0.1, 1.3)),
@@ -382,8 +495,13 @@ function bindPointer() {
 
 function applyTheme() {
   if (!r3) return;
-  const t = THEMES[document.documentElement.classList.contains('dark-mode') ? 'dark' : 'light'];
+  const dark = document.documentElement.classList.contains('dark-mode');
+  const t = THEMES[dark ? 'dark' : 'light'];
   const { scene, mats, hemi, sun } = r3;
+  r3.theme = t;
+  r3.renderer.toneMappingExposure = t.exposure;
+  scene.environmentIntensity = t.env;
+  if (r3.bloom) Object.assign(r3.bloom, t.bloom);
   scene.background.set(t.bg);
   scene.fog.color.set(t.bg);
   scene.fog.near = t.fogNear;
@@ -397,17 +515,22 @@ function applyTheme() {
   mats.carpet.color.set(t.carpet);
   mats.wood.color.set(t.wood);
   mats.books.color.setScalar(t.books);
-  mats.lamp.color.set(t.lamp);
-  mats.glow.opacity = t.glow;
+  mats.lamp.color.set(t.lamp).multiplyScalar(t.lampBoost);
   mats.dust.opacity = t.dust;
+  mats.dust.color.set(0xffe3b0).multiplyScalar(dark ? 2 : 1);
+  mats.pool.opacity = t.pool;
   r3.trailOpacity = t.trail;
-  // Kolory serii z CSS różnią się między motywami
+  // Kolory serii z CSS różnią się między motywami; po ciemku ślady świecą (addytywnie)
   world?.racers.forEach(r => {
     r.css = resolveColor(r.s.color);
     r.coverMat.color.set(r.css);
     r.coverMat.emissive.set(r.css);
-    r.trailMat.color.set(r.css);
+    r.trailMat.color.set(r.css).multiplyScalar(dark ? 1.5 : 1);
+    r.trailMat.blending = dark ? THREE.AdditiveBlending : THREE.NormalBlending;
+    r.trailMat.needsUpdate = true;
     r.trailMat.opacity = t.trail;
+    r.glowMat.color.set(r.css);
+    r.glowMat.opacity = dark ? 0.6 : 0.35;
     r.tag.style.setProperty('--c', r.css);
     r.boardRow.style.setProperty('--c', r.css);
   });
@@ -446,6 +569,48 @@ function parquet(g, w, h) {
     }
     g.fillStyle = 'rgba(0,0,0,0.3)';
     g.fillRect(0, y, w, 2);
+  }
+}
+
+// Dywan: bordowy, delikatna kratka w romby i złote bordiury z ornamentem przy krawędziach
+function carpet(g, w, h) {
+  g.fillStyle = '#7f1a2a';
+  g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 1400; i++) {  // faktura runa
+    g.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '255,200,200'},${rand(0.02, 0.06)})`;
+    g.fillRect(rand(0, w), rand(0, h), rand(1, 3), rand(1, 3));
+  }
+  g.strokeStyle = 'rgba(255,205,150,0.09)';
+  g.lineWidth = 2;
+  for (let y = -32; y < h + 32; y += 32) {
+    for (let x = 48; x < w - 48; x += 32) {
+      g.beginPath();
+      g.moveTo(x, y - 14);
+      g.lineTo(x + 14, y);
+      g.lineTo(x, y + 14);
+      g.lineTo(x - 14, y);
+      g.closePath();
+      g.stroke();
+    }
+  }
+  for (const edge of [0, w]) {
+    const dir = edge === 0 ? 1 : -1;
+    const at = px => edge + dir * px;
+    g.fillStyle = '#4a0d18';
+    g.fillRect(Math.min(at(0), at(30)), 0, 30, h);
+    g.fillStyle = '#e2b65a';
+    g.fillRect(Math.min(at(5), at(8)), 0, 3, h);
+    g.fillRect(Math.min(at(25), at(27)), 0, 2, h);
+    for (let y = 8; y < h; y += 16) {
+      const cx = at(16.5);
+      g.beginPath();
+      g.moveTo(cx, y - 5);
+      g.lineTo(cx + 4, y);
+      g.lineTo(cx, y + 5);
+      g.lineTo(cx - 4, y);
+      g.closePath();
+      g.fill();
+    }
   }
 }
 
@@ -530,75 +695,165 @@ function arch(halfW, z, text, checkered) {
   return g;
 }
 
-// Regały wzdłuż toru: deski i książki jako dwa InstancedMesh (dwa wywołania rysowania na tysiące brył)
-function buildShelves(group, halfW, zNear, zFar) {
+// Wiele powtarzalnych brył (deski, książki, stoły, lampy) jako jeden InstancedMesh
+// na parę geometria + materiał: kilkanaście wywołań rysowania zamiast tysięcy
+function batcher() {
+  const kinds = new Map();
+  return {
+    add(geo, mat, [sx, sy, sz], [x, y, z], { color = null, rot = null } = {}) {
+      const key = `${geo.uuid}:${mat.uuid}`;
+      if (!kinds.has(key)) kinds.set(key, { geo, mat, items: [] });
+      kinds.get(key).items.push({ s: [sx, sy, sz], p: [x, y, z], color, rot });
+    },
+    flush(group) {
+      const d = r3.dummy;
+      for (const { geo, mat, items } of kinds.values()) {
+        const mesh = new THREE.InstancedMesh(geo, mat, items.length);
+        const colored = items.some(it => it.color);
+        items.forEach((it, i) => {
+          d.position.set(...it.p);
+          d.rotation.set(...(it.rot || [0, 0, 0]));
+          d.scale.set(...it.s);
+          d.updateMatrix();
+          mesh.setMatrixAt(i, d.matrix);
+          if (colored) mesh.setColorAt(i, r3.tmpColor.set(it.color || '#ffffff'));
+        });
+        mesh.frustumCulled = false;
+        group.add(mesh);
+      }
+    },
+  };
+}
+
+const pickSpine = () => {
+  const c = new THREE.Color(SPINE_COLORS[Math.floor(Math.random() * SPINE_COLORS.length)]);
+  return c.multiplyScalar(rand(0.8, 1.1));
+};
+
+// Główne regały wzdłuż toru, książka po książce (są blisko kamery)
+function buildShelves(b, halfW, zNear, zFar) {
+  const { geo, mats } = r3;
   const unit = 4;
   const levels = 5;
   const levelH = 1.3;
   const depth = 0.9;
   const inner = halfW + 3.4;
-  const boards = [];
-  const books = [];
+  const topY = levels * levelH + 0.25;
   for (const side of [-1, 1]) {
     const xMid = side * (inner + depth / 2);
     for (let z = zNear; z > zFar; z -= unit) {
       const zMid = z - unit / 2;
-      for (let l = 0; l <= levels; l++) boards.push([depth, 0.08, unit, xMid, l * levelH + 0.04, zMid]);
-      boards.push([depth, levels * levelH, 0.1, xMid, (levels * levelH) / 2, z]);
-      boards.push([0.06, levels * levelH, unit, side * (inner + depth), (levels * levelH) / 2, zMid]);
-      boards.push([depth + 0.2, 0.25, unit, xMid, levels * levelH + 0.12, zMid]);
+      for (let l = 0; l <= levels; l++) b.add(geo.box, mats.wood, [depth, 0.08, unit], [xMid, l * levelH + 0.04, zMid]);
+      b.add(geo.box, mats.wood, [depth, levels * levelH, 0.1], [xMid, (levels * levelH) / 2, z]);
+      b.add(geo.box, mats.wood, [0.06, levels * levelH, unit], [side * (inner + depth), (levels * levelH) / 2, zMid]);
+      b.add(geo.box, mats.wood, [depth + 0.2, 0.25, unit], [xMid, levels * levelH + 0.12, zMid]);
       for (let l = 0; l < levels; l++) {
         let zz = z - 0.08;
         while (zz > z - unit + 0.35) {
           const thick = rand(0.12, 0.3);
           if (Math.random() < 0.04) { zz -= rand(0.3, 0.7); continue; }  // luka na półce
           const hgt = rand(0.62, 1.0) * levelH * 0.88;
-          books.push({
-            s: [depth * rand(0.72, 0.9), hgt, thick * 0.93, xMid + side * rand(0, 0.06), l * levelH + 0.08 + hgt / 2, zz - thick / 2],
-            c: SPINE_COLORS[Math.floor(Math.random() * SPINE_COLORS.length)],
-          });
+          b.add(geo.box, mats.books, [depth * rand(0.72, 0.9), hgt, thick * 0.93], [xMid + side * rand(0, 0.06), l * levelH + 0.08 + hgt / 2, zz - thick / 2], { color: pickSpine() });
           zz -= thick;
+        }
+      }
+      // Na szczycie regału: globus, roślina albo leżący stos książek (widać je z góry)
+      const roll = Math.random();
+      const zz = zMid + rand(-1, 1);
+      if (roll < 0.22) {
+        b.add(geo.cyl, mats.gold, [0.25, 0.12, 0.25], [xMid, topY + 0.06, zz]);
+        b.add(geo.ball, mats.globe, [0.62, 0.62, 0.62], [xMid, topY + 0.45, zz]);
+      } else if (roll < 0.42) {
+        b.add(geo.cyl, mats.pot, [0.38, 0.4, 0.38], [xMid, topY + 0.2, zz]);
+        b.add(geo.ball, mats.plant, [0.75, 0.6, 0.75], [xMid, topY + 0.6, zz]);
+      } else if (roll < 0.7) {
+        let y = topY;
+        for (let k = 0; k < 2 + Math.floor(rand(0, 3)); k++) {
+          const t = rand(0.12, 0.2);
+          b.add(geo.box, mats.books, [rand(0.55, 0.75), t, rand(0.8, 1.1)], [xMid, y + t / 2, zz], { color: pickSpine(), rot: [0, rand(-0.4, 0.4), 0] });
+          y += t;
         }
       }
     }
   }
-  const d = r3.dummy;
-  const place = (mesh, i, [sx, sy, sz, x, y, z]) => {
-    d.position.set(x, y, z);
-    d.rotation.set(0, 0, 0);
-    d.scale.set(sx, sy, sz);
-    d.updateMatrix();
-    mesh.setMatrixAt(i, d.matrix);
-  };
-  const boardMesh = new THREE.InstancedMesh(r3.geo.box, r3.mats.wood, boards.length);
-  boards.forEach((b, i) => place(boardMesh, i, b));
-  const bookMesh = new THREE.InstancedMesh(r3.geo.box, r3.mats.books, books.length);
-  const color = r3.tmpColor;
-  books.forEach((b, i) => {
-    place(bookMesh, i, b.s);
-    bookMesh.setColorAt(i, color.set(b.c).multiplyScalar(rand(0.8, 1.1)));
-  });
-  for (const m of [boardMesh, bookMesh]) {
-    m.frustumCulled = false;
-    group.add(m);
+  return topY;
+}
+
+// Za głównymi regałami rzędy regałów w poprzek toru, jak w czytelni. Daleko i we mgle,
+// więc książki na nich to jeden blok z teksturą grzbietów na półkę
+function buildStacks(b, halfW, zNear, zFar) {
+  const { geo, mats } = r3;
+  const x0 = halfW + 5.4;
+  const x1 = halfW + 12;
+  const len = x1 - x0;
+  const levels = 3;
+  const levelH = 1.25;
+  const h = levels * levelH;
+  for (const side of [-1, 1]) {
+    const xMid = side * (x0 + len / 2);
+    for (let z = zNear - 2; z > zFar; z -= 4.2) {
+      for (let l = 0; l <= levels; l++) b.add(geo.box, mats.wood, [len, 0.07, 0.85], [xMid, l * levelH + 0.035, z]);
+      b.add(geo.box, mats.wood, [len, h, 0.06], [xMid, h / 2, z]);
+      for (const end of [x0, x1]) b.add(geo.box, mats.wood, [0.1, h + 0.15, 0.9], [side * end, (h + 0.15) / 2, z]);
+      for (let l = 0; l < levels; l++) {
+        for (const face of [-1, 1]) {
+          b.add(geo.box, mats.spines, [len - 0.2, levelH * rand(0.68, 0.82), 0.34], [xMid + rand(-0.1, 0.1), l * levelH + 0.07 + levelH * 0.37, z + face * 0.22], { rot: [0, Math.random() < 0.5 ? 0 : Math.PI, 0] });
+        }
+      }
+    }
   }
 }
 
-function buildLamps(group, halfW, zNear, zFar) {
-  for (let z = zNear - 6; z > zFar; z -= 16) {
-    for (const side of [-1, 1]) {
-      const x = side * (halfW + 2.1);
-      const post = new THREE.Mesh(r3.geo.post, r3.mats.metal);
-      post.scale.y = 3.6;
-      post.position.set(x, 1.8, z);
-      const bulb = new THREE.Mesh(r3.geo.bulb, r3.mats.lamp);
-      bulb.position.set(x, 3.75, z);
-      const glow = new THREE.Sprite(r3.mats.glow);
-      glow.scale.setScalar(2.6);
-      glow.position.copy(bulb.position);
-      group.add(post, bulb, glow);
+// Stoły do czytania z zielonymi lampami bankierskimi i plamą ciepłego światła wokół
+function buildTables(b, halfW, zNear, zFar) {
+  const { geo, mats } = r3;
+  let side = 1;
+  for (let z = zNear - 10; z > zFar + 10; z -= 13) {
+    side = -side;
+    const x = side * (halfW + 2.15);
+    const y = 0.8;
+    b.add(geo.box, mats.wood, [1.3, 0.08, 2.4], [x, y, z]);
+    for (const dx of [-0.55, 0.55]) for (const dz of [-1.05, 1.05]) b.add(geo.box, mats.wood, [0.08, y, 0.08], [x + dx, y / 2, z + dz]);
+    const lz = z - 0.6;
+    b.add(geo.cyl, mats.gold, [0.24, 0.05, 0.24], [x, y + 0.07, lz]);
+    b.add(geo.cyl, mats.gold, [0.05, 0.36, 0.05], [x, y + 0.27, lz]);
+    b.add(geo.cyl, mats.shade, [0.3, 0.6, 0.3], [x, y + 0.47, lz], { rot: [0, 0, Math.PI / 2] });
+    b.add(geo.ball, mats.lamp, [0.16, 0.12, 0.16], [x, y + 0.38, lz]);
+    b.add(geo.decal, mats.pool, [5, 1, 5], [x, 0.016, lz]);
+    b.add(geo.decal, mats.pool, [1.6, 1, 1.6], [x, y + 0.045, lz]);
+    let sy = y + 0.04;
+    for (let k = 0; k < 1 + Math.floor(rand(0, 3)); k++) {
+      const t = rand(0.08, 0.14);
+      b.add(geo.box, mats.books, [rand(0.5, 0.65), t, rand(0.7, 0.9)], [x + rand(-0.15, 0.15), sy + t / 2, z + 0.55], { color: pickSpine(), rot: [0, rand(-0.5, 0.5), 0] });
+      sy += t;
     }
   }
+}
+
+// Lewitujące świece nad bokami toru i stojące na regałach; płomienie to punkty w HDR (świecą w bloomie)
+function buildCandles(group, halfW, zNear, zFar, shelfTop) {
+  const items = [];
+  for (let z = zNear - 4; z > zFar; z -= rand(2.5, 4.5)) {
+    for (const side of [-1, 1]) {
+      if (Math.random() < 0.35) continue;
+      items.push({ x: side * rand(halfW + 0.9, halfW + 3), y: rand(4.2, 7), z: z + rand(-1, 1), h: rand(0.35, 0.65), bob: rand(0.12, 0.3), seed: rand(0, 100) });
+    }
+    if (Math.random() < 0.25) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      items.push({ x: side * (halfW + 3.85), y: shelfTop + 0.2, z, h: 0.4, bob: 0, seed: rand(0, 100) });
+    }
+  }
+  const bodies = new THREE.InstancedMesh(r3.geo.cyl, r3.mats.candle, items.length);
+  bodies.frustumCulled = false;
+  const pos = new Float32Array(items.length * 3);
+  const col = new Float32Array(items.length * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const flames = new THREE.Points(geo, r3.mats.flame);
+  flames.frustumCulled = false;
+  group.add(bodies, flames);
+  return { items, bodies, flames, pos, col, geo };
 }
 
 function buildDust(group, halfW, zNear, zFar) {
@@ -638,7 +893,7 @@ function crownMesh() {
 function makeRacer(s, i, n, group) {
   const css = resolveColor(s.color);
   const { geo, mats } = r3;
-  const coverMat = new THREE.MeshStandardMaterial({ color: css, emissive: css, emissiveIntensity: 0.22, roughness: 0.42, metalness: 0.05 });
+  const coverMat = new THREE.MeshStandardMaterial({ color: css, emissive: css, emissiveIntensity: 0.3, roughness: 0.35, metalness: 0.1 });
   const x = (i - (n - 1) / 2) * LANE_W;
 
   const root = new THREE.Group();
@@ -668,13 +923,19 @@ function makeRacer(s, i, n, group) {
 
   const shadow = new THREE.Mesh(geo.shadow, mats.shadow);
   shadow.position.y = 0.035;
-  root.add(shadow);
+  // Kolorowa poświata pod książką (addytywna, w bloomie wygląda jak światło odbite od dywanu)
+  const glowMat = new THREE.MeshBasicMaterial({ map: r3.tex.glow, color: css, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.5 });
+  const glow = new THREE.Mesh(geo.decal, glowMat);
+  glow.scale.set(3.4, 1, 3.8);
+  glow.position.y = 0.04;
+  root.add(shadow, glow);
   group.add(root);
 
-  const trailMat = new THREE.MeshBasicMaterial({ color: css, transparent: true, opacity: r3.trailOpacity, depthWrite: false });
+  // Ślad na dywanie świeci najmocniej przy książce i wygasa w stronę startu
+  const trailMat = new THREE.MeshBasicMaterial({ map: r3.tex.trail, color: css, transparent: true, opacity: r3.trailOpacity, depthWrite: false });
   const trail = new THREE.Mesh(geo.trail, trailMat);
   trail.position.set(x, 0.022, 0);
-  trail.scale.set(LANE_W * 0.42, 1, 0.001);
+  trail.scale.set(LANE_W * 0.5, 1, 0.001);
   group.add(trail);
 
   // Imię namalowane na dywanie przed linią startu
@@ -696,9 +957,9 @@ function makeRacer(s, i, n, group) {
   r3.board.appendChild(boardRow);
 
   return {
-    s, first, css, root, body, wings, ribbon, shadow, trail, trailMat, coverMat,
+    s, first, css, root, body, wings, ribbon, shadow, glow, glowMat, trail, trailMat, coverMat,
     tag, tagRank, boardRow, boardPts,
-    z: 0, v: 0, speed: 0, phase: rand(0, 6), seed: rand(0, 100),
+    z: 0, v: 0, speed: 0, phase: rand(0, 6), seed: rand(0, 100), sparkAcc: 0,
     rank: i, shownV: -1, shownRank: -1,
   };
 }
@@ -719,8 +980,9 @@ function buildWorld(series, rows, sig) {
   const zMid = (zNear + zFar) / 2;
 
   // Podłoga, dywan, złote krawędzie i linie torów
-  const floorW = halfW * 2 + 26;
+  const floorW = halfW * 2 + 30;
   mats.floor.map.repeat.set(floorW / 4, len / 4);
+  mats.carpet.map.repeat.set(1, (len - 8) / (halfW * 2));
   group.add(flat(new THREE.PlaneGeometry(floorW, len), mats.floor, 0, 0, zMid));
   group.add(flat(new THREE.PlaneGeometry(halfW * 2, len - 8), mats.carpet, 0, 0.01, zMid - 4));
   for (const side of [-1, 1]) group.add(boxAt(mats.gold, 0.16, 0.05, len - 8, side * halfW, 0.03, zMid - 4));
@@ -748,8 +1010,12 @@ function buildWorld(series, rows, sig) {
   group.add(finishFloor);
   group.add(arch(halfW, finishZ, 'META · DZIŚ', true));
 
-  buildShelves(group, halfW, zNear, zFar);
-  buildLamps(group, halfW, zNear, zFar);
+  const b = batcher();
+  const shelfTop = buildShelves(b, halfW, zNear, zFar);
+  buildStacks(b, halfW, zNear, zFar);
+  buildTables(b, halfW, zNear, zFar);
+  b.flush(group);
+  const candles = buildCandles(group, halfW, zNear, zFar, shelfTop);
   const dust = buildDust(group, halfW, zNear, zFar);
 
   r3.board.style.height = `${n * BOARD_ROW}px`;
@@ -765,7 +1031,7 @@ function buildWorld(series, rows, sig) {
 
   r3.scene.add(group);
   world = {
-    sig, group, racers, byKey, events, evIdx: 0, dust, crown,
+    sig, group, racers, byKey, events, evIdx: 0, dust, crown, candles,
     t0, t1, t: t1, finalMax, halfW, leader: racers[0],
     baseDist: 9 + halfW * 1.5,
   };
@@ -802,6 +1068,10 @@ function replay() {
   });
   r3.particles.life.fill(0);
   r3.particles.activeUntil = performance.now() + 100;
+  r3.sparks.life.fill(0);
+  r3.sparks.activeUntil = performance.now() + 100;
+  r3.rings.forEach(ring => { ring.age = Infinity; ring.mesh.visible = false; });
+  r3.rockets = [];
   setCamMode(view.mode, true);
   Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, spread: 0 });
   setPlayIcon();
@@ -828,9 +1098,14 @@ function frame(now) {
   }
   updateRacers(dt, now);
   updateParticles(dt);
+  updateRockets(dt);
+  updateSparks(dt);
+  updateRings(dt);
+  updateCandles(now);
   updateDust(dt);
   updateCamera(dt);
-  r3.renderer.render(r3.scene, r3.camera);
+  if (r3.composer) r3.composer.render(dt / 1000);
+  else r3.renderer.render(r3.scene, r3.camera);
   updateOverlay();
 }
 
@@ -858,6 +1133,19 @@ function updateRacers(dt, now) {
     r.trail.scale.z = Math.max(0.001, -r.z);
     const lift = r.body.position.y - HOVER;
     r.shadow.scale.setScalar(1 - lift * 0.6);
+
+    // Świecący pył za lecącą książką: im szybciej, tym gęściej
+    if (view.playing && r.speed > 0.0015) {
+      r.sparkAcc += dt * (0.012 + Math.min(r.speed, 0.04) * 3.5);
+      const color = r3.tmpColor.set(r.css).lerp(GOLD, 0.25).multiplyScalar(2.2);
+      while (r.sparkAcc >= 1) {
+        r.sparkAcc -= 1;
+        spark(
+          r.root.position.x + rand(-0.6, 0.6), r.body.position.y + rand(-0.25, 0.25), r.z + rand(0.6, 1.1),
+          rand(-0.4, 0.4), rand(-0.2, 0.5), rand(0.2, 1.2), color, rand(0.6, 1.1), -0.6,
+        );
+      }
+    }
   }
   updateRanking();
   updateEvents();
@@ -893,6 +1181,14 @@ function updateEvents() {
     if (!r) continue;
     r3.tmpV.set(r.root.position.x, r.body.position.y, r.z);
     emit(r3.tmpV, 26, ['#f6eedb', '#ffffff', r.css], { speed: 2.6, up: 4.5 });
+    // Skończona książka: fala światła po dywanie i złote iskry
+    ring(r.root.position.x, r.z, r.css);
+    const gold = r3.tmpColor.copy(GOLD).multiplyScalar(3);
+    for (let i = 0; i < 36; i++) {
+      const a = rand(0, Math.PI * 2);
+      const v = rand(1.5, 4);
+      spark(r.root.position.x, r.body.position.y, r.z, Math.cos(a) * v, rand(1, 4), Math.sin(a) * v, gold, rand(0.6, 1.2), -5);
+    }
   }
 }
 
@@ -901,6 +1197,17 @@ function finale() {
   for (let i = 0; i < 4; i++) {
     r3.tmpV.set(rand(-world.halfW, world.halfW), 6.2, -TRACK_LEN + rand(-0.5, 0.5));
     emit(r3.tmpV, 55, colors, { speed: 4, up: 3, spread: 2 });
+  }
+  // Fajerwerki znad mety, w kolorach wszystkich zawodników
+  if (!reduced()) {
+    const fwColors = [...world.racers.map(r => r.css), '#f0c75e'];
+    for (let i = 0; i < 7; i++) {
+      r3.rockets.push({
+        x: rand(-world.halfW - 1, world.halfW + 1), y: 0.5, z: -TRACK_LEN + rand(0, 10),
+        vy: rand(6.5, 8), delay: i * 0.35 + rand(0, 0.2), fuse: rand(0.65, 0.8),
+        color: new THREE.Color(fwColors[i % fwColors.length]),
+      });
+    }
   }
   r3.shake = 0.3;
   if (reduced()) return;
@@ -1069,6 +1376,166 @@ function updateParticles(dt) {
     P.mesh.setMatrixAt(i, d.matrix);
   }
   P.mesh.instanceMatrix.needsUpdate = true;
+}
+
+/* ----------------- Iskry, fale, fajerwerki, świece ----------------- */
+// Iskry to punkty z kolorem w HDR (jaśniej niż biel), więc świecą w bloomie. Martwa iskra
+// ma kolor 0: przy mieszaniu addytywnym jest niewidoczna, nie trzeba jej usuwać z bufora.
+function buildSparks() {
+  const pos = new Float32Array(SPARKS * 3).fill(-1000);
+  const col = new Float32Array(SPARKS * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const points = new THREE.Points(geo, r3.mats.spark);
+  points.frustumCulled = false;
+  r3.scene.add(points);
+  r3.sparks = {
+    geo, pos, col, next: 0, activeUntil: 0,
+    vel: new Float32Array(SPARKS * 3),
+    base: new Float32Array(SPARKS * 3),
+    life: new Float32Array(SPARKS),
+    max: new Float32Array(SPARKS),
+    grav: new Float32Array(SPARKS),
+  };
+  r3.rockets = [];
+  GOLD = new THREE.Color(0xf0c75e);
+}
+
+function spark(x, y, z, vx, vy, vz, color, life, grav = -2) {
+  if (reduced()) return;
+  const S = r3.sparks;
+  const i = S.next;
+  S.next = (S.next + 1) % SPARKS;
+  const j = i * 3;
+  S.pos[j] = x; S.pos[j + 1] = y; S.pos[j + 2] = z;
+  S.vel[j] = vx; S.vel[j + 1] = vy; S.vel[j + 2] = vz;
+  S.base[j] = color.r; S.base[j + 1] = color.g; S.base[j + 2] = color.b;
+  S.life[i] = S.max[i] = life;
+  S.grav[i] = grav;
+  S.activeUntil = performance.now() + life * 1000 + 100;
+}
+
+function updateSparks(dt) {
+  const S = r3.sparks;
+  if (performance.now() > S.activeUntil) return;
+  const s = dt / 1000;
+  const drag = Math.exp(-1.8 * s);
+  const bright = r3.theme.spark;
+  for (let i = 0; i < SPARKS; i++) {
+    if (S.life[i] <= 0) continue;
+    const j = i * 3;
+    S.life[i] -= s;
+    if (S.life[i] <= 0) {
+      S.col[j] = S.col[j + 1] = S.col[j + 2] = 0;
+      S.pos[j + 1] = -1000;
+      continue;
+    }
+    S.vel[j + 1] += S.grav[i] * s;
+    for (let a = 0; a < 3; a++) {
+      S.vel[j + a] *= drag;
+      S.pos[j + a] += S.vel[j + a] * s;
+    }
+    const fade = (S.life[i] / S.max[i]) ** 1.3 * bright;
+    S.col[j] = S.base[j] * fade;
+    S.col[j + 1] = S.base[j + 1] * fade;
+    S.col[j + 2] = S.base[j + 2] * fade;
+  }
+  S.geo.attributes.position.needsUpdate = true;
+  S.geo.attributes.color.needsUpdate = true;
+}
+
+function buildRings() {
+  r3.rings = Array.from({ length: RINGS }, () => {
+    const mesh = new THREE.Mesh(r3.geo.decal, keep(r3.mats.ring.clone()));
+    mesh.visible = false;
+    mesh.position.y = 0.05;
+    r3.scene.add(mesh);
+    return { mesh, age: Infinity };
+  });
+  r3.nextRing = 0;
+}
+
+// Fala światła rozchodząca się po dywanie
+function ring(x, z, color) {
+  if (reduced()) return;
+  const r = r3.rings[r3.nextRing];
+  r3.nextRing = (r3.nextRing + 1) % RINGS;
+  r.age = 0;
+  r.mesh.position.x = x;
+  r.mesh.position.z = z;
+  r.mesh.material.color.set(color).multiplyScalar(1.6);
+  r.mesh.visible = true;
+}
+
+function updateRings(dt) {
+  for (const r of r3.rings) {
+    if (!r.mesh.visible) continue;
+    r.age += dt / 1000;
+    const t = r.age / 1.1;
+    if (t >= 1) {
+      r.mesh.visible = false;
+      continue;
+    }
+    const size = 1 + (1 - (1 - t) ** 3) * 7;
+    r.mesh.scale.set(size, 1, size);
+    r.mesh.material.opacity = (1 - t) ** 1.5;
+  }
+}
+
+// Rakieta leci w górę zostawiając smugę, po czasie rozpryskuje się kulą iskier
+function updateRockets(dt) {
+  if (!r3.rockets.length) return;
+  const s = dt / 1000;
+  const trail = r3.tmpColor.setRGB(2.5, 1.9, 1.2);
+  r3.rockets = r3.rockets.filter(rk => {
+    if (rk.delay > 0) {
+      rk.delay -= s;
+      return true;
+    }
+    rk.vy -= 4 * s;
+    rk.y += rk.vy * s;
+    rk.fuse -= s;
+    spark(rk.x + rand(-0.05, 0.05), rk.y, rk.z, rand(-0.3, 0.3), -1, rand(-0.3, 0.3), trail, rand(0.3, 0.5), -3);
+    if (rk.fuse > 0) return true;
+    const color = rk.color.clone().multiplyScalar(4);
+    for (let i = 0; i < 160; i++) {
+      // Równomiernie po sferze
+      const u = rand(-1, 1);
+      const a = rand(0, Math.PI * 2);
+      const v = rand(4, 6.5);
+      const rxy = Math.sqrt(1 - u * u);
+      spark(rk.x, rk.y, rk.z, Math.cos(a) * rxy * v, u * v, Math.sin(a) * rxy * v, color, rand(1.1, 1.8), -3.5);
+    }
+    return false;
+  });
+}
+
+function updateCandles(now) {
+  const C = world.candles;
+  const d = r3.dummy;
+  const t = now / 1000;
+  const bright = r3.theme.lampBoost * 0.85;
+  C.items.forEach((c, i) => {
+    const y = c.y + Math.sin(t * 0.9 + c.seed) * c.bob;
+    d.position.set(c.x, y, c.z);
+    d.rotation.set(0, 0, 0);
+    d.scale.set(0.11, c.h, 0.11);
+    d.updateMatrix();
+    C.bodies.setMatrixAt(i, d.matrix);
+    const j = i * 3;
+    C.pos[j] = c.x;
+    C.pos[j + 1] = y + c.h / 2 + 0.16;
+    C.pos[j + 2] = c.z;
+    // Migotanie: dwie sinusoidy o różnych częstotliwościach udają nierówny płomień
+    const flicker = 0.82 + 0.12 * Math.sin(t * 11 + c.seed) + 0.06 * Math.sin(t * 23 + c.seed * 3);
+    C.col[j] = 1 * bright * flicker;
+    C.col[j + 1] = 0.72 * bright * flicker;
+    C.col[j + 2] = 0.38 * bright * flicker;
+  });
+  C.bodies.instanceMatrix.needsUpdate = true;
+  C.geo.attributes.position.needsUpdate = true;
+  C.geo.attributes.color.needsUpdate = true;
 }
 
 function updateDust(dt) {
