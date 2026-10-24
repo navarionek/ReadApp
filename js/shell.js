@@ -1,5 +1,6 @@
 import { playRankingIntro } from './ranking.js';
 import { cancelEdit } from './form.js';
+import { hideRace3d, showRace3d } from './race3d.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { state } from './state.js';
 import { drawTimeline, playRace } from './stats.js';
@@ -39,11 +40,14 @@ export function showScreen(name) {
 
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
   if (name === 'statystyki') {
-    if (state.hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); });
+    if (state.hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); showRace3d(true); });
     else state.racePending = true;
-  } else if (state.raceFrame !== null) {
-    cancelAnimationFrame(state.raceFrame);
-    state.raceFrame = null;
+  } else {
+    hideRace3d();
+    if (state.raceFrame !== null) {
+      cancelAnimationFrame(state.raceFrame);
+      state.raceFrame = null;
+    }
   }
 }
 
