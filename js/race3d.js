@@ -13,8 +13,8 @@ const TRACK_LEN = 160;       // od startu do mety, jednostki sceny
 const LANE_W = 2.4;
 const HOVER = 1.4;           // wysokość lotu książek
 const SPEEDS = [1, 2, 4];
-const CAM_MODES = ['auto', 'chase', 'side', 'top'];
-const CAM_LABELS = { auto: 'Reżyser', chase: 'Pościg', side: 'Z boku', top: 'Z góry' };
+const CAM_MODES = ['top', 'chase', 'side'];
+const CAM_LABELS = { top: 'Z góry', chase: 'Pościg', side: 'Z boku' };
 const BOARD_ROW = 22;        // px, wysokość wiersza tabeli wyników
 const PARTICLES = 600;
 const SPINE_COLORS = ['#8c2f39', '#2f4b7c', '#3d6b45', '#b08d2a', '#5a3d6e', '#a0522d', '#2e6f73', '#c4b49a', '#6b4226', '#7d8c97', '#9c3d54', '#d0c3a5'];
@@ -56,7 +56,7 @@ const view = {
   playing: false,
   p: 1,              // 0..1, dzień roku
   speed: 1,
-  mode: 'auto',
+  mode: 'top',
   showcase: false,   // po dojechaniu do mety kamera powoli krąży wokół lidera
   full: false,
 };
@@ -179,11 +179,6 @@ async function ensureMounted() {
     raf: null, last: 0, size: { w: 1, h: 1 },
     cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, spread: 0, tz: null, tx: null, offZ: 0, offX: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
-    shot: { name: 'follow', subject: null, until: 0 },
-    holdUntil: 0,          // do kiedy reżyser nie zmienia ujęć (ktoś sam obraca kamerę)
-    directorIdx: 0,
-    lastCloseAt: -Infinity,
-    stragglerShown: false,
     finalStretch: false,
     shake: 0, pops: [], bannerUntil: 0, bannerPriority: 0, bannerTimer: null,
     tmpV: new THREE.Vector3(), tmpColor: new THREE.Color(), dummy: new THREE.Object3D(),
@@ -365,7 +360,6 @@ function bindPointer() {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
     view.showcase = false;
-    r3.holdUntil = performance.now() + 6000;  // reżyser odpuszcza na chwilę
   });
   canvas.addEventListener('pointermove', e => {
     const prev = pointers.get(e.pointerId);
@@ -388,7 +382,6 @@ function bindPointer() {
   canvas.addEventListener('wheel', e => {
     if (!view.full) return;  // w karcie kółko przewija stronę
     e.preventDefault();
-    r3.holdUntil = performance.now() + 6000;
     r3.camGoal.dist = clamp(r3.camGoal.dist * Math.exp(e.deltaY * 0.001), 4, 90);
   }, { passive: false });
   canvas.addEventListener('dblclick', toggleFull);
@@ -746,7 +739,7 @@ function buildWorld(series, rows, sig) {
 
   // Start, znaczniki punktów co „ładny” krok i meta (= dzisiejszy wynik lidera)
   group.add(flat(new THREE.PlaneGeometry(halfW * 2, 0.22), mats.white, 0, 0.026, 0));
-  group.add(arch(halfW, 0.4, 'START', false));
+  group.add(arch(halfW, -3, 'START', false));  // przed linią: kamera z góry nie patrzy na książki przez belkę
   const step = niceMax(finalMax / 5);
   for (let v = step; v < finalMax * 0.96; v += step) {
     const z = -(v / finalMax) * TRACK_LEN;
@@ -823,11 +816,7 @@ function replay() {
   r3.bannerUntil = 0;
   r3.particles.life.fill(0);
   r3.particles.activeUntil = performance.now() + 100;
-  r3.stragglerShown = false;
   r3.finalStretch = false;
-  r3.directorIdx = 0;
-  r3.holdUntil = 0;
-  r3.lastCloseAt = -Infinity;
   setCamMode(view.mode, true);
   Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, spread: 0 });
   setPlayIcon();
@@ -856,7 +845,6 @@ function frame(now) {
       finale();
     }
   }
-  direct(now);
   updateRacers(dt, now);
   updateParticles(dt);
   updateDust(dt);
@@ -915,13 +903,6 @@ function updateRanking(announce) {
       if (r.newRank === 0) showBanner('Nowy lider', r.first, 2, 2000, r.css);
       else showBanner('Wyprzedzanie', `${r.first}  ›  ${passed.map(o => o.first).join(', ')}`, 1, 1600, r.css);
       r3.shake = Math.max(r3.shake, r.newRank === 0 ? 0.35 : 0.18);
-      // Reżyser robi zbliżenie na tego, kto wyprzedził (walka o podium, nie na końcu stawki)
-      // (najwyżej co 8 s, bo dwie osoby łeb w łeb mijają się co chwilę)
-      const now = performance.now();
-      if (view.mode === 'auto' && r.newRank <= 1 && view.p < 0.9 && now >= r3.holdUntil && now - r3.lastCloseAt > 8000) {
-        r3.lastCloseAt = now;
-        setShot('close', r, 2800);
-      }
     }
   }
   world.racers.forEach(r => { r.rank = r.newRank; });
@@ -956,86 +937,36 @@ function finale() {
   }
   r3.shake = 0.3;
   if (reduced()) return;
-  // Kamera nie przeskakuje: dalej płynie z tego samego miejsca, tylko powoli podjeżdża i krąży wokół lidera
+  // Kamera nie przeskakuje: zostaje nad czołówką, tylko lekko podjeżdża i powoli krąży
   view.showcase = true;
-  r3.camGoal.dist = world.baseDist * 0.42;
-  r3.camGoal.pitch = 0.2;
+  r3.camGoal.dist *= 0.85;
 }
 
 /* ----------------- Kamera ----------------- */
-// Ujęcia: kąt wokół celu (0 = zza pleców, π = od przodu), wysokość i odległość (× bazowa).
-// mirror: reżyser losuje stronę, żeby te same ujęcia nie wyglądały identycznie.
+// Ujęcia: kąt wokół celu (0 = zza pleców), wysokość i odległość (× bazowa)
 const SHOTS = {
+  top: { yaw: 0, pitch: 1.05, dist: 1.15 },
   chase: { yaw: 0.3, pitch: 0.34, dist: 0.85 },
   side: { yaw: 1.05, pitch: 0.22, dist: 0.95 },
-  top: { yaw: 0.001, pitch: 1.2, dist: 1.4 },
-  follow: { yaw: 0.22, pitch: 0.26, dist: 0.72 },
-  front: { yaw: Math.PI - 0.32, pitch: 0.2, dist: 0.68 },
-  rail: { yaw: 1.3, pitch: 0.12, dist: 0.62, mirror: true },
-  crane: { yaw: -0.6, pitch: 0.9, dist: 1, mirror: true },
-  low: { yaw: -0.25, pitch: 0.07, dist: 0.58, mirror: true },
-  close: { yaw: 0.55, pitch: 0.26, dist: 0.5, mirror: true },
-  finish: { yaw: Math.PI - 0.15, pitch: 0.17, dist: 0.85 },
 };
-const DIRECTOR = ['follow', 'front', 'rail', 'crane', 'close', 'low', 'front'];
 const PACK_GAP = 20;  // kto jest dalej za liderem, wypada z kadru czołówki
-
-function aim(name, snap = false) {
-  const s = SHOTS[name];
-  const yaw = s.mirror && Math.random() < 0.5 ? -s.yaw : s.yaw;
-  const { cam, camGoal: g } = r3;
-  // Najkrótsza droga do nowego kąta zamiast kręcenia się o pełne obroty
-  g.yaw = yaw + Math.round((cam.yaw - yaw) / (2 * Math.PI)) * 2 * Math.PI;
-  g.pitch = s.pitch;
-  g.dist = s.dist * (world ? world.baseDist : 14);
-  if (snap) Object.assign(cam, { yaw: g.yaw, pitch: g.pitch, dist: g.dist });
-}
-
-// subject: zawodnik, na którym skupia się ujęcie; null = czołówka
-function setShot(name, subject, ms, snap = false) {
-  r3.shot = { name, subject, until: performance.now() + ms };
-  aim(name, snap);
-}
 
 function setCamMode(mode, snap = false) {
   view.mode = mode;
   view.showcase = false;
-  if (mode === 'auto') setShot('follow', null, 4500, snap);
-  else setShot(mode, null, Infinity, snap);
+  const s = SHOTS[mode];
+  const { cam, camGoal: g } = r3;
+  // Najkrótsza droga do nowego kąta zamiast kręcenia się o pełne obroty
+  g.yaw = s.yaw + Math.round((cam.yaw - s.yaw) / (2 * Math.PI)) * 2 * Math.PI;
+  g.pitch = s.pitch;
+  g.dist = s.dist * (world ? world.baseDist : 14);
+  if (snap) Object.assign(cam, { yaw: g.yaw, pitch: g.pitch, dist: g.dist });
   r3.camLabel.textContent = CAM_LABELS[mode];
 }
 
-// Reżyser: co kilka sekund nowe ujęcie, przy wyprzedzaniu zbliżenie,
-// raz na wyścig zerknięcie na maruderów, a przed metą kamera czeka za linią
-function direct(now) {
-  if (view.mode !== 'auto' || !view.playing || now < r3.holdUntil) return;
-  const { shot } = r3;
-  // Lider na ostatniej prostej: kamera czeka za metą (z zapasem na przejazd)
-  if (view.p > 0.9 || world.leader.z < -TRACK_LEN * 0.82) {
-    if (shot.name !== 'finish') setShot('finish', null, Infinity);
-    return;
-  }
-  if (now < shot.until) return;
-  const straggler = world.racers.reduce((a, b) => (b.z > a.z ? b : a));
-  if (!r3.stragglerShown && view.p > 0.4 && straggler.z - world.leader.z > PACK_GAP) {
-    r3.stragglerShown = true;
-    setShot('close', straggler, 3200);
-    showBanner('Tymczasem z tyłu', straggler.first, 0, 2400, straggler.css);
-    return;
-  }
-  r3.directorIdx = (r3.directorIdx + 1) % DIRECTOR.length;
-  const name = DIRECTOR[r3.directorIdx];
-  setShot(name, name === 'close' ? world.leader : null, rand(3600, 5000));
-}
-
-// key: co jest celem; jego zmiana = zmiana ujęcia (wtedy płynny przejazd albo cięcie)
-function shotTarget() {
-  const leader = world.leader;
-  if (view.showcase) return { key: `show:${leader.s.key}`, x: leader.root.position.x, z: leader.z, spread: 0 };
-  // Kamera stoi za metą, lider wlatuje w kadr
-  if (r3.shot.name === 'finish') return { key: `finish:${leader.s.key}`, x: leader.root.position.x * 0.7, z: -TRACK_LEN, spread: 0 };
-  const subject = r3.shot.subject;
-  if (subject) return { key: `subject:${subject.s.key}`, x: subject.root.position.x, z: subject.z, spread: 0 };
+// Cel kamery: czołówka (wszyscy w zasięgu PACK_GAP od lidera).
+// key zmienia się, gdy ktoś wypada z czołówki albo do niej dołącza (wtedy płynny przejazd).
+function packTarget() {
   let lead = 0;
   for (const r of world.racers) lead = Math.min(lead, r.z);
   const pack = world.racers.filter(r => r.z - lead <= PACK_GAP);
@@ -1045,31 +976,24 @@ function shotTarget() {
     back = Math.max(back, r.z);
     x += r.root.position.x;
   }
-  return { key: `pack:${pack.map(r => r.s.key).join()}`, x: (x / pack.length) * 0.6, z: lead * 0.6 + back * 0.4, spread: back - lead };
+  return { key: `pack:${pack.map(r => r.s.key).join()}`, x: (x / pack.length) * 0.4, z: (lead + back) / 2, spread: back - lead };
 }
 
 function updateCamera(dt) {
   const { cam, camGoal: g, camera } = r3;
-  if (view.showcase) g.yaw += dt * 0.00014;
-  // Reżyser i finał przejeżdżają między ujęciami wolno (jak kran), ręczne tryby reagują szybciej
-  const glide = view.showcase ? 1500 : view.mode === 'auto' ? 950 : 380;
-  const k = ease(dt, glide);
+  if (view.showcase) g.yaw += dt * 0.00008;
+  // Finał przejeżdża wolno (bez szarpnięcia na mecie), ręczna zmiana kamery szybciej
+  const k = ease(dt, view.showcase ? 1500 : 380);
   cam.yaw += (g.yaw - cam.yaw) * k;
   cam.pitch += (g.pitch - cam.pitch) * k;
   cam.dist += (g.dist - cam.dist) * k;
 
-  // Cel idzie za zawodnikami bez opóźnienia (także przy zrywach); tylko zmiana celu
-  // (inne ujęcie, ktoś wypadł z czołówki) zamienia przeskok na offset, który płynnie wygasa
-  const target = shotTarget();
+  // Cel idzie za zawodnikami bez opóźnienia (także przy zrywach); tylko zmiana składu
+  // czołówki zamienia przeskok celu na offset, który płynnie wygasa
+  const target = packTarget();
   if (cam.tz !== null && cam.key !== target.key) {
-    const jumpZ = cam.tz - target.z;
-    if (Math.abs(jumpZ) > 15) {
-      // Cel daleko (np. maruderzy): twarde cięcie jak w transmisji, zamiast przelotu nad pustym dywanem
-      Object.assign(cam, { yaw: g.yaw, pitch: g.pitch, dist: g.dist, offZ: 0, offX: 0, spread: target.spread });
-    } else {
-      cam.offZ += jumpZ;
-      cam.offX += cam.tx - target.x;
-    }
+    cam.offZ += cam.tz - target.z;
+    cam.offX += cam.tx - target.x;
   }
   cam.key = target.key;
   cam.tz = target.z;
@@ -1079,13 +1003,12 @@ function updateCamera(dt) {
   cam.focus = target.z + cam.offZ;
   cam.focusX = target.x + cam.offX;
   cam.spread += (target.spread - cam.spread) * ease(dt, 700);
-  const dist = cam.dist + Math.min(r3.portrait ? 10 : 16, cam.spread * 0.3);
+  const dist = cam.dist + Math.min(r3.portrait ? 14 : 20, cam.spread * 0.5);
 
   r3.shake *= Math.exp(-dt / 260);
   const jitter = () => (Math.random() - 0.5) * r3.shake;
   // W pionie górę kadru zajmuje HUD, więc celujemy wyżej i stawka ląduje niżej na ekranie.
-  // Patrzymy trochę przed zawodników (od tyłu) albo za nich (od przodu).
-  const look = r3.tmpV.set(cam.focusX, r3.portrait ? 2.4 : 1.3, cam.focus - 1.5 * Math.cos(cam.yaw));
+  const look = r3.tmpV.set(cam.focusX, r3.portrait ? 2.4 : 1.3, cam.focus - 1);
   camera.position.set(
     look.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * dist + jitter(),
     look.y + Math.sin(cam.pitch) * dist + jitter(),
