@@ -179,8 +179,7 @@ async function ensureMounted() {
     raf: null, last: 0, size: { w: 1, h: 1 },
     cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, spread: 0, tz: null, tx: null, offZ: 0, offX: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
-    finalStretch: false,
-    shake: 0, pops: [], bannerUntil: 0, bannerPriority: 0, bannerTimer: null,
+    shake: 0,
     tmpV: new THREE.Vector3(), tmpColor: new THREE.Color(), dummy: new THREE.Object3D(),
   };
   buildShared();
@@ -284,10 +283,6 @@ function buildHud() {
   r3.dateDay = el('strong', { text: '' });
   r3.labels = el('div', { class: 'r3d-labels', 'aria-hidden': 'true' });
   r3.board = el('ol', { class: 'r3d-board', 'aria-label': 'Kolejność' });
-  r3.bannerKicker = el('span', { class: 'r3d-banner-kicker' });
-  r3.bannerMain = el('strong', { class: 'r3d-banner-main' });
-  r3.banner = el('div', { class: 'r3d-banner', hidden: '', role: 'status' }, [r3.bannerKicker, r3.bannerMain]);
-  r3.feed = el('div', { class: 'r3d-feed', 'aria-hidden': 'true' });
   r3.status = el('div', { class: 'r3d-status', hidden: '' });
 
   r3.host.replaceChildren(
@@ -295,8 +290,6 @@ function buildHud() {
     r3.labels,
     el('div', { class: 'r3d-date' }, [r3.dateDay, el('span', { text: String(currentYear()) })]),
     r3.board,
-    r3.banner,
-    r3.feed,
     el('div', { class: 'r3d-controls' }, [r3.playBtn, r3.scrub, r3.speedBtn, r3.camBtn, r3.fullBtn]),
     r3.status,
   );
@@ -496,10 +489,7 @@ function clearWorld() {
   r3.scene.remove(world.group);
   disposeTree(world.group);
   world.racers.forEach(r => r.tag.remove());
-  r3.pops.forEach(p => p.node.remove());
-  r3.pops = [];
   r3.board.replaceChildren();
-  r3.feed.replaceChildren();
   world = null;
 }
 
@@ -695,8 +685,7 @@ function makeRacer(s, i, n, group) {
   group.add(nameTag);
 
   const tagRank = el('b');
-  const tagPts = el('em');
-  const tag = el('div', { class: 'r3d-tag' }, [tagRank, el('span', { text: first }), tagPts]);
+  const tag = el('div', { class: 'r3d-tag' }, [tagRank, el('span', { text: first })]);
   tag.style.setProperty('--c', css);
   r3.labels.appendChild(tag);
 
@@ -708,9 +697,9 @@ function makeRacer(s, i, n, group) {
 
   return {
     s, first, css, root, body, wings, ribbon, shadow, trail, trailMat, coverMat,
-    tag, tagRank, tagPts, boardRow, boardPts,
+    tag, tagRank, boardRow, boardPts,
     z: 0, v: 0, speed: 0, phase: rand(0, 6), seed: rand(0, 100),
-    rank: i, newRank: i, shownV: -1, shownRank: -1,
+    rank: i, shownV: -1, shownRank: -1,
   };
 }
 
@@ -787,7 +776,7 @@ function buildWorld(series, rows, sig) {
     r.v = exactValue(r.s, world.t);
     r.z = -(r.v / finalMax) * TRACK_LEN;
   });
-  updateRanking(false);
+  updateRanking();
   world.evIdx = events.filter(e => e.t <= world.t).length;
   crown.position.set(world.leader.root.position.x, HOVER + 0.9, world.leader.z);
   setCamMode(view.mode, true);
@@ -811,12 +800,8 @@ function replay() {
     r.speed = 0;
     r.rank = i;
   });
-  r3.feed.replaceChildren();
-  r3.banner.hidden = true;
-  r3.bannerUntil = 0;
   r3.particles.life.fill(0);
   r3.particles.activeUntil = performance.now() + 100;
-  r3.finalStretch = false;
   setCamMode(view.mode, true);
   Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, spread: 0 });
   setPlayIcon();
@@ -835,10 +820,6 @@ function frame(now) {
     const slow = 1 - 0.7 * smoothstep(0.88, 1, view.p);
     view.p = Math.min(1, view.p + (dt * view.speed * slow) / PLAY_MS);
     r3.scrub.value = String(Math.round(view.p * 1000));
-    if (!r3.finalStretch && view.p > 0.9) {
-      r3.finalStretch = true;
-      showBanner('Ostatnia prosta', 'Finisz!', 1, 1800, world.leader.css);
-    }
     if (view.p >= 1) {
       view.playing = false;
       setPlayIcon();
@@ -850,7 +831,7 @@ function frame(now) {
   updateDust(dt);
   updateCamera(dt);
   r3.renderer.render(r3.scene, r3.camera);
-  updateOverlay(now);
+  updateOverlay();
 }
 
 function updateRacers(dt, now) {
@@ -878,7 +859,7 @@ function updateRacers(dt, now) {
     const lift = r.body.position.y - HOVER;
     r.shadow.scale.setScalar(1 - lift * 0.6);
   }
-  updateRanking(view.playing);
+  updateRanking();
   updateEvents();
 
   // Korona leci za liderem
@@ -892,20 +873,10 @@ function updateRacers(dt, now) {
   crown.rotation.y += dt * 0.0024;
 }
 
-function updateRanking(announce) {
+function updateRanking() {
+  // Przy remisie zostaje dotychczasowa kolejność, żeby tabela nie migała
   const sorted = [...world.racers].sort((a, b) => b.v - a.v || a.rank - b.rank);
-  sorted.forEach((r, i) => { r.newRank = i; });
-  if (announce) {
-    for (const r of sorted) {
-      if (r.newRank >= r.rank) continue;
-      const passed = world.racers.filter(o => o.rank < r.rank && o.newRank > r.newRank && o.v > 0.5);
-      if (!passed.length) continue;
-      if (r.newRank === 0) showBanner('Nowy lider', r.first, 2, 2000, r.css);
-      else showBanner('Wyprzedzanie', `${r.first}  ›  ${passed.map(o => o.first).join(', ')}`, 1, 1600, r.css);
-      r3.shake = Math.max(r3.shake, r.newRank === 0 ? 0.35 : 0.18);
-    }
-  }
-  world.racers.forEach(r => { r.rank = r.newRank; });
+  sorted.forEach((r, i) => { r.rank = i; });
   world.leader = sorted[0];
 }
 
@@ -922,14 +893,10 @@ function updateEvents() {
     if (!r) continue;
     r3.tmpV.set(r.root.position.x, r.body.position.y, r.z);
     emit(r3.tmpV, 26, ['#f6eedb', '#ffffff', r.css], { speed: 2.6, up: 4.5 });
-    pop(r, `+${ev.pts}`);
-    addFeed(r, ev);
   }
 }
 
 function finale() {
-  const leader = [...world.racers].sort((a, b) => b.s.total - a.s.total)[0];
-  showBanner('Na dziś prowadzi', `${leader.first} · ${leader.s.total} pkt`, 3, 4200, leader.css);
   const colors = [...world.racers.map(r => r.css), '#f0c75e', '#ffffff'];
   for (let i = 0; i < 4; i++) {
     r3.tmpV.set(rand(-world.halfW, world.halfW), 6.2, -TRACK_LEN + rand(-0.5, 0.5));
@@ -1120,41 +1087,6 @@ function updateDust(dt) {
 }
 
 /* ----------------- HUD ----------------- */
-function showBanner(kicker, main, priority, ms, color) {
-  const now = performance.now();
-  if (r3.bannerUntil > now && priority < r3.bannerPriority) return;
-  r3.bannerPriority = priority;
-  r3.bannerUntil = now + ms;
-  r3.bannerKicker.textContent = kicker;
-  r3.bannerMain.textContent = main;
-  r3.banner.style.setProperty('--c', color);
-  r3.banner.hidden = false;
-  r3.banner.classList.remove('r3d-in');
-  void r3.banner.offsetWidth;  // restart animacji wejścia
-  r3.banner.classList.add('r3d-in');
-  clearTimeout(r3.bannerTimer);
-  r3.bannerTimer = setTimeout(() => { r3.banner.hidden = true; }, ms);
-}
-
-function pop(racer, text) {
-  const node = el('div', { class: 'r3d-pop', text });
-  node.style.setProperty('--c', racer.css);
-  r3.labels.appendChild(node);
-  r3.pops.push({ node, racer, born: performance.now() });
-}
-
-function addFeed(racer, ev) {
-  const item = el('div', { class: 'r3d-feed-item' }, [
-    el('i', { class: 'r3d-dot' }),
-    el('b', { text: racer.first }),
-    el('span', { text: ev.title }),
-    el('em', { text: `+${ev.pts}` }),
-  ]);
-  item.style.setProperty('--c', racer.css);
-  r3.feed.prepend(item);
-  while (r3.feed.children.length > 3) r3.feed.lastChild.remove();
-}
-
 // Punkt sceny → piksele nad canvasem; null, gdy za kamerą albo daleko poza kadrem
 function toScreen(x, y, z) {
   const v = r3.tmpV.set(x, y, z).project(r3.camera);
@@ -1162,7 +1094,7 @@ function toScreen(x, y, z) {
   return { x: ((v.x + 1) / 2) * r3.size.w, y: ((1 - v.y) / 2) * r3.size.h };
 }
 
-function updateOverlay(now) {
+function updateOverlay() {
   for (const r of world.racers) {
     const pt = toScreen(r.root.position.x, r.body.position.y + 0.95, r.z);
     r.tag.style.visibility = pt ? 'visible' : 'hidden';
@@ -1170,7 +1102,6 @@ function updateOverlay(now) {
     const v = Math.round(r.v);
     if (r.shownV !== v) {
       r.shownV = v;
-      r.tagPts.textContent = String(v);
       r.boardPts.textContent = compactNumber(v);
     }
     if (r.shownRank !== r.rank) {
@@ -1181,20 +1112,6 @@ function updateOverlay(now) {
       r.boardRow.classList.toggle('lead', r.rank === 0);
     }
   }
-
-  r3.pops = r3.pops.filter(p => {
-    const age = now - p.born;
-    if (age > 1500) {
-      p.node.remove();
-      return false;
-    }
-    const r = p.racer;
-    const pt = toScreen(r.root.position.x, r.body.position.y + 1.8 + age * 0.0011, r.z);
-    p.node.style.visibility = pt ? 'visible' : 'hidden';
-    if (pt) p.node.style.transform = `translate(${pt.x}px, ${pt.y}px) translate(-50%, -100%) scale(${1 + Math.max(0, 0.3 - age / 600)})`;
-    p.node.style.opacity = String(1 - (age / 1500) ** 2);
-    return true;
-  });
 
   const day = view.p >= 1 ? 'dziś' : formatDay(new Date(world.t));
   if (r3.dateDay.textContent !== day) r3.dateDay.textContent = day;

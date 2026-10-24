@@ -1086,8 +1086,7 @@ body.r3d-lock {
   pointer-events: none;
 }
 
-.r3d-tag,
-.r3d-pop {
+.r3d-tag {
   position: absolute;
   top: 0;
   left: 0;
@@ -1123,23 +1122,9 @@ body.r3d-lock {
   font-weight: 700;
 }
 
-.r3d-tag em {
-  font-style: normal;
-  color: #cbd5e1;
-  font-variant-numeric: tabular-nums;
-}
-
 .r3d-tag.lead {
   border-color: #f0c75e;
   box-shadow: 0 0 12px rgb(240 199 94 / 0.45);
-}
-
-.r3d-pop {
-  font-size: 1.05rem;
-  font-weight: 900;
-  color: #fff;
-  text-shadow: 0 0 6px var(--c), 0 2px 4px rgb(0 0 0 / 0.6);
-  font-variant-numeric: tabular-nums;
 }
 
 .r3d-date {
@@ -1219,96 +1204,6 @@ body.r3d-lock {
   background: var(--c);
 }
 
-.r3d-banner {
-  position: absolute;
-  bottom: 3.75rem;
-  left: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  max-width: calc(100% - 2rem);
-  padding: 0.4rem 1.1rem 0.5rem;
-  border-radius: var(--radius-sm);
-  background: var(--r3d-glass);
-  border-bottom: 3px solid var(--c, #f0c75e);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.r3d-banner.r3d-in {
-  animation: r3d-banner-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.r3d-banner-kicker {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #f0c75e;
-}
-
-.r3d-banner-main {
-  overflow: hidden;
-  max-width: 100%;
-  font-size: 1.05rem;
-  font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@keyframes r3d-banner-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.85); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-}
-
-.r3d-feed {
-  position: absolute;
-  top: 4.1rem;
-  left: 0.625rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  max-width: min(18rem, calc(100% - 11rem));
-  pointer-events: none;
-}
-
-.r3d-feed-item {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: var(--r3d-glass);
-  font-size: 0.6875rem;
-  max-width: 100%;
-  white-space: nowrap;
-  animation: r3d-feed-in 0.3s ease-out, r3d-feed-out 0.6s ease-in 4.5s forwards;
-}
-
-.r3d-feed-item span {
-  overflow: hidden;
-  color: #cbd5e1;
-  text-overflow: ellipsis;
-}
-
-.r3d-feed-item em {
-  margin-left: auto;
-  font-style: normal;
-  font-weight: 800;
-  color: #f0c75e;
-}
-
-@keyframes r3d-feed-in {
-  from { opacity: 0; transform: translateX(-12px); }
-}
-
-@keyframes r3d-feed-out {
-  to { opacity: 0; }
-}
-
 .r3d-controls {
   position: absolute;
   left: 0.5rem;
@@ -1371,11 +1266,9 @@ body.r3d-lock {
   .r3d-btn-text span { display: none; }  /* na telefonie tylko ikona kamery */
   .r3d-board { width: 7rem; }
   .r3d-date strong { font-size: 1.05rem; }
-  .r3d-feed { top: 3.6rem; max-width: calc(100% - 9.5rem); }
   /* Sześć torów na 340 px: same kółka z miejscem, imiona są w tabeli i na dywanie */
   .r3d-tag { padding: 0.125rem; }
-  .r3d-tag span,
-  .r3d-tag em { display: none; }
+  .r3d-tag span { display: none; }
 }
 
 /* Kafelki statystyk */
