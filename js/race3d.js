@@ -76,7 +76,6 @@ const view = {
   playing: false,
   p: 1,              // 0..1, dzień roku
   mode: 'top',
-  showcase: false,   // po dojechaniu do mety kamera powoli krąży wokół lidera
   full: false,
 };
 
@@ -224,9 +223,8 @@ async function ensureMounted() {
     renderer, scene, camera, hemi, sun, canvas, host, composer, bloom,
     quality: { ratio: pixelRatio, sum: 0, n: 0, skip: 90 },
     raf: null, last: 0, size: { w: 1, h: 1 },
-    cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 },
+    cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0, fitX: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
-    shake: 0,
     tmpV: new THREE.Vector3(), tmpColor: new THREE.Color(), dummy: new THREE.Object3D(),
   };
   buildShared();
@@ -417,13 +415,13 @@ function bindPointer() {
   canvas.addEventListener('pointerdown', e => {
     last = { id: e.pointerId, x: e.clientX, y: e.clientY };
     canvas.setPointerCapture(e.pointerId);
-    view.showcase = false;
   });
   canvas.addEventListener('pointermove', e => {
     if (!last || last.id !== e.pointerId) return;
     const g = r3.camGoal;
-    g.yaw -= (e.clientX - last.x) * 0.006;
-    g.pitch = clamp(g.pitch + (e.clientY - last.y) * 0.005, 0.05, 1.4);
+    // Ograniczony obrót: kamera zostaje „od tyłu” stawki, nie da się jej obrócić w ścianę ani na wprost
+    g.yaw = clamp(g.yaw - (e.clientX - last.x) * 0.006, -0.9, 0.9);
+    g.pitch = clamp(g.pitch + (e.clientY - last.y) * 0.005, 0.35, 1.4);
     last = { id: e.pointerId, x: e.clientX, y: e.clientY };
   });
   const release = () => { last = null; };
@@ -1025,7 +1023,7 @@ function buildWorld(series, rows, sig) {
   world.evIdx = events.filter(e => e.t <= world.t).length;
   crown.position.set(world.leader.root.position.x, HOVER + 0.9, world.leader.z);
   setCamMode(view.mode, true);
-  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
+  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0, fitX: 0 });
   applyTheme();
   setReplayVisible();
 }
@@ -1035,7 +1033,6 @@ function replay() {
   if (!world) return;
   view.p = 0;
   view.playing = true;
-  view.showcase = false;
   world.t = world.t0;
   world.evIdx = 0;
   world.racers.forEach((r, i) => {
@@ -1052,7 +1049,7 @@ function replay() {
   r3.rings.forEach(ring => { ring.age = Infinity; ring.mesh.visible = false; });
   r3.rockets = [];
   setCamMode(view.mode, true);
-  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
+  Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0, fitX: 0 });
   setReplayVisible();
 }
 
@@ -1224,11 +1221,7 @@ function finale() {
       });
     }
   }
-  r3.shake = 0.3;
-  if (reduced()) return;
-  // Kamera nie przeskakuje: zostaje nad czołówką, tylko lekko podjeżdża i powoli krąży
-  view.showcase = true;
-  r3.camGoal.dist *= 0.85;
+  // Kamera zostaje tam, gdzie była: nad czołówką, z góry (bez krążenia, które rozjeżdżało kadr)
 }
 
 /* ----------------- Kamera ----------------- */
@@ -1245,7 +1238,6 @@ const FRAME = { top: 0.5, bottom: -0.8, side: 0.82 };
 
 function setCamMode(mode, snap = false) {
   view.mode = mode;
-  view.showcase = false;
   const s = SHOTS[mode];
   const { cam, camGoal: g } = r3;
   // Najkrótsza droga do nowego kąta zamiast kręcenia się o pełne obroty
@@ -1287,9 +1279,7 @@ function packOnScreen(pack) {
 
 function updateCamera(dt) {
   const { cam, camGoal: g, camera } = r3;
-  if (view.showcase) g.yaw += dt * 0.00008;
-  // Finał przejeżdża wolno (bez szarpnięcia na mecie), ręczna zmiana kamery szybciej
-  const k = ease(dt, view.showcase ? 1500 : 380);
+  const k = ease(dt, 380);
   cam.yaw += (g.yaw - cam.yaw) * k;
   cam.pitch += (g.pitch - cam.pitch) * k;
   cam.dist += (g.dist - cam.dist) * k;
@@ -1307,7 +1297,7 @@ function updateCamera(dt) {
   cam.offZ *= Math.exp(-dt / 700);
   cam.offX *= Math.exp(-dt / 700);
   cam.focus = target.z + cam.offZ + cam.fitZ;
-  cam.focusX = target.x + cam.offX;
+  cam.focusX = target.x + cam.offX + cam.fitX;
   const dist = cam.dist * cam.fit;
   // Przy dużym odstępie (kamera daleko) widok przechodzi w prawie pionowy, jak mapa: z ukosa
   // daleka książka byłaby kropką na horyzoncie. Mgła odsuwa się razem z kamerą.
@@ -1316,14 +1306,12 @@ function updateCamera(dt) {
   r3.scene.fog.near = Math.max(t.fogNear, dist * 0.9);
   r3.scene.fog.far = Math.max(t.fogFar, dist * 1.8 + 40);
 
-  r3.shake *= Math.exp(-dt / 260);
-  const jitter = () => (Math.random() - 0.5) * r3.shake;
   // W pionie górę kadru zajmuje HUD, więc celujemy wyżej i stawka ląduje niżej na ekranie.
   const look = r3.tmpV.set(cam.focusX, r3.portrait ? 2.4 : 1.3, cam.focus - 1);
   camera.position.set(
-    look.x + Math.sin(cam.yaw) * Math.cos(pitch) * dist + jitter(),
-    look.y + Math.sin(pitch) * dist + jitter(),
-    look.z + Math.cos(cam.yaw) * Math.cos(pitch) * dist + jitter(),
+    look.x + Math.sin(cam.yaw) * Math.cos(pitch) * dist,
+    look.y + Math.sin(pitch) * dist,
+    look.z + Math.cos(cam.yaw) * Math.cos(pitch) * dist,
   );
   // Kamera zostaje nad korytarzem między regałami, zamiast filmować tył półek
   const wall = world.halfW + 2.7;
@@ -1340,16 +1328,19 @@ function updateCamera(dt) {
   camera.lookAt(look);
 
   // Dopasowanie kadru: patrzymy, gdzie grupa wypadła na ekranie, i na następną klatkę
-  // płynnie odsuwamy/przybliżamy kamerę (fit) oraz przesuwamy cel (fitZ), żeby wszyscy
+  // płynnie odsuwamy/przybliżamy kamerę (fit) oraz przesuwamy cel (fitZ, fitX), żeby wszyscy
   // mieścili się w FRAME. Nigdy bliżej niż ujęcie bazowe.
   const seen = packOnScreen(target.pack);
   const s = dt / 1000;
   const fill = Math.max((seen.maxY - seen.minY) / (FRAME.top - FRAME.bottom), seen.maxX / FRAME.side);
   const err = fill - 0.85;
   cam.fit = clamp(cam.fit * Math.exp(clamp(err, -0.4, 1.5) * (err > 0.15 ? 5 : 2) * s), 1, 14);
-  // Środek grupy na środku obszaru; za wysoko na ekranie = za daleko, więc cel do przodu (−z)
+  // Środek grupy na środku obszaru. Za wysoko na ekranie = za daleko od kamery, więc cel
+  // przesuwamy w stronę, w którą kamera patrzy (po obrocie palcem to już nie musi być −z)
   const centerErr = (seen.minY + seen.maxY) / 2 - (FRAME.top + FRAME.bottom) / 2;
-  cam.fitZ = clamp(cam.fitZ - clamp(centerErr, -1, 1) * dist * 0.9 * s, -TRACK_LEN * 0.3, TRACK_LEN * 0.3);
+  const push = clamp(centerErr, -1, 1) * dist * 0.9 * s;
+  cam.fitZ = clamp(cam.fitZ - Math.cos(cam.yaw) * push, -TRACK_LEN * 0.3, TRACK_LEN * 0.3);
+  cam.fitX = clamp(cam.fitX - Math.sin(cam.yaw) * push, -world.halfW, world.halfW);
 }
 
 /* ----------------- Kartki i konfetti ----------------- */
