@@ -86,31 +86,63 @@ export function readingCoverOf(item) {
   return null;
 }
 
-// „Zmień autora” w oknie książki: przycisk, który odsłania pole z zapisem (reads albo reading_now)
-function authorEditor(table, row, afterSave) {
-  const input = el('input', { type: 'text', class: 'plain-input', maxlength: '200', 'aria-label': 'Autor', placeholder: 'np. Andrzej Sapkowski', autocomplete: 'off' });
-  input.value = row.author || '';
+// Serwer (fill-book-info) uzupełnia dane tylko wpisom bez info_checked_at i wpisuje wtedy rok
+// z wyszukiwarki. Zanim zapiszemy rok ręcznie, niech to uzupełnienie się odbędzie, inaczej
+// nadpisałoby nasz rok. Gdy serwer nie da rady (np. Google nie odpowiada), sami oznaczamy wpis
+// jako sprawdzony: rok zostaje, a okładkę można wtedy wybrać ręcznie.
+async function settleBookInfo(table, row) {
+  if (row.info_checked_at) return {};
+  try {
+    const { data, error } = await supabaseClient.functions.invoke('fill-book-info', { body: { table, ids: [row.id] } });
+    if (error) throw error;
+    const it = (data?.items || []).find(i => i.id === row.id && !i.pending && i.info_checked_at);
+    if (it) {
+      INFO_FIELDS.forEach(f => { if (f in it) row[f] = it[f]; });
+      return {};
+    }
+  } catch (err) {
+    console.error('fill-book-info failed:', err);
+  }
+  return { info_checked_at: new Date().toISOString() };
+}
+
+// „Zmień autora / rok wydania” w oknie książki: przycisk, który odsłania pola z zapisem
+// (reads, reading_now albo reading_queue)
+function bookFactsEditor(table, row, afterSave) {
+  const author = el('input', { type: 'text', class: 'plain-input', maxlength: '200', 'aria-label': 'Autor', placeholder: 'Autor, np. Andrzej Sapkowski', autocomplete: 'off' });
+  author.value = row.author || '';
+  const maxYear = new Date().getFullYear() + 1;
+  const year = el('input', { type: 'number', class: 'plain-input', inputmode: 'numeric', min: '0', max: String(maxYear), step: '1', 'aria-label': 'Rok wydania', placeholder: 'Rok', autocomplete: 'off' });
+  year.value = row.published_year ?? '';
   const save = el('button', { type: 'submit', class: 'btn btn-primary', text: 'Zapisz' });
-  const form = el('form', { class: 'author-form', hidden: '' }, [input, save]);
-  const toggle = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('user-round'), el('span', { text: 'Zmień autora' })]);
+  const form = el('form', { class: 'author-form', hidden: '' }, [author, year, save]);
+  const toggle = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('pencil'), el('span', { text: 'Zmień autora / rok wydania' })]);
 
   toggle.addEventListener('click', () => {
     toggle.hidden = true;
     form.hidden = false;
-    input.focus();
+    author.focus();
   });
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const author = input.value.trim().slice(0, 200) || null;
+    const yearText = year.value.trim();
+    const publishedYear = yearText === '' ? null : Number(yearText);
+    if (publishedYear !== null && (!Number.isInteger(publishedYear) || publishedYear < 0 || publishedYear > maxYear)) {
+      showToast(`Rok wydania: liczba od 0 do ${maxYear}.`);
+      year.focus();
+      return;
+    }
+    const values = { author: author.value.trim().slice(0, 200) || null, published_year: publishedYear };
     save.disabled = true;
-    const { error } = await supabaseClient.from(table).update({ author }).eq('id', row.id);
+    Object.assign(values, await settleBookInfo(table, row));
+    const { error } = await supabaseClient.from(table).update(values).eq('id', row.id);
     save.disabled = false;
     if (error) {
       showToast('Nie udało się zapisać: ' + friendlyError(error));
       return;
     }
-    row.author = author;
-    showToast('Zapisano autora.');
+    Object.assign(row, values);
+    showToast('Zapisano.');
     afterSave();
   });
   return el('div', { class: 'author-edit' }, [toggle, form]);
@@ -128,7 +160,9 @@ export function openReadingModal(item) {
       coverEl(book, 'large'),
       el('div', { class: 'book-modal-info' }, [
         el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: item.title }),
-        ...(book.author ? [el('p', { class: 'book-modal-author', text: book.author })] : []),
+        ...(book.author || item.published_year
+          ? [el('p', { class: 'book-modal-author', text: [book.author, item.published_year].filter(Boolean).join(' · ') })]
+          : []),
         el('p', { class: 'book-modal-author', text: `Czytane od ${formatDay(new Date(item.started_at))} · ${days} ${days === 1 ? 'dzień' : 'dni'}` }),
       ]),
     ]),
@@ -153,7 +187,7 @@ export function openReadingModal(item) {
       picker.hidden = false;
       renderCoverPicker(picker, item, item.title, saveReadingInfo);
     });
-    const authorEdit = authorEditor('reading_now', item, () => {
+    const authorEdit = bookFactsEditor('reading_now', item, () => {
       renderReadingNow();
       if (currentScreen() === 'polka') renderShelf();
       openReadingModal(item);
@@ -269,7 +303,7 @@ export function openQueueModal(item) {
       await loadShelf();
     });
 
-    const authorEdit = authorEditor('reading_queue', item, () => {
+    const authorEdit = bookFactsEditor('reading_queue', item, () => {
       renderShelf();
       openQueueModal(item);
     });
@@ -495,7 +529,7 @@ export function openBookModal(row) {
       picker.hidden = false;
       renderCoverPicker(picker, row, row.title || '', saveBookInfo);
     });
-    const authorEdit = authorEditor('reads', row, () => {
+    const authorEdit = bookFactsEditor('reads', row, () => {
       renderShelf();
       openBookModal(row);
     });

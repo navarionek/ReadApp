@@ -2316,8 +2316,19 @@ label .hint {
 
 .author-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 5.5rem auto;  /* autor, rok wydania, zapisz */
   gap: 0.5rem;
+}
+
+/* Na telefonie autor w całym wierszu, pod nim rok i „Zapisz” */
+@media (max-width: 480px) {
+  .author-form {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .author-form input[type="text"] {
+    grid-column: 1 / -1;
+  }
 }
 
 /* Baner nagrody: mały i spokojny (kto bierze udział, nie jest tu potrzebne) */
