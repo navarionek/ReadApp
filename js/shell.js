@@ -20,6 +20,7 @@ export function currentScreen() {
 
 export function showScreen(name) {
   if (name === 'admin' && !state.isAdmin) name = 'start';
+  if (name === 'wrapped') name = 'start';  // Wrapped ukryty, dopóki nie będzie dopracowany
   // Wyjście z formularza w trakcie edycji = porzucenie edycji, żeby „Dodaj” było znowu puste
   if (name !== 'dodaj' && (state.editingId || state.finishing)) cancelEdit();
   document.querySelectorAll('.screen').forEach(screen => {
