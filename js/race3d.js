@@ -33,14 +33,14 @@ const THEMES = {
   dark: {
     bg: 0x0b0d18, fogNear: 30, fogFar: 125,
     sky: 0x9fb0ff, ground: 0x24170c, hemi: 0.75, sun: 0xffd9a0, sunI: 1.3, env: 0.35, exposure: 1.05,
-    floor: 0x9a8576, carpet: 0xb59a9a, wood: 0x6b4630, books: 0.75,
+    floor: 0x9a8576, carpet: 0xb59a9a, wood: 0x6b4630, wall: 0x2e1c13, books: 0.75,
     lamp: 0xffc977, lampBoost: 4, dust: 0.8, trail: 0.85, pool: 0.55, spark: 1,
     bloom: { strength: 0.85, radius: 0.55, threshold: 0.92 },
   },
   light: {
     bg: 0xf1e6d2, fogNear: 38, fogFar: 160,
     sky: 0xfff6e8, ground: 0x8a6a4a, hemi: 1, sun: 0xfff4e0, sunI: 1.6, env: 0.4, exposure: 0.95,
-    floor: 0xcfc2b6, carpet: 0xd6c4c4, wood: 0x8a5a3a, books: 0.95,
+    floor: 0xcfc2b6, carpet: 0xd6c4c4, wood: 0x8a5a3a, wall: 0x5a3a28, books: 0.95,
     lamp: 0xffe0a0, lampBoost: 1.6, dust: 0.35, trail: 0.6, pool: 0.18, spark: 0.7,
     bloom: { strength: 0.3, radius: 0.4, threshold: 0.95 },
   },
@@ -333,6 +333,7 @@ function buildShared() {
     floor: keep(new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.45 })),  // lakierowany parkiet
     carpet: keep(new THREE.MeshStandardMaterial({ map: carpetTex, roughness: 0.95 })),
     wood: keep(new THREE.MeshStandardMaterial({ roughness: 0.7 })),
+    wall: keep(new THREE.MeshStandardMaterial({ roughness: 0.8 })),
     books: keep(new THREE.MeshStandardMaterial({ roughness: 0.75 })),
     spines: keep(new THREE.MeshStandardMaterial({ map: spinesTex, roughness: 0.8 })),
     gold: keep(new THREE.MeshStandardMaterial({ color: 0xf0c75e, metalness: 0.75, roughness: 0.28, emissive: 0x6b4a00, emissiveIntensity: 0.35 })),
@@ -514,6 +515,7 @@ function applyTheme() {
   mats.floor.color.set(t.floor);
   mats.carpet.color.set(t.carpet);
   mats.wood.color.set(t.wood);
+  mats.wall.color.set(t.wall);
   mats.books.color.setScalar(t.books);
   mats.lamp.color.set(t.lamp).multiplyScalar(t.lampBoost);
   mats.dust.opacity = t.dust;
@@ -729,6 +731,25 @@ const pickSpine = () => {
   const c = new THREE.Color(SPINE_COLORS[Math.floor(Math.random() * SPINE_COLORS.length)]);
   return c.multiplyScalar(rand(0.8, 1.1));
 };
+
+// Ściany czytelni: boazeria ze złotym gzymsem i listwą, po bokach i na obu końcach
+function buildWalls(b, wallX, zNear, zFar) {
+  const { geo, mats } = r3;
+  const h = 8;
+  const len = zNear - zFar;
+  const zMid = (zNear + zFar) / 2;
+  const t = 0.5;
+  for (const side of [-1, 1]) {
+    const x = side * (wallX + t / 2);
+    b.add(geo.box, mats.wall, [t, h, len + t * 2], [x, h / 2, zMid]);
+    b.add(geo.box, mats.gold, [t + 0.3, 0.25, len + t * 2], [x - side * 0.15, h + 0.12, zMid]);
+    b.add(geo.box, mats.gold, [t + 0.12, 0.08, len], [x - side * 0.06, 1.1, zMid]);
+  }
+  for (const z of [zNear + t / 2, zFar - t / 2]) {
+    b.add(geo.box, mats.wall, [wallX * 2 + t * 2, h, t], [0, h / 2, z]);
+    b.add(geo.box, mats.gold, [wallX * 2 + t * 2, 0.25, t + 0.3], [0, h + 0.12, z]);
+  }
+}
 
 // Główne regały wzdłuż toru, książka po książce (są blisko kamery)
 function buildShelves(b, halfW, zNear, zFar) {
@@ -988,12 +1009,12 @@ function buildWorld(series, rows, sig) {
   const zMid = (zNear + zFar) / 2;
 
   // Podłoga, dywan, złote krawędzie i linie torów
-  // Podłoga z dużym zapasem: przy oddalonej kamerze (duży odstęp między osobami) nie widać jej krawędzi
-  const floorW = 400;
-  const floorL = len + 200;
-  mats.floor.map.repeat.set(floorW / 4, floorL / 4);
+  // Podłoga tylko w obrysie czytelni; dookoła ściany, więc nigdzie nie widać parkietu po horyzont
+  const wallX = halfW + 12.6;
+  const floorW = wallX * 2;
+  mats.floor.map.repeat.set(floorW / 4, len / 4);
   mats.carpet.map.repeat.set(1, (len - 8) / (halfW * 2));
-  group.add(flat(new THREE.PlaneGeometry(floorW, floorL), mats.floor, 0, 0, zMid));
+  group.add(flat(new THREE.PlaneGeometry(floorW, len), mats.floor, 0, 0, zMid));
   group.add(flat(new THREE.PlaneGeometry(halfW * 2, len - 8), mats.carpet, 0, 0.01, zMid - 4));
   for (const side of [-1, 1]) group.add(boxAt(mats.gold, 0.16, 0.05, len - 8, side * halfW, 0.03, zMid - 4));
   for (let i = 1; i < n; i++) group.add(flat(new THREE.PlaneGeometry(0.05, len - 8), mats.lane, (i - n / 2) * LANE_W, 0.018, zMid - 4));
@@ -1021,6 +1042,7 @@ function buildWorld(series, rows, sig) {
   group.add(arch(halfW, finishZ, 'META · DZIŚ', true));
 
   const b = batcher();
+  buildWalls(b, wallX, zNear, zFar);
   const shelfTop = buildShelves(b, halfW, zNear, zFar);
   buildStacks(b, halfW, zNear, zFar);
   buildTables(b, halfW, zNear, zFar);
