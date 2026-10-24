@@ -19,12 +19,9 @@ const PLAY_MS = 18000;       // cały rok przy prędkości 1×
 const TRACK_LEN = 160;       // od startu do mety, jednostki sceny
 const LANE_W = 2.4;
 const HOVER = 1.4;           // wysokość lotu książek
-const SPEEDS = [1, 2, 4];
-const CAM_MODES = ['top', 'chase', 'side'];
-const CAM_LABELS = { top: 'Z góry', chase: 'Pościg', side: 'Z boku' };
 const BOARD_ROW = 22;        // px, wysokość wiersza tabeli wyników
-const PARTICLES = 600;       // kartki i konfetti
-const SPARKS = 2400;         // świecące iskry: pył za książkami, fale, fajerwerki
+const PARTICLES = 250;       // kartki i konfetti
+const SPARKS = 900;          // świecące iskry: pył za książkami, fale, fajerwerki
 const RINGS = 8;             // fale światła po skończonej książce
 const SPINE_COLORS = ['#8c2f39', '#2f4b7c', '#3d6b45', '#b08d2a', '#5a3d6e', '#a0522d', '#2e6f73', '#c4b49a', '#6b4226', '#7d8c97', '#9c3d54', '#d0c3a5'];
 
@@ -78,7 +75,6 @@ const view = {
   autoplay: false,   // przy najbliższym pokazaniu odpal wyścig od startu
   playing: false,
   p: 1,              // 0..1, dzień roku
-  speed: 1,
   mode: 'top',
   showcase: false,   // po dojechaniu do mety kamera powoli krąży wokół lidera
   full: false,
@@ -100,7 +96,7 @@ export function hideRace3d() {
   view.active = false;
   view.playing = false;
   if (view.full) toggleFull();
-  if (r3) setPlayIcon();
+  if (r3) setReplayVisible();
   updateLoop();
 }
 
@@ -202,7 +198,7 @@ async function ensureMounted() {
   let bloom = null;
   if (ADDONS) {
     try {
-      const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+      const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 2 });
       composer = new ADDONS.EffectComposer(renderer, target);
       composer.addPass(new ADDONS.RenderPass(scene, camera));
       bloom = new ADDONS.UnrealBloomPass(new THREE.Vector2(1, 1), 0.8, 0.5, 0.8);
@@ -218,13 +214,15 @@ async function ensureMounted() {
       bloom = null;
     }
   }
-  // Z bloomem każdy piksel liczony jest kilka razy, więc na telefonach trochę mniejsza rozdzielczość
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, composer ? 1.5 : 2);
+  // Z bloomem każdy piksel liczony jest kilka razy, więc mniejsza rozdzielczość
+  // (dalej zmniejsza ją adaptQuality, gdy klatki są za wolne)
+  const pixelRatio = Math.min(window.devicePixelRatio || 1, composer ? 1.25 : 1.5);
   renderer.setPixelRatio(pixelRatio);
   composer?.setPixelRatio(pixelRatio);
 
   r3 = {
     renderer, scene, camera, hemi, sun, canvas, host, composer, bloom,
+    quality: { ratio: pixelRatio, sum: 0, n: 0, skip: 90 },
     raf: null, last: 0, size: { w: 1, h: 1 },
     cam: { yaw: 0.3, pitch: 0.34, dist: 14, focus: 0, focusX: 0, tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 },
     camGoal: { yaw: 0.3, pitch: 0.34, dist: 14 },
@@ -310,8 +308,9 @@ function buildShared() {
     g.fillStyle = grad;
     g.fillRect(0, 0, 128, 128);
   });
-  // Grzbiety książek na dalszych regałach: paski różnej szerokości i wysokości, z ciemnymi etykietami
-  const spinesTex = canvasTexture(512, 128, (g, w, h) => {
+  // Grzbiety książek na regałach: paski różnej szerokości i wysokości, z ciemnymi etykietami.
+  // Trzy warianty losowane per półka, żeby nie było widać powtórzeń.
+  const spinesTex = () => canvasTexture(512, 128, (g, w, h) => {
     g.fillStyle = '#2a1a10';
     g.fillRect(0, 0, w, h);
     let x = 0;
@@ -327,7 +326,7 @@ function buildShared() {
       x += bw;
     }
   });
-  r3.tex = { trail: trailTex, glow: glowTex, spines: spinesTex };
+  r3.tex = { trail: trailTex, glow: glowTex };
 
   r3.mats = {
     floor: keep(new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.45 })),  // lakierowany parkiet
@@ -335,7 +334,6 @@ function buildShared() {
     wood: keep(new THREE.MeshStandardMaterial({ roughness: 0.7 })),
     wall: keep(new THREE.MeshStandardMaterial({ roughness: 0.8 })),
     books: keep(new THREE.MeshStandardMaterial({ roughness: 0.75 })),
-    spines: keep(new THREE.MeshStandardMaterial({ map: spinesTex, roughness: 0.8 })),
     gold: keep(new THREE.MeshStandardMaterial({ color: 0xf0c75e, metalness: 0.75, roughness: 0.28, emissive: 0x6b4a00, emissiveIntensity: 0.35 })),
     goldFlat: keep(new THREE.MeshBasicMaterial({ color: 0xf0c75e, transparent: true, opacity: 0.75 })),
     white: keep(new THREE.MeshBasicMaterial({ color: 0xcfcfcf, transparent: true, opacity: 0.85 })),
@@ -359,6 +357,7 @@ function buildShared() {
     spark: keep(new THREE.PointsMaterial({ map: dustTex, size: 0.3, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
     ring: keep(new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })),
   };
+  r3.spineMats = [0, 1, 2].map(() => keep(new THREE.MeshStandardMaterial({ map: spinesTex(), roughness: 0.8 })));
 
   const trail = new THREE.PlaneGeometry(1, 1);
   trail.rotateX(-Math.PI / 2);
@@ -372,7 +371,7 @@ function buildShared() {
   r3.geo = {
     decal: keep(decal),
     cyl: keep(new THREE.CylinderGeometry(0.5, 0.5, 1, 14)),
-    ball: keep(new THREE.SphereGeometry(0.5, 18, 12)),
+    ball: keep(new THREE.SphereGeometry(0.5, 12, 8)),
     spine: keep(new THREE.CylinderGeometry(0.09, 0.09, 1.42, 12)),
     cover: keep(new THREE.BoxGeometry(0.94, 0.05, 1.42)),
     pages: keep(new THREE.BoxGeometry(0.86, 0.1, 1.3)),
@@ -385,15 +384,9 @@ function buildShared() {
   };
 }
 
+// HUD: data, tabela i jedyny przycisk „Powtórz”, widoczny dopiero po dojechaniu do mety
 function buildHud() {
-  const btn = (name, label) => el('button', { type: 'button', class: 'r3d-btn', 'aria-label': label, title: label }, [icon(name)]);
-  r3.playBtn = btn('play', 'Odtwórz');
-  r3.scrub = el('input', { type: 'range', min: '0', max: '1000', value: '1000', step: '1', class: 'r3d-scrub', 'aria-label': 'Dzień roku' });
-  r3.speedBtn = el('button', { type: 'button', class: 'r3d-btn r3d-btn-text', title: 'Prędkość', text: '1×' });
-  r3.camLabel = el('span', { text: CAM_LABELS[view.mode] });
-  r3.camBtn = el('button', { type: 'button', class: 'r3d-btn r3d-btn-text', title: 'Zmień kamerę' }, [icon('video'), r3.camLabel]);
-  r3.fullBtn = btn('maximize', 'Pełny ekran');
-
+  r3.replayBtn = el('button', { type: 'button', class: 'r3d-replay', hidden: '' }, [icon('rotate-ccw'), el('span', { text: 'Powtórz' })]);
   r3.dateDay = el('strong', { text: '' });
   r3.labels = el('div', { class: 'r3d-labels', 'aria-hidden': 'true' });
   r3.board = el('ol', { class: 'r3d-board', 'aria-label': 'Kolejność' });
@@ -404,94 +397,50 @@ function buildHud() {
     r3.labels,
     el('div', { class: 'r3d-date' }, [r3.dateDay, el('span', { text: String(currentYear()) })]),
     r3.board,
-    el('div', { class: 'r3d-controls' }, [r3.playBtn, r3.scrub, r3.speedBtn, r3.camBtn, r3.fullBtn]),
+    r3.replayBtn,
     r3.status,
   );
   refreshIcons();
-
-  r3.playBtn.addEventListener('click', () => {
-    if (!world) return;
-    if (view.p >= 1) replay();
-    else {
-      view.playing = !view.playing;
-      view.showcase = false;
-    }
-    setPlayIcon();
-  });
-  r3.scrub.addEventListener('input', () => {
-    view.p = Number(r3.scrub.value) / 1000;
-    view.playing = false;
-    view.showcase = false;
-    setPlayIcon();
-  });
-  r3.speedBtn.addEventListener('click', () => {
-    view.speed = SPEEDS[(SPEEDS.indexOf(view.speed) + 1) % SPEEDS.length];
-    r3.speedBtn.textContent = `${view.speed}×`;
-  });
-  r3.camBtn.addEventListener('click', () => setCamMode(CAM_MODES[(CAM_MODES.indexOf(view.mode) + 1) % CAM_MODES.length]));
-  r3.fullBtn.addEventListener('click', toggleFull);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && view.full) toggleFull();
+  r3.replayBtn.addEventListener('click', () => {
+    if (world) replay();
   });
 }
 
-function setPlayIcon() {
-  const playing = view.playing;
-  const name = playing ? 'pause' : view.p >= 1 ? 'rotate-ccw' : 'play';
-  if (r3.playIcon === name) return;
-  r3.playIcon = name;
-  r3.playBtn.replaceChildren(icon(name));
-  r3.playBtn.setAttribute('aria-label', playing ? 'Pauza' : view.p >= 1 ? 'Od nowa' : 'Odtwórz');
-  refreshIcons();
+function setReplayVisible() {
+  r3.replayBtn.hidden = !world || view.playing || view.p < 1;
+}
+
+// Przeciąganie obraca kamerę (kółko i dwa palce zostają dla przewijania i zoomu strony)
+function bindPointer() {
+  let last = null;
+  const { canvas } = r3;
+  canvas.addEventListener('pointerdown', e => {
+    last = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    canvas.setPointerCapture(e.pointerId);
+    view.showcase = false;
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!last || last.id !== e.pointerId) return;
+    const g = r3.camGoal;
+    g.yaw -= (e.clientX - last.x) * 0.006;
+    g.pitch = clamp(g.pitch + (e.clientY - last.y) * 0.005, 0.05, 1.4);
+    last = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
+  const release = () => { last = null; };
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  // Pełny ekran: dwuklik (dwa stuknięcia) włącza i wyłącza, Esc też wyłącza
+  canvas.addEventListener('dblclick', toggleFull);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && view.full) toggleFull();
+  });
 }
 
 function toggleFull() {
   view.full = !view.full;
   r3.host.classList.toggle('r3d-full', view.full);
   document.body.classList.toggle('r3d-lock', view.full);
-  r3.fullBtn.replaceChildren(icon(view.full ? 'minimize' : 'maximize'));
-  r3.fullBtn.setAttribute('aria-label', view.full ? 'Zamknij pełny ekran' : 'Pełny ekran');
-  refreshIcons();
   resize();
-}
-
-// Przeciąganie obraca kamerę, dwa palce / kółko (na pełnym ekranie) przybliżają
-function bindPointer() {
-  const pointers = new Map();
-  const { canvas } = r3;
-  const pinchDist = () => {
-    const [a, b] = [...pointers.values()];
-    return Math.hypot(a.x - b.x, a.y - b.y);
-  };
-  canvas.addEventListener('pointerdown', e => {
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    canvas.setPointerCapture(e.pointerId);
-    view.showcase = false;
-  });
-  canvas.addEventListener('pointermove', e => {
-    const prev = pointers.get(e.pointerId);
-    if (!prev) return;
-    const g = r3.camGoal;
-    if (pointers.size === 1) {
-      g.yaw -= (e.clientX - prev.x) * 0.006;
-      g.pitch = clamp(g.pitch + (e.clientY - prev.y) * 0.005, 0.05, 1.4);
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    } else if (pointers.size === 2) {
-      const before = pinchDist();
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      const after = pinchDist();
-      if (after > 0) g.dist = clamp(g.dist * (before / after), 4, 90);
-    }
-  });
-  const release = e => pointers.delete(e.pointerId);
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('wheel', e => {
-    if (!view.full) return;  // w karcie kółko przewija stronę
-    e.preventDefault();
-    r3.camGoal.dist = clamp(r3.camGoal.dist * Math.exp(e.deltaY * 0.001), 4, 90);
-  }, { passive: false });
-  canvas.addEventListener('dblclick', toggleFull);
 }
 
 function applyTheme() {
@@ -517,6 +466,7 @@ function applyTheme() {
   mats.wood.color.set(t.wood);
   mats.wall.color.set(t.wall);
   mats.books.color.setScalar(t.books);
+  r3.spineMats.forEach(m => m.color.setScalar(t.books));
   mats.lamp.color.set(t.lamp).multiplyScalar(t.lampBoost);
   mats.dust.opacity = t.dust;
   mats.dust.color.set(0xffe3b0).multiplyScalar(dark ? 2 : 1);
@@ -727,6 +677,8 @@ function batcher() {
   };
 }
 
+const pickSpineMat = () => r3.spineMats[Math.floor(Math.random() * r3.spineMats.length)];
+
 const pickSpine = () => {
   const c = new THREE.Color(SPINE_COLORS[Math.floor(Math.random() * SPINE_COLORS.length)]);
   return c.multiplyScalar(rand(0.8, 1.1));
@@ -751,7 +703,8 @@ function buildWalls(b, wallX, zNear, zFar) {
   }
 }
 
-// Główne regały wzdłuż toru, książka po książce (są blisko kamery)
+// Główne regały wzdłuż toru. Książki na półce to jeden blok z teksturą grzbietów
+// (z góry wygląda prawie tak samo jak pojedyncze, a brył jest kilkadziesiąt razy mniej)
 function buildShelves(b, halfW, zNear, zFar) {
   const { geo, mats } = r3;
   const unit = 4;
@@ -769,14 +722,8 @@ function buildShelves(b, halfW, zNear, zFar) {
       b.add(geo.box, mats.wood, [0.06, levels * levelH, unit], [side * (inner + depth), (levels * levelH) / 2, zMid]);
       b.add(geo.box, mats.wood, [depth + 0.2, 0.25, unit], [xMid, levels * levelH + 0.12, zMid]);
       for (let l = 0; l < levels; l++) {
-        let zz = z - 0.08;
-        while (zz > z - unit + 0.35) {
-          const thick = rand(0.12, 0.3);
-          if (Math.random() < 0.04) { zz -= rand(0.3, 0.7); continue; }  // luka na półce
-          const hgt = rand(0.62, 1.0) * levelH * 0.88;
-          b.add(geo.box, mats.books, [depth * rand(0.72, 0.9), hgt, thick * 0.93], [xMid + side * rand(0, 0.06), l * levelH + 0.08 + hgt / 2, zz - thick / 2], { color: pickSpine() });
-          zz -= thick;
-        }
+        const hgt = levelH * rand(0.7, 0.84);
+        b.add(geo.box, pickSpineMat(), [depth * 0.82, hgt, unit - 0.2], [xMid + side * 0.03, l * levelH + 0.08 + hgt / 2, zMid], { rot: [0, Math.random() < 0.5 ? 0 : Math.PI, 0] });
       }
       // Na szczycie regału: globus, roślina albo leżący stos książek (widać je z góry)
       const roll = Math.random();
@@ -818,7 +765,7 @@ function buildStacks(b, halfW, zNear, zFar) {
       for (const end of [x0, x1]) b.add(geo.box, mats.wood, [0.1, h + 0.15, 0.9], [side * end, (h + 0.15) / 2, z]);
       for (let l = 0; l < levels; l++) {
         for (const face of [-1, 1]) {
-          b.add(geo.box, mats.spines, [len - 0.2, levelH * rand(0.68, 0.82), 0.34], [xMid + rand(-0.1, 0.1), l * levelH + 0.07 + levelH * 0.37, z + face * 0.22], { rot: [0, Math.random() < 0.5 ? 0 : Math.PI, 0] });
+          b.add(geo.box, pickSpineMat(), [len - 0.2, levelH * rand(0.68, 0.82), 0.34], [xMid + rand(-0.1, 0.1), l * levelH + 0.07 + levelH * 0.37, z + face * 0.22], { rot: [0, Math.random() < 0.5 ? 0 : Math.PI, 0] });
         }
       }
     }
@@ -854,7 +801,7 @@ function buildTables(b, halfW, zNear, zFar) {
 // Lewitujące świece nad bokami toru i stojące na regałach; płomienie to punkty w HDR (świecą w bloomie)
 function buildCandles(group, halfW, zNear, zFar, shelfTop) {
   const items = [];
-  for (let z = zNear - 4; z > zFar; z -= rand(2.5, 4.5)) {
+  for (let z = zNear - 4; z > zFar; z -= rand(3.5, 6)) {
     for (const side of [-1, 1]) {
       if (Math.random() < 0.35) continue;
       items.push({ x: side * rand(halfW + 0.9, halfW + 3), y: rand(4.2, 7), z: z + rand(-1, 1), h: rand(0.35, 0.65), bob: rand(0.12, 0.3), seed: rand(0, 100) });
@@ -878,7 +825,7 @@ function buildCandles(group, halfW, zNear, zFar, shelfTop) {
 }
 
 function buildDust(group, halfW, zNear, zFar) {
-  const count = 520;
+  const count = 160;
   const pos = new Float32Array(count * 3);
   const vel = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -1080,8 +1027,7 @@ function buildWorld(series, rows, sig) {
   setCamMode(view.mode, true);
   Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
   applyTheme();
-  setPlayIcon();
-  r3.scrub.value = String(Math.round(view.p * 1000));
+  setReplayVisible();
 }
 
 /* ----------------- Odtwarzanie ----------------- */
@@ -1107,7 +1053,7 @@ function replay() {
   r3.rockets = [];
   setCamMode(view.mode, true);
   Object.assign(r3.cam, { tz: null, tx: null, offZ: 0, offX: 0, fit: 1, fitZ: 0 });
-  setPlayIcon();
+  setReplayVisible();
 }
 
 function frame(now) {
@@ -1116,16 +1062,17 @@ function frame(now) {
     return;
   }
   r3.raf = requestAnimationFrame(frame);
-  const dt = Math.min(50, now - r3.last);
+  const rawDt = now - r3.last;
+  const dt = Math.min(50, rawDt);
   r3.last = now;
+  adaptQuality(rawDt);
   if (view.playing) {
     // Ostatnia prosta w zwolnionym tempie, żeby dojazd na metę nie urywał się nagle
     const slow = 1 - 0.7 * smoothstep(0.88, 1, view.p);
-    view.p = Math.min(1, view.p + (dt * view.speed * slow) / PLAY_MS);
-    r3.scrub.value = String(Math.round(view.p * 1000));
+    view.p = Math.min(1, view.p + (dt * slow) / PLAY_MS);
     if (view.p >= 1) {
       view.playing = false;
-      setPlayIcon();
+      setReplayVisible();
       finale();
     }
   }
@@ -1140,6 +1087,34 @@ function frame(now) {
   if (r3.composer) r3.composer.render(dt / 1000);
   else r3.renderer.render(r3.scene, r3.camera);
   updateOverlay();
+}
+
+// Automatyczna jakość: gdy przez ~1,5 s klatki idą wolniej niż ~45 na sekundę, zmniejszamy
+// rozdzielczość, a gdy to nie wystarczy, wyłączamy poświatę. Tylko w dół, żeby obraz nie mrugał.
+// Pierwsze klatki pomijamy (kompilacja shaderów).
+function adaptQuality(rawDt) {
+  const q = r3.quality;
+  if (q.skip > 0) {
+    q.skip--;
+    return;
+  }
+  if (rawDt > 250) return;  // przerwa (karta w tle, przewijanie), nie wolna klatka
+  q.sum += rawDt;
+  q.n++;
+  if (q.sum < 1500) return;
+  const avg = q.sum / q.n;
+  q.sum = 0;
+  q.n = 0;
+  if (avg < 22) return;
+  if (q.ratio > 0.75) {
+    q.ratio = Math.max(0.75, q.ratio - 0.25);
+    r3.renderer.setPixelRatio(q.ratio);
+    r3.composer?.setPixelRatio(q.ratio);
+    resize();
+  } else if (r3.composer) {
+    r3.composer = null;  // bez poświaty; tonację robi wtedy sam renderer
+  }
+  q.skip = 30;
 }
 
 function updateRacers(dt, now) {
@@ -1176,7 +1151,7 @@ function updateRacers(dt, now) {
 
     // Świecący pył za lecącą książką: im szybciej, tym gęściej
     if (view.playing && r.speed > 0.0015) {
-      r.sparkAcc += dt * (0.012 + Math.min(r.speed, 0.04) * 3.5);
+      r.sparkAcc += dt * (0.006 + Math.min(r.speed, 0.04) * 1.8);
       const color = r3.tmpColor.set(r.css).lerp(GOLD, 0.25).multiplyScalar(2.2);
       while (r.sparkAcc >= 1) {
         r.sparkAcc -= 1;
@@ -1220,11 +1195,11 @@ function updateEvents() {
     const r = world.byKey.get(ev.key);
     if (!r) continue;
     r3.tmpV.set(r.root.position.x, r.body.position.y, r.z);
-    emit(r3.tmpV, 26, ['#f6eedb', '#ffffff', r.css], { speed: 2.6, up: 4.5 });
+    emit(r3.tmpV, 14, ['#f6eedb', '#ffffff', r.css], { speed: 2.6, up: 4.5 });
     // Skończona książka: fala światła po dywanie i złote iskry
     ring(r.root.position.x, r.z, r.css);
     const gold = r3.tmpColor.copy(GOLD).multiplyScalar(3);
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 20; i++) {
       const a = rand(0, Math.PI * 2);
       const v = rand(1.5, 4);
       spark(r.root.position.x, r.body.position.y, r.z, Math.cos(a) * v, rand(1, 4), Math.sin(a) * v, gold, rand(0.6, 1.2), -5);
@@ -1234,14 +1209,14 @@ function updateEvents() {
 
 function finale() {
   const colors = [...world.racers.map(r => r.css), '#f0c75e', '#ffffff'];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     r3.tmpV.set(rand(-world.halfW, world.halfW), 6.2, -TRACK_LEN + rand(-0.5, 0.5));
-    emit(r3.tmpV, 55, colors, { speed: 4, up: 3, spread: 2 });
+    emit(r3.tmpV, 40, colors, { speed: 4, up: 3, spread: 2 });
   }
   // Fajerwerki znad mety, w kolorach wszystkich zawodników
   if (!reduced()) {
     const fwColors = [...world.racers.map(r => r.css), '#f0c75e'];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 5; i++) {
       r3.rockets.push({
         x: rand(-world.halfW - 1, world.halfW + 1), y: 0.5, z: -TRACK_LEN + rand(0, 10),
         vy: rand(6.5, 8), delay: i * 0.35 + rand(0, 0.2), fuse: rand(0.65, 0.8),
@@ -1260,15 +1235,13 @@ function finale() {
 // Ujęcia: kąt wokół celu (0 = zza pleców), wysokość i odległość (× bazowa)
 const SHOTS = {
   top: { yaw: 0, pitch: 1.05, dist: 1.15 },
-  chase: { yaw: 0.3, pitch: 0.34, dist: 0.85 },
-  side: { yaw: 1.05, pitch: 0.22, dist: 0.95 },
 };
 // Dalej za liderem: poza kadrem, bo kamera musiałaby odjechać tak daleko, że książek nie widać.
 // Pierwsza dwójka jest w kadrze zawsze, niezależnie od odstępu.
 const PACK_MAX_GAP = TRACK_LEN * 0.22;
 // Obszar kadru (współrzędne ekranu −1..1), w którym mają się mieścić książki z etykietami:
-// między datą/tabelą u góry a paskiem sterowania na dole
-const FRAME = { top: 0.5, bottom: -0.62, side: 0.82 };
+// pod datą i tabelą, z małym marginesem na dole
+const FRAME = { top: 0.5, bottom: -0.8, side: 0.82 };
 
 function setCamMode(mode, snap = false) {
   view.mode = mode;
@@ -1280,7 +1253,6 @@ function setCamMode(mode, snap = false) {
   g.pitch = s.pitch;
   g.dist = s.dist * (world ? world.baseDist : 14);
   if (snap) Object.assign(cam, { yaw: g.yaw, pitch: g.pitch, dist: g.dist });
-  r3.camLabel.textContent = CAM_LABELS[mode];
 }
 
 // Kogo kamera trzyma w kadrze: zawsze dwie pierwsze osoby na torze, a kolejne, jeśli nie są
@@ -1573,10 +1545,10 @@ function updateRockets(dt) {
     rk.vy -= 4 * s;
     rk.y += rk.vy * s;
     rk.fuse -= s;
-    spark(rk.x + rand(-0.05, 0.05), rk.y, rk.z, rand(-0.3, 0.3), -1, rand(-0.3, 0.3), trail, rand(0.3, 0.5), -3);
+    if (Math.random() < 0.5) spark(rk.x + rand(-0.05, 0.05), rk.y, rk.z, rand(-0.3, 0.3), -1, rand(-0.3, 0.3), trail, rand(0.3, 0.5), -3);
     if (rk.fuse > 0) return true;
     const color = rk.color.clone().multiplyScalar(4);
-    for (let i = 0; i < 160; i++) {
+    for (let i = 0; i < 100; i++) {
       // Równomiernie po sferze
       const u = rand(-1, 1);
       const a = rand(0, Math.PI * 2);
