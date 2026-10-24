@@ -14,8 +14,11 @@ const TOWER_H = 10;      // wysokość najwyższej wieży (jednostki sceny)
 const BOOK_L = 2.4;      // długość książki (wzdłuż grzbietu, oś x)
 const BOOK_W = 1.7;      // szerokość okładki (oś z)
 const GAP = 3.6;         // odstęp między wieżami
-const DROP_MS = 650;
-const DROP_FROM = 7;     // z jakiej wysokości nad stosem spada książka
+const FALL_S = 0.7;      // czas spadania (z przyspieszeniem, jak przy grawitacji)
+const SETTLE_S = 0.45;   // klapnięcie na płasko po dotknięciu stosu
+const DROP_FROM = 4.5;   // z jakiej wysokości nad stosem spada książka
+const DUST = 220;        // pula drobinek kurzu przy lądowaniu
+const COVER_UPRIGHT = -Math.PI / 2;  // obrót w płaszczyźnie, przy którym okładka w locie stoi tytułem do góry
 const OUT = 1.1;         // o ile wysuwa się stuknięta książka
 const PITCH = 0.32;
 const YAW = 0.3;
@@ -32,13 +35,7 @@ const smoothstep = (a, b, x) => {
   const t = clamp((x - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
-// Odbicie przy lądowaniu (klasyczne easeOutBounce, tylko łagodniejsze ostatnie podskoki)
-const bounce = x => {
-  if (x < 1 / 2.75) return 7.5625 * x * x;
-  if (x < 2 / 2.75) return 7.5625 * (x -= 1.5 / 2.75) * x + 0.75;
-  if (x < 2.5 / 2.75) return 7.5625 * (x -= 2.25 / 2.75) * x + 0.9375;
-  return 7.5625 * (x -= 2.625 / 2.75) * x + 0.984375;
-};
+const rand = (min, max) => min + Math.random() * (max - min);
 const firstName = name => (name || '?').split(' ')[0];
 const pl = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
 
@@ -194,6 +191,7 @@ async function ensureMounted() {
   };
   buildShared();
   buildHud();
+  buildDust();
   applyTheme();
 
   new ResizeObserver(() => { resize(); kick(); }).observe(host);
@@ -567,14 +565,15 @@ function buildWorld(readers, rows, sig) {
         const mesh = new THREE.Mesh(t3.box, [t3.mats.pages, t3.mats.pages, coverMat, t3.mats.bottom, spineMat, t3.mats.pages]);
         const jitter = 0.94 + Math.random() * 0.1;
         mesh.scale.set(BOOK_L * jitter, th, BOOK_W * (0.94 + Math.random() * 0.1));
-        mesh.rotation.y = (Math.random() - 0.5) * 0.14;
+        const ry = (Math.random() - 0.5) * 0.14;  // stos nie jest idealnie równy
+        mesh.rotation.y = ry;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         const book = {
           row, tower: tw, pts, th, mesh, spineMat, coverMat,
           t: new Date(row.created_at).getTime(),
           y: base + th / 2, x: tw.x + (Math.random() - 0.5) * 0.18, z: (Math.random() - 0.5) * 0.15,
-          drop: null, out: 0,
+          ry, drop: null, out: 0,
         };
         coverTexture(row, tex => {
           if (book.coverMat.map) book.coverMat.map.dispose();
@@ -619,7 +618,9 @@ function placeAll(t) {
     b.drop = null;
     b.mesh.visible = b.t <= t;
     b.mesh.position.set(b.x, b.y, b.z);
+    b.mesh.rotation.set(0, b.ry, 0);
   });
+  world.towers.forEach(tw => { tw.squash = null; });
   updateTowers();
 }
 
@@ -629,10 +630,139 @@ function updateTowers() {
     tw.pts = 0;
   });
   world.books.forEach(b => {
-    if (!b.mesh.visible || b.drop) return;
+    if (!b.mesh.visible || (b.drop && !b.drop.landed)) return;  // w locie jeszcze się nie liczy
     b.tower.height = Math.max(b.tower.height, b.y + b.th / 2);
     b.tower.pts += b.pts;
   });
+}
+
+/* ----------------- Spadanie i lądowanie ----------------- */
+// Lot: okładką do kamery (obrót o 90° wokół osi x), tuż przed stosem przekręca się na płasko,
+// ale ląduje lekko przechylona i dotyka stosu jednym brzegiem
+function startDrop(b, now) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  // Początek: okładka do kamery, stoi pionowo tytułem do góry. Koniec lotu: prawie płasko,
+  // lekko przechylona. Obrót między nimi po najkrótszej drodze (slerp), bez skręcania się.
+  const rx1 = side * rand(0.08, 0.16);
+  const rz1 = rand(-0.07, 0.07);
+  const start = new THREE.Euler(Math.PI / 2 - rand(0.05, 0.2), b.ry + COVER_UPRIGHT + rand(-0.12, 0.12), rand(-0.1, 0.1));
+  b.drop = {
+    start: now, landed: false, rx1, rz1,
+    q0: new THREE.Quaternion().setFromEuler(start),
+    q1: new THREE.Quaternion().setFromEuler(new THREE.Euler(rx1, b.ry, rz1)),
+  };
+}
+
+// O ile podnieść środek przechylonej książki, żeby niższy brzeg leżał na stosie
+const edgeLift = (rx, rz) => (BOOK_W / 2) * Math.abs(Math.sin(rx)) + (BOOK_L / 2) * Math.abs(Math.sin(rz));
+
+// Zwraca wysokość książki w tej klatce i ustawia jej obrót
+function dropStep(b, now) {
+  const d = b.drop;
+  const t = (now - d.start) / 1000;
+  let rx;
+  let rz;
+  let y;
+  if (t < FALL_S) {
+    const k = t / FALL_S;
+    const turn = smoothstep(0.45, 1, k);  // najpierw widać okładkę, obrót na płasko pod koniec lotu
+    b.mesh.quaternion.slerpQuaternions(d.q0, d.q1, turn);
+    // Pod koniec lotu przechył jest już mały; do podniesienia brzegu wystarczy przybliżenie
+    y = b.y + DROP_FROM * (1 - k * k) + edgeLift(d.rx1, d.rz1) + (BOOK_L / 2) * (1 - turn);  // droga ~ t²
+    return y;
+  } else {
+    if (!d.landed) {
+      d.landed = true;
+      land(b);
+    }
+    // Klapnięcie: przechył szybko gaśnie, z jednym małym wychyleniem w drugą stronę
+    const s = t - FALL_S;
+    const swing = Math.exp(-s / 0.075) * Math.cos(s * 26);
+    rx = d.rx1 * swing;
+    rz = d.rz1 * swing;
+    y = b.y + edgeLift(rx, rz);
+    if (s >= SETTLE_S) {
+      rx = 0;
+      rz = 0;
+      y = b.y;
+      b.drop = null;
+    }
+  }
+  b.mesh.rotation.set(rx, b.ry, rz);
+  return y;
+}
+
+// Uderzenie: stos się ugina (grubsza książka = mocniej), spod okładki wylatuje kurz
+function land(b) {
+  b.tower.squash = { start: performance.now(), amp: 0.04 + Math.min(0.08, b.th * 0.12) };
+  if (reduced()) return;
+  const D = t3.dust;
+  const n = 10 + Math.round(Math.min(10, b.th * 12));
+  for (let i = 0; i < n; i++) {
+    const j = D.next;
+    D.next = (D.next + 1) % DUST;
+    // Start na obwodzie książki, lot na zewnątrz i lekko w górę
+    const a = rand(0, Math.PI * 2);
+    const ex = Math.cos(a) * (BOOK_L / 2);
+    const ez = Math.sin(a) * (BOOK_W / 2);
+    D.pos.set([b.x + ex, b.y - b.th / 2 + 0.02, b.z + ez], j * 3);
+    D.vel.set([Math.cos(a) * rand(0.6, 1.6), rand(0.15, 0.6), Math.sin(a) * rand(0.6, 1.6)], j * 3);
+    D.life[j] = D.max[j] = rand(0.45, 0.8);
+  }
+  D.active = true;
+}
+
+function buildDust() {
+  const pos = new Float32Array(DUST * 3).fill(-1000);
+  const col = new Float32Array(DUST * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const tex = canvasTexture(32, 32, g => {
+    const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 32, 32);
+  });
+  const mat = new THREE.PointsMaterial({ map: tex, size: 0.35, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+  t3.scene.add(points);
+  t3.dust = { geo, pos, col, vel: new Float32Array(DUST * 3), life: new Float32Array(DUST), max: new Float32Array(DUST), next: 0, active: false };
+}
+
+// Kurz: rozlatuje się, zwalnia (opór powietrza), lekko opada i gaśnie. Zwraca true, póki coś leci.
+function updateDust(dt) {
+  const D = t3.dust;
+  if (!D.active) return false;
+  const s = dt / 1000;
+  const drag = Math.exp(-4 * s);
+  let alive = false;
+  for (let i = 0; i < DUST; i++) {
+    if (D.life[i] <= 0) continue;
+    const j = i * 3;
+    D.life[i] -= s;
+    if (D.life[i] <= 0) {
+      D.col[j] = D.col[j + 1] = D.col[j + 2] = 0;
+      D.pos[j + 1] = -1000;
+      continue;
+    }
+    alive = true;
+    D.vel[j + 1] -= 0.6 * s;
+    for (let a = 0; a < 3; a++) {
+      D.vel[j + a] *= drag;
+      D.pos[j + a] += D.vel[j + a] * s;
+    }
+    const f = (D.life[i] / D.max[i]) * 0.55;
+    D.col[j] = 0.95 * f;
+    D.col[j + 1] = 0.85 * f;
+    D.col[j + 2] = 0.7 * f;
+  }
+  D.geo.attributes.position.needsUpdate = true;
+  D.geo.attributes.color.needsUpdate = true;
+  D.active = alive;
+  return alive;
 }
 
 /* ----------------- Odtwarzanie ----------------- */
@@ -664,18 +794,34 @@ function frame(now) {
     }
   }
 
+  // Ugięcie stosu po uderzeniu książki: krótka, mocno wytłumiona sprężyna
+  for (const tw of world.towers) {
+    tw.dip = 0;
+    if (!tw.squash) continue;
+    const s = (now - tw.squash.start) / 1000;
+    if (s > 0.5) {
+      tw.squash = null;
+      continue;
+    }
+    tw.dip = tw.squash.amp * Math.exp(-s / 0.07) * Math.cos(s * 32);
+    busy = true;
+  }
+
   // Książki, których dzień właśnie minął, zaczynają spadać na swój stos
   for (const b of world.books) {
     if (!b.mesh.visible && b.t <= world.t) {
       b.mesh.visible = true;
-      b.drop = { start: now };
+      startDrop(b, now);
     }
+    let y = b.y;
     if (b.drop) {
-      const k = Math.min(1, (now - b.drop.start) / DROP_MS);
-      b.mesh.position.y = b.y + DROP_FROM * (1 - bounce(k));
-      if (k >= 1) b.drop = null;
+      y = dropStep(b, now);
       busy = true;
+    } else if (b.tower.dip && b.mesh.visible) {
+      // Niższe książki uginają się mniej niż górne
+      y -= b.tower.dip * ((b.y + b.th / 2) / Math.max(0.1, b.tower.height));
     }
+    b.mesh.position.y = y;
     // Wybrana książka wysuwa się ze stosu w stronę kamery
     const outGoal = t3.selected === b ? OUT : 0;
     if (Math.abs(b.out - outGoal) > 0.002) {
@@ -684,6 +830,7 @@ function frame(now) {
     }
     b.mesh.position.z = b.z + b.out;
   }
+  if (updateDust(dt)) busy = true;
   updateTowers();
 
   // Korona na najwyższej wieży
@@ -707,7 +854,8 @@ function frame(now) {
 // Kamera obejmuje wszystkie wieże i rośnie razem z najwyższą; zwraca true, póki jeszcze jedzie
 function updateCamera(dt) {
   const { cam, goal, camera } = t3;
-  const tallest = Math.max(2.5, ...world.towers.map(tw => tw.height));
+  // Minimum, żeby na początku roku było widać książkę spadającą z góry
+  const tallest = Math.max(4.5, ...world.towers.map(tw => tw.height));
   const vfov = (camera.fov * Math.PI) / 180;
   const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
   const halfW = world.width / 2 + 1.6;
