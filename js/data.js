@@ -71,7 +71,7 @@ export async function loadReads() {
   const [readsResult, nowResult, queueResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, unfinished, rating, created_at, started_at, author, published_year, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
+      .select('id, user_id, title, pages, multiplier, unfinished, rating, created_at, started_at, author, published_year, cover_url, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
       .gte('created_at', new Date(year, 0, 1).toISOString())
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),

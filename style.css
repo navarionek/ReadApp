@@ -1204,6 +1204,70 @@ body.r3d-lock {
   background: var(--c);
 }
 
+/* Wieże z książek: imię i punkty pod każdą wieżą, szczegóły stukniętej książki */
+.t3d-name {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.15rem 0.6rem 0.2rem;
+  border-radius: var(--radius-sm);
+  border-bottom: 3px solid var(--c);
+  background: var(--r3d-glass);
+  font-size: 0.75rem;
+  line-height: 1.25;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.t3d-name span {
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.t3d-pop {
+  position: absolute;
+  top: 0.625rem;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: max-content;
+  max-width: min(18rem, calc(100% - 9rem));
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--c, #f0c75e);
+  background: var(--r3d-glass);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: r3d-replay-in 0.25s ease-out;
+}
+
+.t3d-pop-title {
+  font-size: 0.875rem;
+  color: #fff;
+}
+
+.t3d-pop-date {
+  color: #94a3b8;
+}
+
+/* Przy wieżach dół zajmują etykiety z imionami, więc „Powtórz” idzie w prawy górny róg */
+.towers3d .r3d-replay {
+  top: 0.625rem;
+  right: 0.625rem;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  animation: none;
+}
+
 /* Jedyny przycisk: „Powtórz”, pokazywany po dojechaniu do mety */
 .r3d-replay {
   position: absolute;
