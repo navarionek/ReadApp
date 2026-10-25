@@ -53,7 +53,11 @@ export function buildCoverWall(books, { width, height, tile, gap, speed, tileEl 
 // (pilnuje tego CSS), poza nim display: none, więc animacja nic nie kosztuje.
 // Eksperyment: można go wyłączyć w ustawieniach (zapamiętane na tym urządzeniu).
 const STORAGE_KEY = 'coverBg';
+const CACHE_KEY = 'coverBgBooks';  // okładki z ostatniego razu: intro rusza, zanim dojdą dane
 let startSig = null;
+let intro = null;                  // trwa intro; przebudowę ściany odkładamy na jego koniec
+let introPlayed = false;           // tylko raz po włączeniu apki
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 export function startWallEnabled() {
   try {
@@ -85,10 +89,25 @@ export function renderStartWall() {
     startSig = null;
     return;
   }
+  if (intro) {
+    intro.pending = true;
+    return;
+  }
+  // Bez danych zostaje to, co jest (np. ściana z pamięci po intro), zamiast pustego tła
+  if (!state.hasData) return;
   const all = [...state.statsRows, ...state.readingNow].map(r => ({ title: r.title, author: r.author, cover_url: r.cover_url }));
   // Same kolorowe zaślepki z tytułami robią w tle bałagan: jeśli okładek jest dość, tylko one
   const withCovers = all.filter(b => b.cover_url);
   const books = withCovers.length >= 6 ? withCovers : all;
+  if (books.length) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(books.slice(-150)));
+    } catch {}
+  }
+  mountStartWall(books);
+}
+
+function mountStartWall(books) {
   const width = window.innerWidth;
   const height = window.innerHeight;
   // Wysokość zmienia się na telefonie przy chowaniu paska adresu; ściana ma zapas, więc liczy się szerokość
@@ -114,6 +133,57 @@ export function renderStartWall() {
     speed: [tile * 0.08, tile * 0.16],
     tileEl: b => el('div', { class: 'tv-wall-tile' }, [wallCover(b)]),
   }));
+}
+
+/* ----- Intro po włączeniu apki ----- */
+// Ściana na pierwszym planie (karty schowane, bez przygaszenia), kolumny się rozpędzają,
+// a na szczycie prędkości karty wjeżdżają, ściana się oddala, gaśnie i zwalnia do zwykłego
+// tempa tła. Okładki są z pamięci (z ostatniego razu), więc nie czekamy na dane.
+const INTRO_UP = 1500;    // rozpędzanie
+const INTRO_DOWN = 1400;  // hamowanie, w tym czasie wjeżdżają karty
+const INTRO_PEAK = 14;    // ile razy szybciej niż zwykle na szczycie
+
+export function playStartIntro() {
+  if (introPlayed || !startWallEnabled() || calm.matches) return;
+  introPlayed = true;
+  let cached = [];
+  try {
+    cached = JSON.parse(localStorage.getItem(CACHE_KEY)) || [];
+  } catch {}
+  if (!cached.length) return;  // pierwsze uruchomienie: jeszcze nie znamy okładek
+  mountStartWall(cached);
+  const bg = document.getElementById('cover-bg');
+  if (!bg) return;
+  intro = { pending: false };
+  const body = document.body;
+  body.classList.add('wall-intro');
+  // Animacje CSS powstają dopiero, gdy ściana jest widoczna (Start pokazuje się chwilę po
+  // zalogowaniu), więc zbieramy je w pierwszej klatce, w której już są
+  let anims = [];
+  let t0 = null;
+  let revealed = false;
+  const step = now => {
+    if (!anims.length) anims = [...bg.querySelectorAll('.tv-wall-strip')].flatMap(strip => strip.getAnimations());
+    t0 ??= now;
+    const t = now - t0;
+    const k = t < INTRO_UP ? (t / INTRO_UP) ** 2 : (1 - Math.min(1, (t - INTRO_UP) / INTRO_DOWN)) ** 2;
+    // playbackRate zmienia tempo bez przeskoku: animacja CSS jedzie dalej z tego samego miejsca
+    anims.forEach(a => { a.playbackRate = 1 + (INTRO_PEAK - 1) * k; });
+    if (t >= INTRO_UP && !revealed) {
+      revealed = true;
+      body.classList.replace('wall-intro', 'wall-intro-reveal');
+    }
+    if (t < INTRO_UP + INTRO_DOWN) {
+      requestAnimationFrame(step);
+      return;
+    }
+    anims.forEach(a => { a.playbackRate = 1; });
+    body.classList.remove('wall-intro-reveal');
+    const { pending } = intro;
+    intro = null;
+    if (pending) renderStartWall();
+  };
+  requestAnimationFrame(step);
 }
 
 let resizeTimer = null;

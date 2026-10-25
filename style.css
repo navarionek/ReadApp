@@ -4202,3 +4202,48 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   height: auto;
   border-radius: 0;
 }
+
+/* Intro po włączeniu apki (js/coverwall.js): ściana na pierwszym planie, potem odjeżdża w tło */
+.cover-bg .tv-wall {
+  transition: transform 1.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.cover-bg::after {
+  transition: opacity 1.3s ease;
+}
+
+.wall-intro .cover-bg .tv-wall {
+  transform: rotate(-7deg) scale(1.35);
+}
+
+.wall-intro .cover-bg::after {
+  opacity: 0;
+}
+
+.wall-intro main.container {
+  opacity: 0;
+}
+
+.wall-intro-reveal main.container {
+  animation: intro-fade-in 0.5s ease both;
+}
+
+.wall-intro-reveal .screen[data-screen="start"] > * {
+  animation: intro-card-in 0.75s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.wall-intro-reveal .screen[data-screen="start"] > :nth-child(2) { animation-delay: 0.08s; }
+.wall-intro-reveal .screen[data-screen="start"] > :nth-child(3) { animation-delay: 0.16s; }
+.wall-intro-reveal .screen[data-screen="start"] > :nth-child(4) { animation-delay: 0.24s; }
+.wall-intro-reveal .screen[data-screen="start"] > :nth-child(5) { animation-delay: 0.32s; }
+.wall-intro-reveal .screen[data-screen="start"] > :nth-child(n+6) { animation-delay: 0.4s; }
+
+@keyframes intro-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes intro-card-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}

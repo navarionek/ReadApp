@@ -1,6 +1,6 @@
 import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs, viewerId } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
-import { syncStartWallToggle, toggleStartWall } from './coverwall.js';
+import { playStartIntro, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
 import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
@@ -121,6 +121,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const user = session?.user || null;
     // Odświeżenie tokenu co godzinę też tu trafia, dane przeładowujemy tylko przy zmianie usera
     const userChanged = (user?.id || null) !== (state.currentUser?.id || null);
+    // Po włączeniu apki na Starcie: intro ze ścianą okładek (karty chowa, zanim się pokażą)
+    if (user && userChanged && currentScreen() === 'start') playStartIntro();
     updateUI(user);
     // setTimeout: nie wołamy Supabase wewnątrz callbacka auth (zalecenie supabase-js, unika deadlocka)
     if (user && userChanged) {
