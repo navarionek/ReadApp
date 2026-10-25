@@ -4031,11 +4031,75 @@ input[type="date"].plain-input {
     linear-gradient(transparent 70%, rgb(5 6 12 / 0.55));
 }
 
-/* Wygaszacz Tron rysuje się na canvasie na cały panel */
+/* Wygaszacz „lot przez rok”: dwa canvasy (smugi + napisy) i DOM-owe data z rankingiem */
+.tron {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  font-family: "Orbitron", "Segoe UI", system-ui, sans-serif;
+  color: #eaf6ff;
+}
+
 .tron-canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.tron-hud {
+  position: absolute;
+  left: 5vh;
+  top: 5vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+}
+
+.tron-brand {
+  font-size: 1.8vh;
+  font-weight: 600;
+  letter-spacing: 0.6em;
+  opacity: 0.5;
+}
+
+.tron-date {
+  font-size: 6vh;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 2.4vh rgb(140 210 255 / 0.55);
+}
+
+.tron-rank {
+  position: absolute;
+  right: 5vh;
+  top: 5vh;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 2.5vh;
+}
+
+.tron-rank li {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.4em;
+  line-height: 1.7;
+}
+
+.tron-rank b {
+  color: var(--c);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-shadow: 0 0 1.4vh var(--c);
+}
+
+.tron-rank span {
+  min-width: 3.4em;
+  text-align: right;
+  color: rgb(255 255 255 / 0.75);
+  font-variant-numeric: tabular-nums;
 }
 
 .tv-panel-tron {

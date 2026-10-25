@@ -1,99 +1,191 @@
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { compactNumber, formatDay, seriesColors } from './stats.js';
-import { currentYear, DAY_MS } from './ui.js';
+import { currentYear, DAY_MS, el } from './ui.js';
 
-/* ----------------- Wygaszacz TV: wyścig w stylu Tron ----------------- */
-// Każda osoba to świetlny motocykl ciągnący neonową smugę. Czas płynie w prawo, a skończona
-// książka to ostry skręt w górę o tyle, ile była warta punktów: smugi to po prostu wykres
-// punktów narastająco, tylko z zakrętami pod kątem prostym jak w filmie. Na końcu kamera
-// odjeżdża i pokazuje cały rok. Sam Canvas 2D (bez WebGL), bo telewizor nie uciągnie 3D.
+/* ----------------- Wygaszacz TV: lot przez rok ----------------- */
+// Abstrakcyjny lot bez końca przez tunel czasu. Kamera pędzi w głąb, a głębia to kalendarz:
+// to, co daleko, dopiero nadejdzie. Każda osoba to świetlna wstęga na spirali (im więcej
+// ostatnio czyta, tym grubiej świeci), a jej czoło wysuwa się tym dalej, im więcej ma punktów.
+// Skończona książka to okładka w neonowej ramce nawleczona na wstęgę: zapala się, gdy czas
+// do niej dojdzie, i przelatuje obok kamery. Po „dziś” skok z powrotem do stycznia i w kółko.
+// Smugi za wszystkim daje wygaszanie poprzedniej klatki zamiast czyszczenia.
+// Sam Canvas 2D (bez WebGL), bo telewizor nie uciągnie 3D.
 
-const PLAY_MS = 40000;      // od 1 stycznia do dziś
-const ZOOM_MS = 4000;       // odjazd kamery na cały rok
-const WINDOW_DAYS = 70;     // ile dni widać w trakcie jazdy
-const HEAD_X = 0.7;         // gdzie na ekranie jadą motocykle (ułamek szerokości)
-const HORIZON = 0.8;        // linia horyzontu (ułamek wysokości); poniżej podłoga z siatką
-const TOP = 0.2;            // najwyższy punkt wykresu (pod napisami)
+const DAY = 1.6;          // jednostek głębi na dzień
+const NEAR = 0.35;        // bliżej kamery nic nie rysujemy
+const FAR = 75;           // jak daleko widać
+const NOW_Z = 10;         // płaszczyzna „teraz” przed kamerą: tu okładki się zapalają
+const RIBBON_R = 1.25;    // promień spirali wstęg (okładki siedzą na niej)
+const RING_R = 2.7;       // pierścienie miesięcy
+const TWIST = 0.075;      // skręt spirali na jednostkę głębi
+const SPEED = 4.2;        // dni na sekundę (średnio, tempo faluje)
+const TAIL_DAYS = 8;      // po „dziś” jeszcze chwila lotu przed skokiem do stycznia
+const HEAT_DAYS = 20;     // jak długo wstęga świeci po skończonej książce
+const STARS = 150;
 const FONT = '"Orbitron", "Segoe UI", system-ui, sans-serif';
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const ease = (dt, ms) => 1 - Math.exp(-dt / ms);
-const easeInOut = x => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
 const rand = (a, b) => a + Math.random() * (b - a);
 const firstName = name => (name || '?').split(' ')[0];
+const short = (s, n) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+// Oś tunelu wije się w obu kierunkach (dwie sinusoidy, żeby nie było widać powtórzeń)
+const pathX = z => 2.6 * Math.sin(z * 0.031) + 1.2 * Math.sin(z * 0.083 + 1.3);
+const pathY = z => 1.8 * Math.cos(z * 0.027 + 0.7) + 0.9 * Math.sin(z * 0.067);
 
 // Kolor osoby jako neon: ten sam odcień, pełne nasycenie, jasny
 function neon(color) {
   const match = /^var\((--[\w-]+)\)$/.exec(color || '');
   const hex = (match ? getComputedStyle(document.documentElement).getPropertyValue(match[1]).trim() : color) || '#33e0ff';
   const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-  if (!m) return { h: 190, css: a => `hsla(190, 100%, 60%, ${a})` };
-  const [r, g, b] = [m[1], m[2], m[3]].map(x => parseInt(x, 16) / 255);
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  if (max !== min) {
-    const d = max - min;
-    h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-    h = Math.round(h * 60);
-    if (h < 0) h += 360;
+  let h = 190;
+  if (m) {
+    const [r, g, b] = [m[1], m[2], m[3]].map(x => parseInt(x, 16) / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    h = 0;
+    if (max !== min) {
+      const d = max - min;
+      h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = Math.round(h * 60);
+      if (h < 0) h += 360;
+    }
   }
-  return { h, css: a => `hsla(${h}, 100%, 62%, ${a})` };
+  return { h, css: a => `hsla(${h}, 100%, 62%, ${a})`, solid: `hsl(${h} 100% 62%)` };
+}
+
+const covers = new Map();
+function coverImage(url) {
+  if (!url) return null;
+  if (!covers.has(url)) {
+    const img = new Image();
+    img.referrerPolicy = 'no-referrer';
+    img.decoding = 'async';
+    img.src = url;
+    covers.set(url, img);
+  }
+  return covers.get(url);
 }
 
 export function createTron(container) {
-  const canvas = document.createElement('canvas');
-  canvas.className = 'tron-canvas';
-  container.replaceChildren(canvas);
-  const ctx = canvas.getContext('2d');
+  const fx = document.createElement('canvas');
+  const hud = document.createElement('canvas');
+  fx.className = 'tron-canvas';
+  hud.className = 'tron-canvas';
+  const date = el('strong', { class: 'tron-date' });
+  const rank = el('ol', { class: 'tron-rank' });
+  container.replaceChildren(el('div', { class: 'tron' }, [
+    fx, hud,
+    el('div', { class: 'tron-hud' }, [el('span', { class: 'tron-brand', text: 'CZYTANKO' }), date]),
+    rank,
+  ]));
+  const ctx = fx.getContext('2d');
+  const tx = hud.getContext('2d');
 
   let W = 1;
   let H = 1;
   let scale = 1;            // rozdzielczość rysowania; spada, gdy telewizor nie wyrabia
   let raf = null;
-  let startAt = 0;
   let last = 0;
   let perf = { sum: 0, n: 0, skip: 30 };
   let racers = [];
+  let events = [];
+  let loopDays = 30;        // długość jednego przelotu przez rok (do dziś + ogon)
+  let todayDay = 0;
   let t0 = 0;
-  let t1 = 1;
-  let vMax = 150;
-  let floorPhase = 0;
+  let heatNorm = 1;
+  let travel = -4;          // ile dni przelecieliśmy od początku (rośnie bez końca)
+  let time = 0;
+  let kick = 0;             // chwilowe przyspieszenie (przelot okładki, skok do stycznia)
+  let flash = 0;
+  let flashColor = null;
   let sparks = [];
-  let texts = [];
+  let dateText = '';
+  let rankSig = '';
+  const stars = { x: new Float32Array(STARS), y: new Float32Array(STARS), z: new Float32Array(STARS), c: new Uint8Array(STARS) };
+
+  // Kamera (liczone raz na klatkę)
+  let camZ = 0;
+  let camX = 0;
+  let camY = 0;
+  let camDX = 0;
+  let camDY = 0;
+  let focal = 1;
+  let cosR = 1;
+  let sinR = 0;
+  let px = 0;
+  let py = 0;
+  let ps = 0;
 
   function resize() {
     W = Math.max(1, container.clientWidth);
     H = Math.max(1, container.clientHeight);
-    canvas.width = Math.round(W * scale);
-    canvas.height = Math.round(H * scale);
+    [fx, hud].forEach(c => {
+      c.width = Math.round(W * scale);
+      c.height = Math.round(H * scale);
+    });
+    ctx.fillStyle = '#02030a';
+    ctx.fillRect(0, 0, fx.width, fx.height);
   }
 
   function setData(readers, rows) {
     const colors = seriesColors(readers);
     t0 = new Date(currentYear(), 0, 1).getTime();
-    t1 = Math.max(Date.now(), t0 + DAY_MS);
-    racers = [...readers]
-      .sort((a, b) => a.name.localeCompare(b.name, 'pl'))
-      .map(r => {
-        const events = rows
-          .filter(row => row.user_id === r.key)
-          .map(row => ({ t: new Date(row.created_at).getTime(), pts: bookPoints(row), title: row.title || 'bez tytułu' }))
-          .sort((a, b) => a.t - b.t);
-        return { key: r.key, name: firstName(r.name).toUpperCase(), color: neon(colors.get(r.key)), events, total: events.reduce((s, e) => s + e.pts, 0), shown: 0, seen: 0, rank: 0 };
-      });
+    todayDay = Math.max(0, (Date.now() - t0) / DAY_MS);
+    loopDays = Math.floor(todayDay) + 1 + TAIL_DAYS;
+    const sorted = [...readers].sort((a, b) => a.name.localeCompare(b.name, 'pl'));
+    racers = sorted.map((r, i) => ({
+      key: r.key,
+      name: firstName(r.name).toUpperCase(),
+      color: neon(colors.get(r.key)),
+      phase: (i / Math.max(1, sorted.length)) * Math.PI * 2,
+      events: [],
+      cum: 0,
+      lead: 0,
+    }));
+    const byKey = new Map(racers.map(r => [r.key, r]));
+    events = rows
+      .map(row => ({ row, r: byKey.get(row.user_id), d: (new Date(row.created_at).getTime() - t0) / DAY_MS }))
+      .filter(e => e.r && e.d >= 0 && e.d < loopDays)
+      .map(({ row, r, d }) => {
+        const pts = bookPoints(row);
+        return { r, d, pts, title: (row.title || 'bez tytułu').toUpperCase(), img: coverImage(row.cover_url), size: 0.8 + 0.5 * Math.min(1, pts / 600), tilt: rand(-0.12, 0.12) };
+      })
+      .sort((a, b) => a.d - b.d);
+    events.forEach(e => e.r.events.push(e));
+    // Najjaśniejszy moment wstęgi w roku = pełna grubość
+    heatNorm = 1;
+    racers.forEach(r => r.events.forEach(e => { heatNorm = Math.max(heatNorm, heat(r, e.d)); }));
+    rankSig = '';
   }
+
+  function heat(r, d) {
+    let h = 0;
+    for (const e of r.events) {
+      if (e.d > d) break;
+      h += e.pts * Math.exp(-(d - e.d) / HEAT_DAYS);
+    }
+    return h;
+  }
+
+  function cumAt(r, d) {
+    let v = 0;
+    for (const e of r.events) {
+      if (e.d > d) break;
+      v += e.pts;
+    }
+    return v;
+  }
+
+  // Dzień w bieżącym przelocie (światowe dni rosną bez końca, rok się zapętla)
+  const loopDay = wd => wd - Math.floor(wd / loopDays) * loopDays;
 
   function start() {
     stop();
     resize();
-    racers.forEach(r => { r.shown = 0; r.seen = 0; });
-    sparks = [];
-    texts = [];
-    vMax = 150;
     perf = { sum: 0, n: 0, skip: 30 };
-    startAt = performance.now();
-    last = startAt;
+    last = performance.now();
     raf = requestAnimationFrame(frame);
   }
 
@@ -103,7 +195,7 @@ export function createTron(container) {
   }
 
   // Gdy klatki przez ~2 s idą wolniej niż ~40/s, rysujemy w mniejszej rozdzielczości
-  // (neon i tak jest rozmyty, różnicy prawie nie widać)
+  // (wszystko i tak jest rozmyte smugami, różnicy prawie nie widać)
   function adapt(dt) {
     if (perf.skip > 0) {
       perf.skip--;
@@ -123,284 +215,414 @@ export function createTron(container) {
     }
   }
 
-  const valueAt = (r, t) => {
-    let v = 0;
-    for (const e of r.events) {
-      if (e.t > t) break;
-      v += e.pts;
-    }
-    return v;
-  };
+  // Punkt świata (x, y, głębia wz) na ekran: px, py i ps (pikseli na jednostkę); false = za kamerą.
+  // Kamera patrzy wzdłuż osi tunelu, więc daleki koniec zakręca, a bliskie rzeczy zostają w kadrze.
+  function project(x, y, wz) {
+    const z = wz - camZ;
+    if (z < NEAR) return false;
+    const vx = x - camX - camDX * z;
+    const vy = y - camY - camDY * z;
+    ps = focal / z;
+    px = W / 2 + (vx * cosR - vy * sinR) * ps;
+    py = H / 2 + (vx * sinR + vy * cosR) * ps;
+    return true;
+  }
+
+  const spiralX = (r, wz) => pathX(wz) + RIBBON_R * Math.cos(r.phase + wz * TWIST + time * 0.12);
+  const spiralY = (r, wz) => pathY(wz) + RIBBON_R * Math.sin(r.phase + wz * TWIST + time * 0.12);
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(50, now - last);
     adapt(now - last);
     last = now;
-    const elapsed = now - startAt;
-    const p = clamp(elapsed / PLAY_MS, 0, 1);
-    const t = t0 + p * (t1 - t0);
-    const zoom = easeInOut(clamp((elapsed - PLAY_MS - 600) / ZOOM_MS, 0, 1));
+    time += dt / 1000;
 
-    // Skala czasu: w trakcie jazdy okno ~70 dni, po odjeździe kamery cały rok na ekranie
-    const pxPerMsRide = (W * (HEAD_X - 0.04)) / (WINDOW_DAYS * DAY_MS);
-    // Po odjeździe: rok od 6% do 82% szerokości, z prawej zostaje miejsce na imiona i punkty
-    const pxPerMsAll = (W * 0.76) / (t1 - t0);
-    const pxPerMs = pxPerMsRide + (pxPerMsAll - pxPerMsRide) * zoom;
-    const headX = (HEAD_X + (0.82 - HEAD_X) * zoom) * W;
-    const x = time => headX - (t - time) * pxPerMs;
+    // Tempo faluje (raz pędzi, raz prawie dryfuje), a przeloty okładek dają szarpnięcie do przodu
+    kick *= Math.exp(-dt / 700);
+    flash *= Math.exp(-dt / 350);
+    const wave = 0.78 + 0.34 * Math.sin(time * 0.19) * Math.sin(time * 0.071 + 1);
+    const prevTravel = travel;
+    travel += (SPEED * wave * (1 + kick) * dt) / 1000;
+    if (Math.floor(travel / loopDays) !== Math.floor(prevTravel / loopDays)) {
+      kick += 1.6;  // skok z „dziś” do stycznia
+      flash = 0.6;
+      flashColor = null;
+    }
 
-    // Wartości, zdarzenia (skręty w górę) i skala pionowa, która rośnie razem z liderem
-    let lead = 0;
+    camZ = travel * DAY - NOW_Z;
+    camX = pathX(camZ);
+    camY = pathY(camZ);
+    camDX = (pathX(camZ + 1) - pathX(camZ - 1)) / 2;
+    camDY = (pathY(camZ + 1) - pathY(camZ - 1)) / 2;
+    const roll = 0.3 * Math.sin(time * 0.05) + 0.18 * Math.sin(time * 0.11 + 2) - (camDX * 0.6);
+    cosR = Math.cos(roll);
+    sinR = Math.sin(roll);
+    // Ogniskowa oddycha (powolny „zoom”), a przy szarpnięciu kadr się poszerza jak przy skoku
+    focal = (H * 1.25 * (1 + 0.14 * Math.sin(time * 0.045))) / (1 + 0.22 * Math.min(kick, 2));
+
+    const day = loopDay(travel);
+    let maxCum = 0;
     racers.forEach(r => {
-      const v = valueAt(r, t);
-      while (r.seen < r.events.length && r.events[r.seen].t <= t) {
-        const before = r.events.slice(0, r.seen).reduce((s, ev) => s + ev.pts, 0);
-        const e = r.events[r.seen++];
-        if (p > 0) burst(r, e, before);
-      }
-      r.target = v;
-      r.shown += (v - r.shown) * ease(dt, 140);  // szybki podjazd w górę zamiast przeskoku
-      lead = Math.max(lead, v);
+      r.cum = cumAt(r, day);
+      maxCum = Math.max(maxCum, r.cum);
     });
-    const vGoal = zoom > 0 ? Math.max(...racers.map(r => r.total), 150) * 1.12 : Math.max(150, lead * 1.18);
-    vMax += (vGoal - vMax) * ease(dt, 500);
-    const baseY = HORIZON * H;
-    const y = v => baseY - (v / vMax) * (HORIZON - TOP) * H;
+    racers.forEach(r => {
+      // Prowadzący jedzie najdalej w głąb, reszta za nim
+      const goal = maxCum > 0 ? -4 + 9 * (r.cum / maxCum) : 0;
+      r.lead += (goal - r.lead) * ease(dt, 600);
+    });
 
-    floorPhase = (floorPhase + dt * 0.0011 * (1 - zoom * 0.7)) % 1;
+    const visible = visibleEvents(prevTravel);
 
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    drawSky();
-    drawFloor();
-    drawTimeGrid(x, baseY);
-    ctx.globalCompositeOperation = 'lighter';
-    racers.forEach(r => drawTrail(r, x, y, t));
-    drawSparks(dt, x, y);
     ctx.globalCompositeOperation = 'source-over';
-    fadeLeft();
-    racers.forEach(r => drawHead(r, x(t), y(r.shown)));
-    drawLabels(x(t), y);
-    drawTexts(dt, x, y);
-    drawHud(t, p);
-  }
-
-  function drawSky() {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#010208');
-    g.addColorStop(HORIZON * 0.75, '#050a1c');
-    g.addColorStop(HORIZON, '#0b1030');
-    g.addColorStop(1, '#020309');
-    ctx.fillStyle = g;
+    ctx.fillStyle = `rgba(2, 3, 10, ${1 - Math.pow(0.7, dt / 16.7)})`;
     ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    drawGlow();
+    drawStars(dt);
+    drawRings();
+    racers.forEach(drawGuide);
+    drawCovers(visible);
+    ctx.globalCompositeOperation = 'lighter';
+    racers.forEach(drawRibbon);
+    drawSparks(dt);
+    if (flash > 0.01) {
+      ctx.fillStyle = flashColor ? flashColor.css(flash * 0.22) : `rgba(255, 255, 255, ${flash * 0.3})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    tx.setTransform(scale, 0, 0, scale, 0, 0);
+    tx.clearRect(0, 0, W, H);
+    if ('letterSpacing' in tx) tx.letterSpacing = '0.12em';
+    drawMonthLabels();
+    drawTitles(visible);
+    racers.forEach(drawName);
+    updateHud(day);
   }
 
-  // Podłoga: perspektywiczna siatka pędząca w stronę widza i świecący horyzont
-  function drawFloor() {
-    const hy = HORIZON * H;
-    const floorH = H - hy;
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, hy, W, floorH);
-    ctx.clip();
+  // Okładki w zasięgu wzroku (z obu sąsiednich przelotów przez rok) + zapalanie i przeloty
+  function visibleEvents(prevTravel) {
+    const out = [];
+    const lo = (camZ + 0.9) / DAY;
+    const hi = (camZ + FAR) / DAY;
+    const flyBy = (NOW_Z - 2) / DAY;  // tyle dni po zapaleniu okładka mija kamerę
+    for (let k = Math.floor(lo / loopDays); k <= Math.floor(hi / loopDays); k++) {
+      for (const e of events) {
+        const wd = k * loopDays + e.d;
+        if (wd > prevTravel && wd <= travel) burst(e, wd);
+        if (wd + flyBy > prevTravel && wd + flyBy <= travel) kick += 0.28 * e.size;
+        if (wd < lo || wd > hi) continue;
+        out.push({ e, wd, z: wd * DAY - camZ, lit: clamp((travel - wd) * 1.5, 0, 1) });
+      }
+    }
+    return out.sort((a, b) => b.z - a.z);
+  }
+
+  // Poświata w punkcie zbiegu; kolor wędruje po kolorach osób
+  function drawGlow() {
+    if (!project(pathX(camZ + FAR), pathY(camZ + FAR), camZ + FAR)) return;
+    const c = racers.length ? racers[Math.floor(time / 9) % racers.length].color : neon('#33e0ff');
+    const R = H * 0.75;
+    const g = ctx.createRadialGradient(px, py, 0, px, py, R);
+    g.addColorStop(0, c.css(0.015));
+    g.addColorStop(1, c.css(0));
+    ctx.fillStyle = g;
+    ctx.fillRect(px - R, py - R, R * 2, R * 2);
+  }
+
+  // Pył świetlny: kreski, które wydłużają się z prędkością (to on robi „ziuum”)
+  function drawStars(dt) {
+    const moved = (SPEED * DAY * dt) / 1000;
+    const len = clamp(SPEED * DAY * 0.09 * (1 + kick), 0.2, 9);
+    const paths = [new Path2D(), new Path2D(), new Path2D()];  // biały daleko, biały blisko, kolor
+    for (let i = 0; i < STARS; i++) {
+      let z = stars.z[i] - moved * (1 + kick);
+      if (z < NEAR || stars.z[i] === 0) {
+        z = stars.z[i] === 0 ? rand(NEAR, FAR) : FAR;
+        const a = rand(0, Math.PI * 2);
+        const rr = rand(0.5, 6);
+        stars.x[i] = pathX(camZ + z) + Math.cos(a) * rr;
+        stars.y[i] = pathY(camZ + z) + Math.sin(a) * rr;
+        stars.c[i] = Math.random() < 0.25 ? 2 : 0;
+      }
+      stars.z[i] = z;
+      if (!project(stars.x[i], stars.y[i], camZ + z + len)) continue;
+      const x1 = px;
+      const y1 = py;
+      if (!project(stars.x[i], stars.y[i], camZ + z)) continue;
+      const p = paths[stars.c[i] || (z < 18 ? 1 : 0)];
+      p.moveTo(x1, y1);
+      p.lineTo(px, py);
+    }
+    const accent = racers.length ? racers[Math.floor(time / 9) % racers.length].color : neon('#33e0ff');
+    ctx.lineCap = 'round';
     ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(255, 46, 196, 0.35)';
-    ctx.beginPath();
-    for (let i = 0; i < 14; i++) {
-      const z = i + 1 - floorPhase;
-      const yy = hy + floorH / z;
-      ctx.moveTo(0, yy);
-      ctx.lineTo(W, yy);
-    }
-    const vx = W / 2;
-    for (let k = -24; k <= 24; k++) {
-      ctx.moveTo(vx, hy);
-      ctx.lineTo(vx + k * W * 0.09, H);
-    }
-    ctx.stroke();
-    ctx.restore();
-
-    // Horyzont: szeroka poświata i ostra linia
-    const glow = ctx.createLinearGradient(0, hy - H * 0.08, 0, hy + H * 0.05);
-    glow.addColorStop(0, 'rgba(0, 220, 255, 0)');
-    glow.addColorStop(0.62, 'rgba(0, 220, 255, 0.16)');
-    glow.addColorStop(1, 'rgba(255, 46, 196, 0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, hy - H * 0.08, W, H * 0.13);
-    ctx.fillStyle = 'rgba(160, 250, 255, 0.9)';
-    ctx.fillRect(0, hy - 1, W, 2);
+    ctx.strokeStyle = 'rgba(200, 225, 255, 0.35)';
+    ctx.stroke(paths[0]);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(220, 235, 255, 0.55)';
+    ctx.stroke(paths[1]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = accent.css(0.6);
+    ctx.stroke(paths[2]);
   }
 
-  // Pionowe linie na początkach miesięcy i ich nazwy przy horyzoncie
-  function drawTimeGrid(x, baseY) {
-    ctx.font = `600 ${Math.round(H * 0.018)}px ${FONT}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    for (let m = 0; m <= new Date(t1).getMonth(); m++) {
-      const xm = x(new Date(currentYear(), m, 1).getTime());
-      if (xm < -10 || xm > W) continue;
-      ctx.fillStyle = 'rgba(0, 220, 255, 0.07)';
-      ctx.fillRect(xm, TOP * H * 0.8, 1, baseY - TOP * H * 0.8);
-      ctx.fillStyle = 'rgba(0, 220, 255, 0.45)';
-      ctx.fillText(formatDay(new Date(currentYear(), m, 1)).split(' ')[1].toUpperCase(), xm + 6, baseY + 8);
+  // Pierścienie na początkach miesięcy: przerywane, powoli się obracają
+  function monthRings(fn) {
+    const lo = (camZ + 1.5) / DAY;
+    const hi = (camZ + FAR) / DAY;
+    for (let k = Math.floor(lo / loopDays); k <= Math.floor(hi / loopDays); k++) {
+      for (let m = 0; m < 12; m++) {
+        const d = (new Date(currentYear(), m, 1).getTime() - t0) / DAY_MS;
+        if (d >= loopDays) break;
+        const wd = k * loopDays + d;
+        if (wd >= lo && wd <= hi) fn(m, wd * DAY);
+      }
     }
   }
 
-  // Smuga: poziomo (czas), pionowo w momencie skończenia książki; trzy warstwy = neon
-  function drawTrail(r, x, y, t) {
-    ctx.beginPath();
-    let v = 0;
-    ctx.moveTo(x(t0), y(0));
-    for (let i = 0; i < r.seen; i++) {
-      const e = r.events[i];
-      const xe = x(e.t);
-      ctx.lineTo(xe, y(v));
-      // Ostatni skręt może jeszcze trwać: smuga sięga tylko tam, gdzie jest motocykl
-      v = i === r.seen - 1 ? Math.max(v, r.shown) : v + e.pts;
-      ctx.lineTo(xe, y(v));
-    }
-    ctx.lineTo(x(t), y(r.shown));
-    ctx.lineJoin = 'miter';
-    ctx.lineCap = 'butt';
-    [[H * 0.04, 0.07], [H * 0.02, 0.16], [H * 0.009, 0.4], [H * 0.004, 1]].forEach(([w, a]) => {
-      ctx.lineWidth = w;
-      ctx.strokeStyle = r.color.css(a);
+  function drawRings() {
+    ctx.lineWidth = 1.5;
+    monthRings((m, wz) => {
+      if (!project(pathX(wz), pathY(wz), wz)) return;
+      const z = wz - camZ;
+      const a = clamp((FAR - z) / 20, 0, 1) * clamp((z - 1.5) / 3, 0, 1);
+      ctx.strokeStyle = m === 0 ? `rgba(255, 255, 255, ${a * 0.7})` : `rgba(170, 210, 255, ${a * 0.4})`;
+      ctx.setLineDash([RING_R * ps * 0.5, RING_R * ps * 0.12]);
+      ctx.lineDashOffset = time * ps * 0.4;
+      ctx.beginPath();
+      ctx.arc(px, py, RING_R * ps, 0, Math.PI * 2);
       ctx.stroke();
     });
-    ctx.lineWidth = Math.max(1, H * 0.0012);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.setLineDash([]);
+  }
+
+  function drawMonthLabels() {
+    tx.textAlign = 'center';
+    tx.textBaseline = 'bottom';
+    monthRings((m, wz) => {
+      const z = wz - camZ;
+      if (z > 34 || z < 3) return;
+      if (!project(pathX(wz), pathY(wz) - RING_R, wz)) return;
+      const a = clamp((34 - z) / 8, 0, 1) * clamp((z - 3) / 3, 0, 1);
+      const size = clamp(ps * 0.32, H * 0.02, H * 0.09);
+      const name = m === 0 ? String(currentYear()) : new Intl.DateTimeFormat('pl', { month: 'long' }).format(new Date(currentYear(), m, 1)).toUpperCase();
+      tx.font = `600 ${Math.round(size)}px ${FONT}`;
+      tx.fillStyle = `rgba(210, 230, 255, ${a * 0.55})`;
+      tx.fillText(name, px, py - size * 0.3);
+    });
+  }
+
+  // Cienka przerywana linia toru przed czołem wstęgi (dokąd jedzie)
+  function drawGuide(r) {
+    const head = travel * DAY + r.lead;
+    ctx.beginPath();
+    let moved = false;
+    for (let i = 0; i <= 24; i++) {
+      const wz = head + (camZ + FAR - head) * (i / 24) ** 1.4;
+      if (!project(spiralX(r, wz), spiralY(r, wz), wz)) continue;
+      if (moved) ctx.lineTo(px, py);
+      else ctx.moveTo(px, py);
+      moved = true;
+    }
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 10]);
+    ctx.strokeStyle = r.color.css(0.16);
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 
-  // Lewa krawędź gaśnie do tła: stare odcinki smug „wygasają” jak ściany świetlne
-  function fadeLeft() {
-    const g = ctx.createLinearGradient(0, 0, W * 0.22, 0);
-    g.addColorStop(0, 'rgba(3, 5, 16, 1)');
-    g.addColorStop(1, 'rgba(3, 5, 16, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W * 0.22, H * HORIZON);
+  // Okładki zwrócone do widza, nawleczone na wstęgę osoby; przed „teraz” przygaszone
+  function drawCovers(visible) {
+    visible.forEach(({ e, wd, z, lit }) => {
+      const wz = wd * DAY;
+      if (!project(spiralX(e.r, wz), spiralY(e.r, wz), wz)) return;
+      const fade = clamp((FAR - z) / 18, 0, 1) * clamp((z - 0.9) / 0.8, 0, 1);
+      if (fade <= 0) return;
+      const w = 1.1 * e.size * ps;
+      const h = 1.65 * e.size * ps;
+      const ang = Math.atan2(sinR, cosR) + e.tilt;
+      ctx.setTransform(scale * Math.cos(ang), scale * Math.sin(ang), -scale * Math.sin(ang), scale * Math.cos(ang), px * scale, py * scale);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = fade * (0.22 + 0.73 * lit);
+      if (e.img?.complete && e.img.naturalWidth) ctx.drawImage(e.img, -w / 2, -h / 2, w, h);
+      else {
+        ctx.fillStyle = e.r.color.css(0.14);
+        ctx.fillRect(-w / 2, -h / 2, w, h);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineWidth = Math.max(4, 0.16 * ps);
+      ctx.strokeStyle = e.r.color.css(fade * 0.14 * lit);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.lineWidth = Math.max(1, 0.03 * ps);
+      ctx.strokeStyle = e.r.color.css(fade * (0.3 + 0.7 * lit));
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+    });
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
   }
 
-  function drawHead(r, hx, hy) {
-    const R = H * 0.045;
+  // Tytuł i punkty przy zapalonej okładce, aż przeleci obok kamery
+  function drawTitles(visible) {
+    tx.textAlign = 'center';
+    visible.forEach(({ e, wd, z, lit }) => {
+      if (lit <= 0 || z < 1.2) return;
+      const wz = wd * DAY;
+      if (!project(spiralX(e.r, wz), spiralY(e.r, wz), wz)) return;
+      const a = lit * clamp((z - 1.2) / 1.5, 0, 1);
+      const size = clamp(ps * 0.16, H * 0.018, H * 0.05);
+      const top = py - 0.83 * e.size * ps - size * 0.5;
+      tx.textBaseline = 'bottom';
+      tx.font = `800 ${Math.round(size)}px ${FONT}`;
+      tx.fillStyle = `rgba(255, 255, 255, ${a})`;
+      tx.fillText(short(e.title, 28), px, top);
+      tx.font = `600 ${Math.round(size * 0.7)}px ${FONT}`;
+      tx.fillStyle = e.r.color.css(a);
+      tx.fillText(`${e.r.name}  +${e.pts}`, px, top - size * 1.15);
+    });
+  }
+
+  // Wstęga: wielokąt od czoła do kamery, grubszy tam, gdzie osoba dużo czytała;
+  // kilka warstw od szerokiej mgły do białego rdzenia = neon bez drogiego shadowBlur
+  const N = 40;
+  const xs = new Float32Array(N + 1);
+  const ys = new Float32Array(N + 1);
+  const hs = new Float32Array(N + 1);
+  function drawRibbon(r) {
+    const headZ = NOW_Z + r.lead;
+    let n = 0;
+    for (let i = 0; i <= N; i++) {
+      const z = NEAR * 1.05 * Math.pow(headZ / (NEAR * 1.05), i / N);
+      const wz = camZ + z;
+      if (!project(spiralX(r, wz), spiralY(r, wz), wz)) continue;
+      const hNorm = Math.min(1, heat(r, loopDay(wz / DAY)) / heatNorm);
+      xs[n] = px;
+      ys[n] = py;
+      hs[n] = (0.018 + 0.075 * hNorm) * ps;
+      n++;
+    }
+    if (n < 2) return;
+    const hNow = Math.min(1, heat(r, loopDay(travel)) / heatNorm);
+    [[5, 0.05], [2.2, 0.14], [1, 0.7]].forEach(([mult, a]) => {
+      ribbonPath(n, mult);
+      ctx.fillStyle = r.color.css(a * (0.55 + 0.45 * hNow));
+      ctx.fill();
+    });
+    ribbonPath(n, 0.3);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fill();
+
+    // Czoło: rozbłysk i jasny punkt
+    const hx = xs[n - 1];
+    const hy = ys[n - 1];
+    const s = focal / headZ;
+    const R = s * (0.5 + 0.3 * hNow);
     const g = ctx.createRadialGradient(hx, hy, 0, hx, hy, R);
-    g.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-    g.addColorStop(0.18, r.color.css(0.8));
+    g.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+    g.addColorStop(0.15, r.color.css(0.6));
     g.addColorStop(1, r.color.css(0));
     ctx.fillStyle = g;
     ctx.fillRect(hx - R, hy - R, R * 2, R * 2);
-    // Motocykl: krótka świetlna belka z ostrym nosem
-    const len = H * 0.035;
-    const th = H * 0.009;
-    ctx.fillStyle = r.color.css(1);
+    r.hx = hx;
+    r.hy = hy;
+    r.hs = s;
+  }
+
+  function ribbonPath(n, mult) {
     ctx.beginPath();
-    ctx.moveTo(hx - len, hy - th);
-    ctx.lineTo(hx + th * 0.6, hy - th);
-    ctx.lineTo(hx + th * 1.8, hy);
-    ctx.lineTo(hx + th * 0.6, hy + th);
-    ctx.lineTo(hx - len, hy + th);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-    ctx.fillRect(hx - len * 0.7, hy - th * 0.3, len * 0.7, th * 0.6);
-  }
-
-  // Imiona przy motocyklach; gdy się nakładają, rozsuwamy je w pionie
-  function drawLabels(hx, y) {
-    const size = Math.round(H * 0.026);
-    const gap = size * 1.5;
-    const items = racers.map(r => ({ r, ly: y(r.shown) })).sort((a, b) => a.ly - b.ly);
-    for (let i = 1; i < items.length; i++) items[i].ly = Math.max(items[i].ly, items[i - 1].ly + gap);
-    const ranked = [...racers].sort((a, b) => b.target - a.target || a.name.localeCompare(b.name));
-    ranked.forEach((r, i) => { r.rank = i + 1; });
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    items.forEach(({ r, ly }) => {
-      ctx.font = `800 ${size}px ${FONT}`;
-      ctx.shadowColor = r.color.css(0.9);
-      ctx.shadowBlur = size * 0.6;
-      ctx.fillStyle = r.color.css(1);
-      ctx.fillText(r.name, hx + H * 0.035, ly);
-      ctx.shadowBlur = 0;
-      const nameW = ctx.measureText(r.name).width;
-      ctx.font = `500 ${Math.round(size * 0.8)}px ${FONT}`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.fillText(compactNumber(Math.round(r.target)), hx + H * 0.035 + nameW + size * 0.5, ly);
-    });
-  }
-
-  // Skończona książka: iskry na zakręcie (przypięte do tego miejsca na wykresie, więc
-  // przesuwają się razem z nim) i neonowy tytuł z punktami nad zakrętem
-  function burst(r, e, before) {
-    for (let i = 0; i < 26; i++) {
-      const a = rand(0, Math.PI * 2);
-      const s = rand(0.05, 0.35) * H;
-      const life = rand(0.5, 1);
-      sparks.push({ r, t: e.t, v: before, vx: Math.cos(a) * s, vy: Math.sin(a) * s, dx: 0, dy: 0, life, max: life });
+    const side = (i, dir) => {
+      const a = Math.max(0, i - 1);
+      const b = Math.min(n - 1, i + 1);
+      const dx = xs[b] - xs[a];
+      const dy = ys[b] - ys[a];
+      const len = Math.hypot(dx, dy) || 1;
+      const w = hs[i] * mult * dir;
+      return [xs[i] - (dy / len) * w, ys[i] + (dx / len) * w];
+    };
+    for (let i = 0; i < n; i++) {
+      const [x, y] = side(i, 1);
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
     }
-    texts.push({ r, t: e.t, v: before + e.pts, text: `${e.title.toUpperCase()}  +${e.pts}`, age: 0 });
-    if (texts.length > 4) texts.shift();
+    for (let i = n - 1; i >= 0; i--) {
+      const [x, y] = side(i, -1);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
   }
 
-  function drawSparks(dt, x, y) {
+  function drawName(r) {
+    if (r.hx == null) return;
+    const size = clamp(r.hs * 0.24, H * 0.016, H * 0.03);
+    tx.font = `700 ${Math.round(size)}px ${FONT}`;
+    tx.textAlign = 'left';
+    tx.textBaseline = 'middle';
+    tx.fillStyle = r.color.css(0.9);
+    tx.fillText(r.name, r.hx + size * 1.1, r.hy);
+  }
+
+  // Zapalenie okładki: iskry w przestrzeni (zostają w świecie, więc kamera przez nie przelatuje)
+  function burst(e, wd) {
+    const wz = wd * DAY;
+    const x = spiralX(e.r, wz);
+    const y = spiralY(e.r, wz);
+    for (let i = 0; i < 28; i++) {
+      const life = rand(0.7, 1.4);
+      sparks.push({ r: e.r, x, y, z: wz, vx: rand(-2.6, 2.6), vy: rand(-2.6, 2.6), vz: rand(-3, 3), life, max: life });
+    }
+    if (sparks.length > 300) sparks.splice(0, sparks.length - 300);
+    flash = Math.max(flash, 0.25);
+    flashColor = e.r.color;
+  }
+
+  function drawSparks(dt) {
     const s = dt / 1000;
     sparks = sparks.filter(sp => (sp.life -= s) > 0);
+    const paths = new Map();
     sparks.forEach(sp => {
-      sp.vx *= Math.exp(-3 * s);
-      sp.vy *= Math.exp(-3 * s);
-      sp.dx += sp.vx * s;
-      sp.dy += sp.vy * s;
-      const k = sp.life / sp.max;
-      ctx.fillStyle = sp.r.color.css(k);
-      const size = H * 0.006 * (0.5 + k);
-      ctx.fillRect(x(sp.t) + sp.dx - size / 2, y(sp.v) + sp.dy - size / 2, size, size);
+      const damp = Math.exp(-1.5 * s);
+      sp.vx *= damp;
+      sp.vy *= damp;
+      sp.vz *= damp;
+      sp.x += sp.vx * s;
+      sp.y += sp.vy * s;
+      sp.z += sp.vz * s;
+      if (!project(sp.x - sp.vx * 0.06, sp.y - sp.vy * 0.06, sp.z - sp.vz * 0.06)) return;
+      const x1 = px;
+      const y1 = py;
+      if (!project(sp.x, sp.y, sp.z)) return;
+      if (!paths.has(sp.r)) paths.set(sp.r, new Path2D());
+      const p = paths.get(sp.r);
+      p.moveTo(x1, y1);
+      p.lineTo(px, py);
+    });
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    paths.forEach((p, r) => {
+      ctx.strokeStyle = r.color.css(0.85);
+      ctx.stroke(p);
     });
   }
 
-  function drawTexts(dt, x, y) {
-    const size = Math.round(H * 0.024);
-    ctx.font = `700 ${size}px ${FONT}`;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    texts = texts.filter(tx => (tx.age += dt) < 2600);
-    texts.forEach(tx => {
-      const k = tx.age / 2600;
-      const alpha = k < 0.1 ? k / 0.1 : 1 - Math.max(0, (k - 0.6) / 0.4);
-      ctx.shadowColor = tx.r.color.css(0.9);
-      ctx.shadowBlur = size * 0.7;
-      ctx.fillStyle = tx.r.color.css(alpha);
-      ctx.fillText(tx.text, x(tx.t) - H * 0.015, y(tx.v) - H * 0.02 - k * H * 0.03);
-    });
-    ctx.shadowBlur = 0;
-  }
-
-  function drawHud(t, p) {
-    const pad = H * 0.05;
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    ctx.font = `600 ${Math.round(H * 0.022)}px ${FONT}`;
-    ctx.fillStyle = 'rgba(0, 220, 255, 0.75)';
-    ctx.fillText('CZYTANKO  //  WYŚCIG ROKU', pad, pad);
-    ctx.font = `800 ${Math.round(H * 0.06)}px ${FONT}`;
-    ctx.shadowColor = 'rgba(0, 220, 255, 0.8)';
-    ctx.shadowBlur = H * 0.02;
-    ctx.fillStyle = '#e8fdff';
-    ctx.fillText(p >= 1 ? 'DZIŚ' : formatDay(new Date(t)).toUpperCase(), pad, pad + H * 0.035);
-    ctx.shadowBlur = 0;
-
-    // Ranking w prawym górnym rogu
-    const size = Math.round(H * 0.024);
-    ctx.textAlign = 'right';
-    const ranked = [...racers].sort((a, b) => a.rank - b.rank);
-    ranked.forEach((r, i) => {
-      const yy = pad + i * size * 1.6;
-      ctx.font = `800 ${size}px ${FONT}`;
-      ctx.fillStyle = r.color.css(1);
-      ctx.fillText(`${r.rank}. ${r.name}`, W - pad - size * 4.2, yy);
-      ctx.font = `500 ${size}px ${FONT}`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.fillText(compactNumber(Math.round(r.target)), W - pad, yy);
-    });
+  // Data i ranking w rogach (DOM: ostre litery, zmienia się rzadko)
+  function updateHud(day) {
+    const text = day >= todayDay ? 'DZIŚ' : formatDay(new Date(t0 + day * DAY_MS)).toUpperCase();
+    if (text !== dateText) {
+      dateText = text;
+      date.textContent = text;
+    }
+    const ranked = [...racers].sort((a, b) => b.cum - a.cum || a.name.localeCompare(b.name));
+    const sig = ranked.map(r => `${r.key}:${r.cum}`).join('|');
+    if (sig === rankSig) return;
+    rankSig = sig;
+    rank.replaceChildren(...ranked.map(r => {
+      const li = el('li', {}, [el('b', { text: r.name }), el('span', { text: compactNumber(Math.round(r.cum)) })]);
+      li.style.setProperty('--c', r.color.solid);
+      return li;
+    }));
   }
 
   return { setData, start, stop, resize };
