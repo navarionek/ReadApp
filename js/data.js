@@ -1,6 +1,7 @@
 import { goalJokeThisOpen, isKrystian } from './discourage.js';
 import { loadPrize, viewerId } from './admin.js';
 import { renderBadgesCard } from './badges.js';
+import { renderStartWall } from './coverwall.js';
 import { avatar, renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
@@ -116,6 +117,7 @@ export async function loadReads() {
   renderStats(readers, rows || []);
   renderBookRanking();
   renderWrapped();
+  renderStartWall();
   refreshIcons();
 }
 

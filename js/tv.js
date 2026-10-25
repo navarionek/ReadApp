@@ -1,4 +1,5 @@
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
+import { buildCoverWall, wallCover } from './coverwall.js';
 import { groupByReader } from './data.js';
 import { daysSince } from './form.js';
 import { recordItems } from './insights.js';
@@ -314,19 +315,8 @@ function emptyPanel(id, text) {
   tv.panels.get(id).replaceChildren(el('div', { class: 'tv-message', text }));
 }
 
-/* ----- Ściana okładek (animacja „idle”) ----- */
-// Okładki z tego roku (i te czytane teraz) w kolumnach na cały ekran. Każda kolumna to pasek
-// okładek powtórzony dwa razy, przesuwany animacją CSS o połowę swojej wysokości: pętla bez
-// przeskoku. Kolumny na zmianę jadą w górę i w dół, każda w swoim tempie.
-function shuffle(list) {
-  const a = [...list];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
+/* ----- Ściana okładek (animacja „idle”, js/coverwall.js) ----- */
+// Okładki z tego roku (i te czytane teraz); świecąca okładka pokazuje, kto ją czytał
 function wallBooks() {
   const colors = colorsOf();
   const book = (r, userId, who) => ({
@@ -340,8 +330,7 @@ function wallBooks() {
 }
 
 function wallTile(b) {
-  const cover = coverEl(b);
-  if (cover.tagName === 'IMG') cover.loading = 'eager';  // kafelki wjeżdżają w kadr ruchem, nie przewijaniem
+  const cover = wallCover(b);
   const who = el('span', { class: 'tv-tile-who', text: b.who });
   who.style.background = b.color;
   return el('div', { class: 'tv-wall-tile' }, [cover, who]);
@@ -358,26 +347,15 @@ function renderWall() {
     return;
   }
   const vh = window.innerHeight / 100;
-  const tileW = 17 * vh;
-  const tileH = tileW * 1.5 + 1.6 * vh;  // okładka 2:3 + odstęp
-  // Ściana jest lekko obrócona i powiększona, więc kolumn i kafelków potrzeba z zapasem
-  const cols = Math.ceil((window.innerWidth * 1.35) / (tileW + 1.6 * vh)) + 1;
-  const perColumn = Math.ceil((window.innerHeight * 1.5) / tileH) + 1;
-  // Każda kolumna dostaje własny losowy wybór (nie wszystkie okładki), żeby telewizor nie miał
-  // na ekranie tysiąca obrazków; z zapasem na kilka ekranów, żeby pętla się nie rzucała w oczy
-  const take = Math.max(perColumn + 2, Math.min(books.length, perColumn * 2));
-  const columns = Array.from({ length: cols }, (_, c) => {
-    let list = shuffle(books);
-    while (list.length < take) list = list.concat(shuffle(books));
-    list = list.slice(0, take);
-    const strip = el('div', { class: 'tv-wall-strip' }, [...list, ...list].map(wallTile));
-    const loopS = (list.length * tileH) / ((1.8 + Math.random() * 1.8) * vh);  // tempo: 1,8–3,6 vh/s
-    strip.style.animationDuration = `${loopS}s`;
-    strip.style.animationDelay = `${-Math.random() * loopS}s`;  // każda kolumna startuje w innym miejscu
-    return el('div', { class: `tv-wall-col${c % 2 ? ' down' : ''}` }, [strip]);
-  });
   tv.panels.get('wall').replaceChildren(
-    el('div', { class: 'tv-wall' }, columns),
+    buildCoverWall(books, {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      tile: 17 * vh,
+      gap: 1.6 * vh,
+      speed: [1.8 * vh, 3.6 * vh],
+      tileEl: wallTile,
+    }),
     el('div', { class: 'tv-wall-shade' }),
   );
 }

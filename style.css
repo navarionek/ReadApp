@@ -3958,12 +3958,12 @@ input[type="date"].plain-input {
   inset: -12vh -8vw;
   display: flex;
   justify-content: center;
-  gap: 1.6vh;
+  gap: var(--gap, 1.6vh);
   transform: rotate(-7deg) scale(1.08);
 }
 
 .tv-wall-col {
-  flex: 0 0 17vh;
+  flex: 0 0 var(--tile, 17vh);
 }
 
 .tv-wall-strip {
@@ -3988,7 +3988,7 @@ input[type="date"].plain-input {
 /* Odstęp marginesem, nie gap: wtedy połowa paska to dokładnie jedna kopia listy (pętla bez skoku) */
 .tv-wall-tile {
   position: relative;
-  margin-bottom: 1.6vh;
+  margin-bottom: var(--gap, 1.6vh);
   border-radius: 0.6vh 1vh 1vh 0.6vh;
   transition: transform 0.9s ease, box-shadow 0.9s ease, filter 0.9s ease;
   filter: brightness(0.82) saturate(0.9);
@@ -4127,4 +4127,39 @@ input[type="date"].plain-input {
   color: rgb(255 255 255 / 0.85);
   text-shadow: 0 0.4vh 2vh rgb(0 0 0 / 0.7);
   font-variant-numeric: tabular-nums;
+}
+
+/* Tło ekranu Start: przygaszona ściana okładek (js/coverwall.js), tylko gdy widać Start */
+.cover-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  display: none;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+body:has(#app-screens:not([hidden]) > .screen[data-screen="start"]:not([hidden])) .cover-bg {
+  display: block;
+}
+
+.cover-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--bg-body) 0%, transparent 30%, transparent 70%, var(--bg-body) 100%),
+    color-mix(in srgb, var(--bg-body) 78%, transparent);
+}
+
+.cover-bg .tv-wall-tile {
+  border-radius: 6px;
+}
+
+.cover-bg .ph-title {
+  font-size: 0.8rem;
+}
+
+.cover-bg .ph-author {
+  font-size: 0.65rem;
 }
