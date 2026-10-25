@@ -1,5 +1,6 @@
 import { playRankingIntro } from './ranking.js';
 import { cancelEdit } from './form.js';
+import { hideCity3d, showCity3d } from './city3d.js';
 import { hideRaceCard, showRaceCard } from './flight.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { state } from './state.js';
@@ -41,10 +42,11 @@ export function showScreen(name) {
 
   // Wyścig odpala się przy każdym wejściu na Statystyki (po wczytaniu danych)
   if (name === 'statystyki') {
-    if (state.hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); showRaceCard(true); });
+    if (state.hasData) requestAnimationFrame(() => { drawTimeline(); playRace(); showRaceCard(true); showCity3d(); });
     else state.racePending = true;
   } else {
     hideRaceCard();
+    hideCity3d();
     if (state.raceFrame !== null) {
       cancelAnimationFrame(state.raceFrame);
       state.raceFrame = null;

@@ -4264,3 +4264,103 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   to { opacity: 1; }
 }
 
+
+/* Miasto czytania (js/city3d.js): nocne miasto z dni czytania */
+.city3d {
+  position: relative;
+  height: clamp(380px, 78vw, 540px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #04050c;
+  color: #fff;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.city3d canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.city3d.city-full {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  height: auto;
+  border-radius: 0;
+}
+
+.city-legend {
+  position: absolute;
+  left: 0.625rem;
+  top: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgb(10 14 28 / 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+.city-person {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.city-person i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  background: var(--c);
+  box-shadow: 0 0 6px var(--c);
+}
+
+.city-person b {
+  font-weight: 700;
+}
+
+.city-person span {
+  margin-left: auto;
+  padding-left: 0.6rem;
+  color: #cbd5e1;
+  font-variant-numeric: tabular-nums;
+}
+
+.city-month {
+  position: absolute;
+  right: 0.75rem;
+  top: 0.6rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(220 228 255 / 0.85);
+  text-shadow: 0 0 12px rgb(120 150 255 / 0.6);
+  pointer-events: none;
+}
+
+.city-tip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--c);
+  background: rgb(10 14 28 / 0.82);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.city-tip b {
+  color: var(--c);
+}
