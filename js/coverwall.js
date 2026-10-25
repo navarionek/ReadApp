@@ -149,7 +149,7 @@ function mountStartWall(books) {
 const INTRO_ZOOM = 1150;   // przybliżanie
 const INTRO_CARDS = 500;   // od tej chwili wjeżdżają karty (jeszcze w trakcie przybliżania)
 const INTRO_FADE = 450;    // na końcu przybliżania canvas znika, zostaje zwykła ściana
-const INTRO_FROM = 0.4;    // skala na starcie (ile razy mniejsze okładki niż w tle)
+const INTRO_FROM = 0.6;    // skala na starcie (ile razy mniejsze okładki niż w tle)
 const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
 const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
 
