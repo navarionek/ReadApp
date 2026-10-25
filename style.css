@@ -4034,6 +4034,7 @@ input[type="date"].plain-input {
 /* Wygaszacz „lot przez rok”: dwa canvasy (smugi + napisy) i DOM-owe data z rankingiem */
 .tron {
   position: relative;
+  container-type: size;  /* napisy skalują się do karty albo ekranu (cqh) */
   width: 100%;
   height: 100%;
   font-family: "Orbitron", "Segoe UI", system-ui, sans-serif;
@@ -4050,35 +4051,35 @@ input[type="date"].plain-input {
 
 .tron-hud {
   position: absolute;
-  left: 5vh;
-  top: 5vh;
+  left: 5cqh;
+  top: 5cqh;
   display: flex;
   flex-direction: column;
-  gap: 0.6vh;
+  gap: 0.6cqh;
 }
 
 .tron-brand {
-  font-size: 1.8vh;
+  font-size: max(1.8cqh, 9px);
   font-weight: 600;
   letter-spacing: 0.6em;
   opacity: 0.5;
 }
 
 .tron-date {
-  font-size: 6vh;
+  font-size: max(6cqh, 22px);
   font-weight: 800;
   letter-spacing: 0.08em;
-  text-shadow: 0 0 2.4vh rgb(140 210 255 / 0.55);
+  text-shadow: 0 0 2.4cqh rgb(140 210 255 / 0.55);
 }
 
 .tron-rank {
   position: absolute;
-  right: 5vh;
-  top: 5vh;
+  right: 5cqh;
+  top: 5cqh;
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 2.5vh;
+  font-size: max(2.5cqh, 12px);
 }
 
 .tron-rank li {
@@ -4092,7 +4093,7 @@ input[type="date"].plain-input {
   color: var(--c);
   font-weight: 800;
   letter-spacing: 0.1em;
-  text-shadow: 0 0 1.4vh var(--c);
+  text-shadow: 0 0 1.4cqh var(--c);
 }
 
 .tron-rank span {
@@ -4181,4 +4182,23 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 
 .cover-bg .ph-author {
   font-size: 0.5rem;
+}
+
+/* Karta „Neonowy wyścig” na Statystykach (ten sam lot co wygaszacz TV) */
+.flight {
+  position: relative;
+  height: clamp(380px, 78vw, 540px);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #02030a;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.flight.flight-full {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  height: auto;
+  border-radius: 0;
 }

@@ -68,7 +68,8 @@ function coverImage(url) {
   return covers.get(url);
 }
 
-export function createTron(container) {
+// maxScale: rozdzielczość rysowania względem CSS (telefon: gęstość ekranu, TV: 1, bo nie uciągnie)
+export function createTron(container, { maxScale = 1 } = {}) {
   const fx = document.createElement('canvas');
   const hud = document.createElement('canvas');
   fx.className = 'tron-canvas';
@@ -85,7 +86,7 @@ export function createTron(container) {
 
   let W = 1;
   let H = 1;
-  let scale = 1;            // rozdzielczość rysowania; spada, gdy telewizor nie wyrabia
+  let scale = maxScale;     // rozdzielczość rysowania; spada, gdy urządzenie nie wyrabia
   let raf = null;
   let last = 0;
   let perf = { sum: 0, n: 0, skip: 30 };
@@ -408,7 +409,7 @@ export function createTron(container) {
       if (z > 34 || z < 3) return;
       if (!project(pathX(wz), pathY(wz) - RING_R, wz)) return;
       const a = clamp((34 - z) / 8, 0, 1) * clamp((z - 3) / 3, 0, 1);
-      const size = clamp(ps * 0.32, H * 0.02, H * 0.09);
+      const size = clamp(ps * 0.32, Math.max(H * 0.02, 11), H * 0.09);
       const name = m === 0 ? String(currentYear()) : new Intl.DateTimeFormat('pl', { month: 'long' }).format(new Date(currentYear(), m, 1)).toUpperCase();
       tx.font = `600 ${Math.round(size)}px ${FONT}`;
       tx.fillStyle = `rgba(210, 230, 255, ${a * 0.55})`;
@@ -473,7 +474,7 @@ export function createTron(container) {
       const wz = wd * DAY;
       if (!project(spiralX(e.r, wz), spiralY(e.r, wz), wz)) return;
       const a = lit * clamp((z - 1.2) / 1.5, 0, 1);
-      const size = clamp(ps * 0.16, H * 0.018, H * 0.05);
+      const size = clamp(ps * 0.16, Math.max(H * 0.018, 11), Math.max(H * 0.05, 13));
       const top = py - 0.83 * e.size * ps - size * 0.5;
       tx.textBaseline = 'bottom';
       tx.font = `800 ${Math.round(size)}px ${FONT}`;
@@ -556,7 +557,7 @@ export function createTron(container) {
 
   function drawName(r) {
     if (r.hx == null) return;
-    const size = clamp(r.hs * 0.24, H * 0.016, H * 0.03);
+    const size = clamp(r.hs * 0.24, Math.max(H * 0.016, 10), Math.max(H * 0.03, 12));
     tx.font = `700 ${Math.round(size)}px ${FONT}`;
     tx.textAlign = 'left';
     tx.textBaseline = 'middle';

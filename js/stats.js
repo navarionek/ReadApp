@@ -1,5 +1,6 @@
 import { renderInsights } from './insights.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
+import { showFlight } from './flight.js';
 import { showRace3d } from './race3d.js';
 import { showTowers3d } from './towers3d.js';
 import { currentScreen } from './shell.js';
@@ -104,6 +105,7 @@ export function renderStats(readers, rows) {
   drawTimeline();
   showRace3d(state.racePending);
   showTowers3d(state.racePending);
+  showFlight();
   if (state.racePending) {
     state.racePending = false;
     playRace();
