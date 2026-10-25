@@ -46,9 +46,13 @@ async function ownToken() {
   return data?.token || null;
 }
 
-async function saveToken() {
+// Baza pozwala wpisać tylko token (user_id bierze się z konta), więc bez upsert:
+// pierwszy link = insert, „Nowy link” = podmiana tokenu w istniejącym wierszu
+async function saveToken(replace) {
   const token = newToken();
-  const { error } = await supabaseClient.from('tv_tokens').upsert({ user_id: state.currentUser.id, token }, { onConflict: 'user_id' });
+  const { error } = replace
+    ? await supabaseClient.from('tv_tokens').update({ token, created_at: new Date().toISOString() }).eq('user_id', state.currentUser.id)
+    : await supabaseClient.from('tv_tokens').insert({ token });
   if (error) throw error;
   return token;
 }
@@ -57,7 +61,7 @@ export async function openTvLinkDialog() {
   closeSettings();
   let token;
   try {
-    token = (await ownToken()) || (await saveToken());
+    token = (await ownToken()) || (await saveToken(false));
   } catch (err) {
     showToast('Nie udało się przygotować linku: ' + friendlyError(err));
     return;
@@ -90,7 +94,7 @@ export async function openTvLinkDialog() {
   renew.addEventListener('click', async () => {
     if (!confirm('Nowy link? Stary przestanie działać na telewizorze.')) return;
     try {
-      token = await saveToken();
+      token = await saveToken(true);
       setLink(token);
       preview.href = tvLink(token);
       showToast('Nowy link gotowy.');
