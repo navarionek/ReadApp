@@ -4031,6 +4031,29 @@ input[type="date"].plain-input {
     linear-gradient(transparent 70%, rgb(5 6 12 / 0.55));
 }
 
+/* Wygaszacz Tron rysuje się na canvasie na cały panel */
+.tron-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tv-panel-tron {
+  overflow: hidden;
+  background: #02030a;
+  animation-duration: 2s;
+}
+
+/* Mały zegar w rogu tylko na wygaszaczach (pełny ekran) */
+.tv-mini-clock {
+  display: none;
+}
+
+.tv-full .tv-mini-clock {
+  display: block;
+  z-index: 5;
+}
+
 .tv-mini-clock {
   position: absolute;
   right: 3vw;

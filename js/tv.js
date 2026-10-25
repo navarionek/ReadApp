@@ -8,6 +8,7 @@ import { coverEl } from './shelf.js';
 import { state } from './state.js';
 import { buildRaceSeries, compactNumber, formatDay, MONTHS_PL as MONTHS_SHORT, seriesColors, valueAt } from './stats.js';
 import { supabaseClient } from './supabase.js';
+import { createTron } from './tron.js';
 import { currentYear, DAY_MS, el, friendlyError, icon, refreshIcons, showToast } from './ui.js';
 
 /* ----------------- Widok TV (?tv=token) ----------------- */
@@ -129,7 +130,8 @@ export async function openTvLinkDialog() {
 // Każdy panel ma render (przy każdych nowych danych), a niektóre enter/leave: animacja rusza
 // od początku przy każdym pokazaniu i staje, gdy panel znika. full = bez nagłówka, cały ekran.
 const PANELS = [
-  { id: 'wall', title: '', ms: 0, full: true, render: renderWall, enter: startWall, leave: stopWall },
+  { id: 'wall', title: '', ms: 60000, full: true, render: renderWall, enter: startWall, leave: stopWall },
+  { id: 'tron', title: '', ms: 60000, full: true, render: renderTron, enter: () => tv.tron?.start(), leave: () => tv.tron?.stop() },
   { id: 'ranking', title: 'Ranking', ms: 14000, render: renderRanking },
   { id: 'race', title: 'Wyścig roku', ms: 19000, render: renderRaceBars, enter: startRaceBars, leave: stopRaceBars },
   { id: 'mosaic', title: 'Okładki roku', ms: 18000, render: renderMosaic, enter: startMosaic, leave: stopMosaic },
@@ -138,9 +140,9 @@ const PANELS = [
   { id: 'calendar', title: 'Kalendarz czytania', ms: 15000, render: renderCalendar },
   { id: 'reading', title: 'Teraz czytają', ms: 16000, render: renderReading },
 ];
-// Na razie telewizor pokazuje tylko ścianę okładek (animacja „idle”); pozostałe ekrany są gotowe,
-// wystarczy dopisać ich id, żeby wróciły do rotacji
-const SHOWN = ['wall'];
+// Na razie telewizor pokazuje dwa wygaszacze na zmianę (okładki i Tron, co minutę); pozostałe
+// ekrany są gotowe, wystarczy dopisać ich id, żeby wróciły do rotacji
+const SHOWN = ['wall', 'tron'];
 const ROTATION = PANELS.filter(p => SHOWN.includes(p.id));
 const RACE_MS = 13000;     // cały rok w wyścigu słupkowym
 const COUNT_MS = 1800;     // odliczanie liczb w „Rok w liczbach”
@@ -166,6 +168,7 @@ const tv = {
   miniClock: null,
   wallSig: null,
   glowTimer: null,
+  tron: null,
 };
 
 export async function startTv(token) {
@@ -173,6 +176,8 @@ export async function startTv(token) {
   // Telewizor zawsze po ciemku (lepiej wygląda na dużym ekranie i nie razi wieczorem)
   document.documentElement.classList.add('dark-mode', 'tv-mode');
   document.querySelector('main.container').hidden = true;
+  // Neonowa czcionka do wygaszacza Tron (bez niej rysuje się systemową)
+  document.head.appendChild(el('link', { rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&display=swap' }));
   buildTv();
   tickClock();
   setInterval(tickClock, 15000);
@@ -202,6 +207,7 @@ function buildTv() {
     ]),
     tv.stage,
     tv.dots,
+    tv.miniClock,
   ]);
   document.body.appendChild(tv.root);
   // Ściana okładek liczy kolumny z rozmiaru ekranu
@@ -373,8 +379,13 @@ function renderWall() {
   tv.panels.get('wall').replaceChildren(
     el('div', { class: 'tv-wall' }, columns),
     el('div', { class: 'tv-wall-shade' }),
-    tv.miniClock,
   );
+}
+
+/* ----- Wygaszacz Tron (js/tron.js) ----- */
+function renderTron() {
+  tv.tron ||= createTron(tv.panels.get('tron'));
+  tv.tron.setData(state.statsReaders, state.statsRows);
 }
 
 // Co kilka sekund któraś okładka w środkowej części ekranu delikatnie się powiększa i świeci
