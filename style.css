@@ -1262,16 +1262,6 @@ body.r3d-lock {
   color: #94a3b8;
 }
 
-/* Przy wieżach dół zajmują etykiety z imionami, więc „Powtórz” idzie w prawy górny róg */
-.towers3d .r3d-replay {
-  top: 0.625rem;
-  right: 0.625rem;
-  bottom: auto;
-  left: auto;
-  transform: none;
-  animation: none;
-}
-
 /* Jedyny przycisk: „Powtórz”, pokazywany po dojechaniu do mety */
 .r3d-replay {
   position: absolute;
@@ -1532,7 +1522,8 @@ select.plain-input {
   border: 1px solid var(--border);
 }
 
-.mode-btn {
+.mode-btn,
+.race-mode-btn {
   padding: 0.5rem;
   border: none;
   border-radius: calc(var(--radius-sm) - 2px);
@@ -1545,10 +1536,17 @@ select.plain-input {
   transition: var(--transition);
 }
 
-.mode-btn.active {
+.mode-btn.active,
+.race-mode-btn.active {
   background: var(--bg-card);
   color: var(--primary);
   box-shadow: var(--shadow-sm);
+}
+
+/* Karta wyścigu: przełącznik neonowy / książkowy 3D */
+.race-mode {
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 1.5rem;
 }
 
 .finishing-note {
