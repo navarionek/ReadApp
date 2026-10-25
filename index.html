@@ -15,6 +15,8 @@
       try { saved = localStorage.getItem('theme'); } catch (e) {}
       const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (dark) document.documentElement.classList.add('dark-mode');
+      // Pasek statusu telefonu w kolorze tła apki (zamiast fioletowego paska)
+      document.querySelector('meta[name="theme-color"]').content = dark ? '#0f172a' : '#f8fafc';
     })();
   </script>
   <link rel="stylesheet" href="style.css">

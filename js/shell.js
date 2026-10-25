@@ -64,6 +64,8 @@ export function goTo(name) {
 /* ----------------- Theme handling ----------------- */
 export function setTheme(isDark) {
   document.documentElement.classList.toggle('dark-mode', isDark);
+  // Pasek statusu telefonu w kolorze tła apki
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isDark ? '#0f172a' : '#f8fafc');
   const themeIcon = document.getElementById('theme-icon');
   if (themeIcon) themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
   document.getElementById('theme-toggle')?.setAttribute('aria-checked', String(isDark));

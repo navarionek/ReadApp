@@ -785,6 +785,10 @@ a.btn {
     border-radius: 0;
     border-width: 1px 0 0;
     box-shadow: 0 -4px 12px rgb(0 0 0 / 0.08);
+    /* Matowe szkło: treść przewija się pod paskiem, rozmyta */
+    background: color-mix(in srgb, var(--bg-card) 72%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    backdrop-filter: blur(16px) saturate(1.4);
   }
 
   .nav-item {
