@@ -162,16 +162,24 @@ export function playStartIntro() {
   body.classList.add('wall-intro');
   // Animacje CSS powstają dopiero, gdy ściana jest widoczna (Start pokazuje się chwilę po
   // zalogowaniu), więc zbieramy je w pierwszej klatce, w której już są
+  // Na czas intro animacje stoją, a ich czas przesuwamy sami o dt × tempo. Zmiana playbackRate
+  // co klatkę rozjeżdżała się z animacją liczoną na GPU i paski skakały w górę i w dół.
   let anims = [];
   let t0 = null;
+  let prev = 0;
   let revealed = false;
   const step = now => {
-    if (!anims.length) anims = [...bg.querySelectorAll('.tv-wall-strip')].flatMap(strip => strip.getAnimations());
+    if (!anims.length) {
+      anims = [...bg.querySelectorAll('.tv-wall-strip')].flatMap(strip => strip.getAnimations());
+      anims.forEach(a => a.pause());
+    }
     t0 ??= now;
     const t = now - t0;
+    const dt = Math.min(50, now - (prev || now));
+    prev = now;
     const k = t < INTRO_UP ? (t / INTRO_UP) ** 2 : (1 - Math.min(1, (t - INTRO_UP) / INTRO_DOWN)) ** 2;
-    // playbackRate zmienia tempo bez przeskoku: animacja CSS jedzie dalej z tego samego miejsca
-    anims.forEach(a => { a.playbackRate = 1 + (INTRO_PEAK - 1) * k; });
+    const rate = 1 + (INTRO_PEAK - 1) * k;
+    anims.forEach(a => { a.currentTime = (Number(a.currentTime) || 0) + dt * rate; });
     if (t >= INTRO_UP && !revealed) {
       revealed = true;
       // Karty wjeżdżają po kolei, od góry
@@ -182,7 +190,9 @@ export function playStartIntro() {
       requestAnimationFrame(step);
       return;
     }
-    anims.forEach(a => { a.playbackRate = 1; });
+    // Dalej zwykłe tempo, od miejsca, w którym intro skończyło (animacje usunięte w międzyczasie,
+    // np. po wyjściu ze Startu, mają stan „idle” i ich nie wskrzeszamy)
+    anims.forEach(a => { if (a.playState === 'paused') a.play(); });
     body.classList.remove('wall-intro-reveal');
     cards().forEach(card => card.style.removeProperty('--intro-delay'));
     const { pending } = intro;
