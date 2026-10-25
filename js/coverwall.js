@@ -51,7 +51,13 @@ export function buildCoverWall(books, { width, height, tile, gap, speed, tileEl 
 /* ----- Tło ekranu Start (telefon i komputer) ----- */
 // Przygaszona ściana z okładek tego roku i tych czytanych teraz. Widać ją tylko na Starcie
 // (pilnuje tego CSS), poza nim display: none, więc animacja nic nie kosztuje.
+// Przy przewijaniu kolumny jadą za stroną wolniej niż karty (paralaksa), każda z inną
+// głębią i na własnej sprężynie: lekko się spóźniają i dobijają, więc ściana faluje.
 let startSig = null;
+let springs = [];
+let springFrame = null;
+let springLast = 0;
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 export function renderStartWall() {
   const all = [...state.statsRows, ...state.readingNow].map(r => ({ title: r.title, author: r.author, cover_url: r.cover_url }));
@@ -67,22 +73,61 @@ export function renderStartWall() {
   let bg = document.getElementById('cover-bg');
   if (!books.length) {
     bg?.remove();
+    springs = [];
     return;
   }
   if (!bg) {
     bg = el('div', { id: 'cover-bg', class: 'cover-bg', 'aria-hidden': 'true' });
     document.body.prepend(bg);
   }
-  const tile = Math.max(90, Math.min(160, Math.min(width, height) * 0.27));
-  bg.replaceChildren(buildCoverWall(books, {
+  // Drobne okładki, dużo kolumn: bardziej faktura niż pojedyncze książki
+  const tile = Math.max(58, Math.min(100, Math.min(width, height) * 0.17));
+  // Kolumny jadą za stroną najwyżej o 0,3 przewinięcia, więc paski muszą mieć zapas w dół
+  const extra = Math.max(0, document.documentElement.scrollHeight - height) * 0.3;
+  const wall = buildCoverWall(books, {
     width,
-    height,
+    height: height + extra,
     tile,
-    gap: tile * 0.09,
-    speed: [tile * 0.06, tile * 0.12],
+    gap: tile * 0.1,
+    speed: [tile * 0.08, tile * 0.16],
     tileEl: b => el('div', { class: 'tv-wall-tile' }, [wallCover(b)]),
-  }));
+  });
+  bg.replaceChildren(wall);
+  springs = [...wall.children].map(col => {
+    const stiff = 40 + Math.random() * 90;  // miękkie kolumny spóźniają się bardziej
+    return { col, depth: 0.08 + Math.random() * 0.22, stiff, damp: 2 * Math.sqrt(stiff) * 0.55, pos: 0, vel: 0 };
+  });
+  springs.forEach(s => {
+    s.pos = -window.scrollY * s.depth;
+    s.col.style.transform = `translate3d(0, ${s.pos}px, 0)`;
+  });
 }
+
+function stepSprings(now) {
+  const dt = Math.min(0.05, (now - springLast) / 1000);
+  springLast = now;
+  let moving = false;
+  springs.forEach(s => {
+    const target = -window.scrollY * s.depth;
+    s.vel += ((target - s.pos) * s.stiff - s.vel * s.damp) * dt;
+    s.pos += s.vel * dt;
+    if (Math.abs(target - s.pos) < 0.3 && Math.abs(s.vel) < 0.3) {
+      s.pos = target;
+      s.vel = 0;
+    } else {
+      moving = true;
+    }
+    s.col.style.transform = `translate3d(0, ${s.pos.toFixed(1)}px, 0)`;
+  });
+  springFrame = moving ? requestAnimationFrame(stepSprings) : null;
+}
+
+window.addEventListener('scroll', () => {
+  if (!springs.length || springFrame !== null || calm.matches) return;
+  if (!springs[0].col.getClientRects().length) return;  // tło niewidoczne (inny ekran)
+  springLast = performance.now();
+  springFrame = requestAnimationFrame(stepSprings);
+}, { passive: true });
 
 let resizeTimer = null;
 window.addEventListener('resize', () => {

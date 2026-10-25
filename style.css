@@ -4153,7 +4153,17 @@ body:has(#app-screens:not([hidden]) > .screen[data-screen="start"]:not([hidden])
 }
 
 .cover-bg .tv-wall-tile {
-  border-radius: 6px;
+  border-radius: 3px 5px 5px 3px;
+}
+
+.cover-bg .tv-wall-col {
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cover-bg .tv-wall-strip {
+    animation: none;
+  }
 }
 
 /* Karty na Starcie jak matowe szkło: okładki z tła rozmyte za nimi */
@@ -4170,9 +4180,9 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 .cover-bg .ph-title {
-  font-size: 0.8rem;
+  font-size: 0.6rem;
 }
 
 .cover-bg .ph-author {
-  font-size: 0.65rem;
+  font-size: 0.5rem;
 }
