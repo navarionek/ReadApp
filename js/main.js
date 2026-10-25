@@ -5,7 +5,7 @@ import { loadReads } from './data.js';
 import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
 import { closeBookModal, loadShelf } from './shelf.js';
-import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme, turnPage } from './shell.js';
+import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme } from './shell.js';
 import { state } from './state.js';
 import { playRace } from './stats.js';
 import { supabaseClient } from './supabase.js';
@@ -72,12 +72,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('started-date').value = todayInputValue();
   document.getElementById('started-date').max = todayInputValue();
-  let shown = currentScreen();
-  window.addEventListener('hashchange', () => {
-    const next = currentScreen();
-    turnPage(shown, next);
-    shown = next;
-  });
+  window.addEventListener('hashchange', () => showScreen(currentScreen()));
   // Kliknięcie „Dodaj” w menu zawsze otwiera pusty formularz, także w trakcie edycji
   document.querySelector('.nav-item[data-screen="dodaj"]').addEventListener('click', () => {
     if (state.editingId || state.finishing) cancelEdit();

@@ -1,7 +1,6 @@
 import { playRankingIntro } from './ranking.js';
 import { cancelEdit } from './form.js';
 import { hideCity3d, showCity3d } from './city3d.js';
-import { experimentsEnabled } from './coverwall.js';
 import { hideRaceCard, showRaceCard } from './flight.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { state } from './state.js';
@@ -53,21 +52,6 @@ export function showScreen(name) {
       state.raceFrame = null;
     }
   }
-}
-
-// Przejście między ekranami jak przewrócenie kartki w książce (View Transitions API).
-// Ekran dalej w menu: obecna strona odwraca się w lewo i odsłania nową; wcześniej w menu:
-// nowa strona wraca z lewej na wierzch. Eksperyment, wyłączany razem z innymi w ustawieniach.
-export function turnPage(from, to) {
-  const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!document.startViewTransition || from === to || calm || !experimentsEnabled()) {
-    showScreen(to);
-    return;
-  }
-  const root = document.documentElement;
-  root.dataset.turn = SCREENS.indexOf(to) > SCREENS.indexOf(from) ? 'forward' : 'back';
-  const transition = document.startViewTransition(() => showScreen(to));
-  transition.finished.finally(() => { delete root.dataset.turn; });
 }
 
 export function goTo(name) {

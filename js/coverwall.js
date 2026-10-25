@@ -59,8 +59,7 @@ let intro = null;                  // trwa intro; przebudowę ściany odkładamy
 let introPlayed = false;           // tylko raz po włączeniu apki
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-// Przełącznik „Eksperymentalne wizuale” w ustawieniach: to tło, intro i kartkowanie ekranów
-export function experimentsEnabled() {
+export function startWallEnabled() {
   try {
     return localStorage.getItem(STORAGE_KEY) !== 'off';
   } catch {
@@ -69,13 +68,13 @@ export function experimentsEnabled() {
 }
 
 export function syncStartWallToggle() {
-  const on = experimentsEnabled();
+  const on = startWallEnabled();
   document.getElementById('cover-bg-toggle')?.setAttribute('aria-checked', String(on));
   document.getElementById('cover-bg-switch')?.classList.toggle('on', on);
 }
 
 export function toggleStartWall() {
-  const on = !experimentsEnabled();
+  const on = !startWallEnabled();
   try {
     localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off');
   } catch {}
@@ -85,7 +84,7 @@ export function toggleStartWall() {
 }
 
 export function renderStartWall() {
-  if (!experimentsEnabled()) {
+  if (!startWallEnabled()) {
     document.getElementById('cover-bg')?.remove();
     startSig = null;
     return;
@@ -266,7 +265,7 @@ function introScene(bg) {
 }
 
 export function playStartIntro() {
-  if (introPlayed || !experimentsEnabled() || calm.matches) return;
+  if (introPlayed || !startWallEnabled() || calm.matches) return;
   introPlayed = true;
   let cached = [];
   try {
