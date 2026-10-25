@@ -4364,3 +4364,24 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 .city-tip b {
   color: var(--c);
 }
+
+/* Podpowiedź sterowania; znika po pierwszym dotyku */
+.city-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 0.75rem;
+  transform: translateX(-50%);
+  max-width: calc(100% - 1.5rem);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgb(10 14 28 / 0.6);
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  text-align: center;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
+.city-hint.gone {
+  opacity: 0;
+}
