@@ -4,24 +4,26 @@ import { compactNumber, formatDay, seriesColors } from './stats.js';
 import { currentYear, DAY_MS, el, icon, refreshIcons } from './ui.js';
 
 /* ----------------- Wieże z książek (3D) ----------------- */
-// Każda książka przeczytana w tym roku to płyta na stosie właściciela: grubość = punkty
-// (najwyższa wieża = lider rankingu), na grzbiecie tytuł, na wierzchu okładka.
-// Animacja przechodzi przez rok i zrzuca książki na stosy w dniu skończenia.
+// Kaskada okładek: każda książka przeczytana w tym roku stoi pionowo okładką do widza. Kolejna
+// staje tuż za poprzednią i wyżej o pasek proporcjonalny do punktów, więc z każdej widać górę
+// okładki z tytułem, a cała pierwsza jest na przodzie. Najwyższa wieża ≈ najwięcej punktów.
+// Animacja przechodzi przez rok i zrzuca książki prosto w dół (bez obracania) w dniu skończenia.
 // Three.js z import mapy (index.html), jak w wyścigu 3D; moduł ładuje się raz dla obu kart.
 
 const PLAY_MS = 12000;   // cały rok
 const TOWER_H = 10;      // wysokość najwyższej wieży (jednostki sceny)
-const BOOK_L = 2.4;      // długość książki (wzdłuż grzbietu, oś x)
-const BOOK_W = 1.7;      // szerokość okładki (oś z)
-const GAP = 3.6;         // odstęp między wieżami
-const FALL_S = 0.7;      // czas spadania (z przyspieszeniem, jak przy grawitacji)
-const SETTLE_S = 0.45;   // klapnięcie na płasko po dotknięciu stosu
+const COVER_W = 1.9;
+const COVER_H = COVER_W / 0.68;  // proporcje okładki
+const DEPTH = 0.1;       // grubość książki
+const Z_STEP = 0.13;     // o ile każda kolejna książka stoi dalej od widza
+const GAP = 3.2;         // odstęp między wieżami
+const MAX_W = COVER_W;
+const FALL_S = 0.6;      // czas spadania (z przyspieszeniem, jak przy grawitacji)
 const DROP_FROM = 4.5;   // z jakiej wysokości nad stosem spada książka
 const DUST = 220;        // pula drobinek kurzu przy lądowaniu
-const COVER_UPRIGHT = -Math.PI / 2;  // obrót w płaszczyźnie, przy którym okładka w locie stoi tytułem do góry
-const OUT = 1.1;         // o ile wysuwa się stuknięta książka
-const PITCH = 0.32;
-const YAW = 0.3;
+const OUT = 0.9;         // o ile przed kaskadą staje stuknięta książka
+const PITCH = 0.16;      // kamera prawie na wprost okładek
+const YAW = 0.12;
 
 const THEMES = {
   dark: { bg: 0x0b0d18, hemi: 0.7, key: 2.4, fill: 0.5, table: 0x5a3824, felt: 0x1d4a35, env: 0.35, exposure: 1.05, bokeh: 0.5 },
@@ -405,42 +407,6 @@ function wrapText(g, text, x, y, maxW, lineH, maxLines) {
   if (line) g.fillText(line, x, y + lines * lineH, maxW);
 }
 
-// Grzbiet: kolor osoby (każda książka w trochę innym odcieniu), tytuł, złote linie;
-// książka z mnożnikiem dostaje złotą opaskę z wartością
-function spineTexture(row, base, th) {
-  const h = clamp(Math.round((512 * th) / BOOK_L), 14, 200);
-  return canvasTexture(512, h, (g, w, hh) => {
-    const c = new THREE.Color(base);
-    c.offsetHSL((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.18);
-    g.fillStyle = `#${c.getHexString()}`;
-    g.fillRect(0, 0, w, hh);
-    g.fillStyle = 'rgba(0,0,0,0.18)';
-    g.fillRect(0, hh - Math.max(1, hh * 0.08), w, hh);
-    g.fillStyle = 'rgba(240,199,94,0.85)';
-    g.fillRect(14, 0, 3, hh);
-    g.fillRect(w - 17, 0, 3, hh);
-    const mult = Number(row.multiplier);
-    let right = w - 30;
-    if (mult !== 1) {
-      g.fillStyle = '#e8c15a';
-      g.fillRect(w - 110, 0, 70, hh);
-      g.fillStyle = '#3a2a10';
-      g.font = `800 ${Math.min(hh * 0.62, 34)}px Inter, system-ui, sans-serif`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(`×${String(mult).replace('.', ',')}`, w - 75, hh / 2 + 1, 64);
-      right = w - 120;
-    }
-    if (hh >= 16) {
-      g.fillStyle = 'rgba(255,255,255,0.95)';
-      g.font = `700 ${Math.min(hh * 0.6, 36)}px Inter, system-ui, sans-serif`;
-      g.textAlign = 'left';
-      g.textBaseline = 'middle';
-      g.fillText(row.title || 'bez tytułu', 30, hh / 2 + 1, right - 30);
-    }
-  });
-}
-
 // Prawdziwa okładka z bazy; gdy serwer nie pozwala jej użyć w WebGL (CORS), zostaje zastępcza
 function coverTexture(row, onReady) {
   const url = row.cover_url;
@@ -470,8 +436,7 @@ function disposeWorld() {
     if (o.geometry && o.geometry !== t3.box && !o.isSprite) o.geometry.dispose();
   });
   world.books.forEach(b => {
-    b.spineMat.map?.dispose();
-    b.spineMat.dispose();
+    if (b.spineMat !== t3.mats.gold) b.spineMat.dispose();
     if (b.coverMat.map && !b.sharedCover) b.coverMat.map.dispose();
     b.coverMat.dispose();
   });
@@ -512,11 +477,15 @@ function buildWorld(readers, rows, sig) {
   const people = readers
     .filter(r => byUser.has(r.key))
     .sort((a, b) => a.name.localeCompare(b.name, 'pl'));
-  const totals = people.map(p => byUser.get(p.key).reduce((s, r) => s + bookPoints(r), 0));
-  const k = TOWER_H / Math.max(1, ...totals);
+  // Pierwsza książka stoi cała (wysokość okładki), każda kolejna dokłada pasek = jej punkty
+  const rest = people.map(p => {
+    const sorted = byUser.get(p.key).slice().sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id);
+    return sorted.slice(1).reduce((s, r) => s + bookPoints(r), 0);
+  });
+  const k = (TOWER_H - COVER_H) / Math.max(1, ...rest);
   const n = people.length;
   const group = new THREE.Group();
-  const width = (n - 1) * GAP + BOOK_L;
+  const width = (n - 1) * GAP + MAX_W;
 
   // Okrągły stół do czytania z suknem; dookoła ciemno, w tle rozmyte światła lamp
   const radius = width / 2 + 3.2;
@@ -547,38 +516,34 @@ function buildWorld(readers, rows, sig) {
     return { key: p.key, first: firstName(p.name), color: colors.get(p.key), css, x, label, height: 0, pts: 0, shownPts: -1 };
   });
 
-  // Książki w kolejności skończenia; każda zna swoje miejsce na stosie
+  // Książki w kolejności skończenia: pierwsza z przodu, każda następna dalej i wyżej o swój pasek
   const books = [];
   towers.forEach((tw, i) => {
-    let base = 0;
+    let top = COVER_H;
     byUser.get(people[i].key)
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id)
-      .forEach(row => {
+      .forEach((row, idx) => {
         const pts = bookPoints(row);
-        const th = Math.max(0.05, pts * k);
-        const spineMat = new THREE.MeshStandardMaterial({ map: spineTexture(row, tw.css, th), roughness: 0.55 });
+        const strip = idx === 0 ? COVER_H : Math.max(0.05, pts * k);  // ile tej okładki wystaje nad poprzednią
+        if (idx > 0) top += strip;
+        // Grzbiet i tył w odcieniu koloru osoby; książka z mnożnikiem ma złote boki
+        const shade = new THREE.Color(tw.css).offsetHSL((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.18);
+        const spineMat = Number(row.multiplier) !== 1 ? t3.mats.gold : new THREE.MeshStandardMaterial({ color: shade, roughness: 0.55 });
         const coverMat = new THREE.MeshStandardMaterial({ map: placeholderCover(row), roughness: 0.6 });
-        coverMat.map.center.set(0.5, 0.5);
-        coverMat.map.rotation = Math.PI / 2;  // okładka w poprzek, bo grzbietem książki leżą do kamery
-        // Kolejność ścian w BoxGeometry: +x, −x, +y (okładka), −y, +z (grzbiet), −z
-        const mesh = new THREE.Mesh(t3.box, [t3.mats.pages, t3.mats.pages, coverMat, t3.mats.bottom, spineMat, t3.mats.pages]);
-        const jitter = 0.94 + Math.random() * 0.1;
-        mesh.scale.set(BOOK_L * jitter, th, BOOK_W * (0.94 + Math.random() * 0.1));
-        const ry = (Math.random() - 0.5) * 0.14;  // stos nie jest idealnie równy
-        mesh.rotation.y = ry;
+        // Kolejność ścian w BoxGeometry: +x (kartki), −x (grzbiet), +y, −y (kartki), +z (okładka), −z (tył)
+        const mesh = new THREE.Mesh(t3.box, [t3.mats.pages, spineMat, t3.mats.pages, t3.mats.pages, coverMat, spineMat]);
+        mesh.scale.set(COVER_W, COVER_H, DEPTH);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         const book = {
-          row, tower: tw, pts, th, mesh, spineMat, coverMat,
+          row, tower: tw, pts, strip, mesh, spineMat, coverMat,
           t: new Date(row.created_at).getTime(),
-          y: base + th / 2, x: tw.x + (Math.random() - 0.5) * 0.18, z: (Math.random() - 0.5) * 0.15,
-          ry, drop: null, out: 0,
+          y: top - COVER_H / 2, x: tw.x + (Math.random() - 0.5) * 0.08, z: -idx * Z_STEP,
+          drop: null, out: 0,
         };
         coverTexture(row, tex => {
           if (book.coverMat.map) book.coverMat.map.dispose();
-          tex.center.set(0.5, 0.5);
-          tex.rotation = Math.PI / 2;
           book.coverMat.map = tex;
           book.sharedCover = true;
           book.coverMat.needsUpdate = true;
@@ -586,8 +551,17 @@ function buildWorld(readers, rows, sig) {
         });
         mesh.position.set(book.x, book.y, book.z);
         group.add(mesh);
+        // Książki z tyłu stoją na drewnianym stopniu (schodkowy stojak), nie wiszą w powietrzu
+        const stepH = top - COVER_H;
+        if (stepH > 0.01) {
+          book.step = new THREE.Mesh(t3.box, t3.mats.table);
+          book.step.scale.set(COVER_W * 0.92, stepH, Z_STEP);
+          book.step.position.set(tw.x, stepH / 2, book.z);
+          book.step.castShadow = true;
+          book.step.receiveShadow = true;
+          group.add(book.step);
+        }
         books.push(book);
-        base += th;
       });
   });
 
@@ -617,8 +591,8 @@ function placeAll(t) {
   world.books.forEach(b => {
     b.drop = null;
     b.mesh.visible = b.t <= t;
+    if (b.step) b.step.visible = b.mesh.visible;
     b.mesh.position.set(b.x, b.y, b.z);
-    b.mesh.rotation.set(0, b.ry, 0);
   });
   world.towers.forEach(tw => { tw.squash = null; });
   updateTowers();
@@ -628,84 +602,46 @@ function updateTowers() {
   world.towers.forEach(tw => {
     tw.height = 0;
     tw.pts = 0;
+    tw.topZ = 0;
   });
   world.books.forEach(b => {
-    if (!b.mesh.visible || (b.drop && !b.drop.landed)) return;  // w locie jeszcze się nie liczy
-    b.tower.height = Math.max(b.tower.height, b.y + b.th / 2);
+    if (!b.mesh.visible || b.drop) return;  // w locie jeszcze się nie liczy
+    if (b.y + COVER_H / 2 >= b.tower.height) {
+      b.tower.height = b.y + COVER_H / 2;
+      b.tower.topZ = b.z;
+    }
     b.tower.pts += b.pts;
   });
 }
 
 /* ----------------- Spadanie i lądowanie ----------------- */
-// Lot: okładką do kamery (obrót o 90° wokół osi x), tuż przed stosem przekręca się na płasko,
-// ale ląduje lekko przechylona i dotyka stosu jednym brzegiem
+// Książka spada prosto w dół, cały czas okładką do widza (bez żadnego obracania)
 function startDrop(b, now) {
-  const side = Math.random() < 0.5 ? -1 : 1;
-  // Początek: okładka do kamery, stoi pionowo tytułem do góry. Koniec lotu: prawie płasko,
-  // lekko przechylona. Obrót między nimi po najkrótszej drodze (slerp), bez skręcania się.
-  const rx1 = side * rand(0.08, 0.16);
-  const rz1 = rand(-0.07, 0.07);
-  const start = new THREE.Euler(Math.PI / 2 - rand(0.05, 0.2), b.ry + COVER_UPRIGHT + rand(-0.12, 0.12), rand(-0.1, 0.1));
-  b.drop = {
-    start: now, landed: false, rx1, rz1,
-    q0: new THREE.Quaternion().setFromEuler(start),
-    q1: new THREE.Quaternion().setFromEuler(new THREE.Euler(rx1, b.ry, rz1)),
-  };
+  b.drop = { start: now };
+  if (b.step) b.step.visible = true;
 }
 
-// O ile podnieść środek przechylonej książki, żeby niższy brzeg leżał na stosie
-const edgeLift = (rx, rz) => (BOOK_W / 2) * Math.abs(Math.sin(rx)) + (BOOK_L / 2) * Math.abs(Math.sin(rz));
-
-// Zwraca wysokość książki w tej klatce i ustawia jej obrót
+// Zwraca wysokość książki w tej klatce
 function dropStep(b, now) {
-  const d = b.drop;
-  const t = (now - d.start) / 1000;
-  let rx;
-  let rz;
-  let y;
-  if (t < FALL_S) {
-    const k = t / FALL_S;
-    const turn = smoothstep(0.45, 1, k);  // najpierw widać okładkę, obrót na płasko pod koniec lotu
-    b.mesh.quaternion.slerpQuaternions(d.q0, d.q1, turn);
-    // Pod koniec lotu przechył jest już mały; do podniesienia brzegu wystarczy przybliżenie
-    y = b.y + DROP_FROM * (1 - k * k) + edgeLift(d.rx1, d.rz1) + (BOOK_L / 2) * (1 - turn);  // droga ~ t²
-    return y;
-  } else {
-    if (!d.landed) {
-      d.landed = true;
-      land(b);
-    }
-    // Klapnięcie: przechył szybko gaśnie, z jednym małym wychyleniem w drugą stronę
-    const s = t - FALL_S;
-    const swing = Math.exp(-s / 0.075) * Math.cos(s * 26);
-    rx = d.rx1 * swing;
-    rz = d.rz1 * swing;
-    y = b.y + edgeLift(rx, rz);
-    if (s >= SETTLE_S) {
-      rx = 0;
-      rz = 0;
-      y = b.y;
-      b.drop = null;
-    }
-  }
-  b.mesh.rotation.set(rx, b.ry, rz);
-  return y;
+  const k = (now - b.drop.start) / 1000 / FALL_S;
+  if (k < 1) return b.y + DROP_FROM * (1 - k * k);  // droga ~ t²: przyspiesza jak przy spadaniu
+  b.drop = null;
+  land(b);
+  return b.y;
 }
 
-// Uderzenie: stos się ugina (grubsza książka = mocniej), spod okładki wylatuje kurz
+// Uderzenie: stos się ugina (większa książka = mocniej), spod książki wylatuje kurz
 function land(b) {
-  b.tower.squash = { start: performance.now(), amp: 0.04 + Math.min(0.08, b.th * 0.12) };
+  b.tower.squash = { start: performance.now(), amp: 0.05 + Math.min(0.06, b.strip * 0.08) };
   if (reduced()) return;
   const D = t3.dust;
-  const n = 10 + Math.round(Math.min(10, b.th * 12));
+  const n = 14;
   for (let i = 0; i < n; i++) {
     const j = D.next;
     D.next = (D.next + 1) % DUST;
-    // Start na obwodzie książki, lot na zewnątrz i lekko w górę
+    // Start wzdłuż dolnej krawędzi książki (na jej stopniu), lot na boki i lekko w górę
     const a = rand(0, Math.PI * 2);
-    const ex = Math.cos(a) * (BOOK_L / 2);
-    const ez = Math.sin(a) * (BOOK_W / 2);
-    D.pos.set([b.x + ex, b.y - b.th / 2 + 0.02, b.z + ez], j * 3);
+    D.pos.set([b.x + rand(-COVER_W / 2, COVER_W / 2), b.y - COVER_H / 2 + 0.02, b.z + rand(-DEPTH, DEPTH)], j * 3);
     D.vel.set([Math.cos(a) * rand(0.6, 1.6), rand(0.15, 0.6), Math.sin(a) * rand(0.6, 1.6)], j * 3);
     D.life[j] = D.max[j] = rand(0.45, 0.8);
   }
@@ -818,25 +754,27 @@ function frame(now) {
       y = dropStep(b, now);
       busy = true;
     } else if (b.tower.dip && b.mesh.visible) {
-      // Niższe książki uginają się mniej niż górne
-      y -= b.tower.dip * ((b.y + b.th / 2) / Math.max(0.1, b.tower.height));
+      // Książki niżej w kaskadzie uginają się mniej niż górne
+      y -= b.tower.dip * ((b.y + COVER_H / 2) / Math.max(0.1, b.tower.height));
     }
     b.mesh.position.y = y;
-    // Wybrana książka wysuwa się ze stosu w stronę kamery
-    const outGoal = t3.selected === b ? OUT : 0;
+    // Wybrana książka wysuwa się przed całą kaskadę i trochę rośnie, żeby było widać całą okładkę
+    const outGoal = t3.selected === b ? 1 : 0;
     if (Math.abs(b.out - outGoal) > 0.002) {
       b.out += (outGoal - b.out) * ease(dt, 120);
       busy = true;
     }
-    b.mesh.position.z = b.z + b.out;
+    const grow = 1 + 0.25 * b.out;
+    b.mesh.scale.set(COVER_W * grow, COVER_H * grow, DEPTH * grow);
+    b.mesh.position.z = b.z + (OUT - b.z) * b.out;
   }
   if (updateDust(dt)) busy = true;
   updateTowers();
 
-  // Korona na najwyższej wieży
-  const top = world.towers.reduce((a, b) => (b.height > a.height ? b : a));
-  world.crown.visible = top.height > 0;
-  world.crown.position.set(top.x, top.height + 0.55 + Math.sin(now * 0.002) * 0.08, 0);
+  // Korona nad wieżą lidera punktów (na jego najnowszej książce)
+  const top = world.towers.reduce((a, b) => (b.pts > a.pts ? b : a));
+  world.crown.visible = top.pts > 0;
+  world.crown.position.set(top.x, top.height + 0.55 + Math.sin(now * 0.002) * 0.08, top.topZ);
   world.crown.rotation.y += dt * 0.0012;  // kręci się, póki pętla działa; potem stoi
 
   if (updateCamera(dt)) busy = true;
@@ -861,7 +799,7 @@ function updateCamera(dt) {
   const halfW = world.width / 2 + 1.6;
   // Zapas u góry na koronę i datę/„Powtórz”, u dołu na etykiety z imionami
   const halfH = tallest / 2 + 2.2;
-  const distGoal = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) + BOOK_W + 2;
+  const distGoal = Math.max(halfW / Math.tan(hfov / 2), halfH / Math.tan(vfov / 2)) + 3;
   const yGoal = tallest * 0.5;
   const k = ease(dt, 260);
   const before = cam.dist + cam.y + cam.yaw + cam.pitch;
@@ -883,7 +821,8 @@ function updateOverlay() {
   const { camera, size } = t3;
   camera.updateMatrixWorld();
   for (const tw of world.towers) {
-    const v = t3.tmpV.set(tw.x, -0.1, BOOK_W * 0.9).project(camera);
+    // Na przedniej krawędzi stołu, pod okładkami (nie zasłania najniższej książki)
+    const v = t3.tmpV.set(tw.x, -0.45, world.radius * 0.55).project(camera);
     tw.label.style.transform = `translate(${((v.x + 1) / 2) * size.w}px, ${((1 - v.y) / 2) * size.h}px) translate(-50%, 0)`;
     const pts = Math.round(tw.pts);
     if (tw.shownPts !== pts) {
