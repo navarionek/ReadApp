@@ -1,5 +1,6 @@
 import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs, viewerId } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
+import { syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
 import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
@@ -82,6 +83,8 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('multiplier-add-form').addEventListener('submit', handleMultiplierAdd);
   document.getElementById('race-play').addEventListener('click', playRace);
   document.getElementById('notify-toggle').addEventListener('click', handleNotifyToggle);  // menu zostaje otwarte, widać przełącznik
+  document.getElementById('cover-bg-toggle').addEventListener('click', toggleStartWall);  // jw.
+  syncStartWallToggle();
   document.getElementById('view-as-btn').addEventListener('click', handleViewAs);
   document.getElementById('view-as-exit').addEventListener('click', () => setViewAs(null));
 
