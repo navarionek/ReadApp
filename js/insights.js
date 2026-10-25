@@ -67,17 +67,24 @@ function bestBucket(rows, keyOf) {
   return { userId, bucket, points: best.points };
 }
 
-function record(iconName, label, main, sub) {
+const record = (iconName, label, main, sub) => ({ icon: iconName, label, main, sub });
+
+function recordEl(r) {
   return el('div', { class: 'record' }, [
-    el('span', { class: 'record-icon' }, [icon(iconName)]),
-    el('span', { class: 'record-label', text: label }),
-    el('span', { class: 'record-main', text: main }),
-    el('span', { class: 'record-sub', text: sub }),
+    el('span', { class: 'record-icon' }, [icon(r.icon)]),
+    el('span', { class: 'record-label', text: r.label }),
+    el('span', { class: 'record-main', text: r.main }),
+    el('span', { class: 'record-sub', text: r.sub }),
   ]);
 }
 
 function renderRecords(readers, rows) {
-  const container = document.getElementById('records-grid');
+  const items = recordItems(readers, rows);
+  document.getElementById('records-grid').replaceChildren(...(items.length ? items.map(recordEl) : [empty('Brak wpisów w tym roku.')]));
+}
+
+// Rekordy roku jako dane ({ icon, label, main, sub }); rysują je Statystyki i widok TV
+export function recordItems(readers, rows) {
   const nameOf = new Map(readers.map(r => [r.key, firstName(r.name)]));
   const who = id => nameOf.get(id) || '?';
   const items = [];
@@ -152,8 +159,7 @@ function renderRecords(readers, rows) {
       items.push(record('landmark', 'Najstarsza książka', oldest.title || 'bez tytułu', `${who(oldest.user_id)} · wydana ${oldest.published_year}`));
     }
   }
-
-  container.replaceChildren(...(items.length ? items : [empty('Brak wpisów w tym roku.')]));
+  return items;
 }
 
 /* ----- 5. Rozkład długości książek ----- */

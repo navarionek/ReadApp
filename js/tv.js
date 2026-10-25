@@ -1,29 +1,23 @@
+import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { groupByReader } from './data.js';
 import { daysSince } from './form.js';
-import { hideRace3d, showRace3d } from './race3d.js';
+import { recordItems } from './insights.js';
 import { avatar } from './ranking.js';
 import { closeSettings } from './shell.js';
 import { coverEl } from './shelf.js';
 import { state } from './state.js';
-import { compactNumber, formatDay, seriesColors } from './stats.js';
+import { buildRaceSeries, compactNumber, formatDay, MONTHS_PL as MONTHS_SHORT, seriesColors, valueAt } from './stats.js';
 import { supabaseClient } from './supabase.js';
-import { hideTowers3d, showTowers3d } from './towers3d.js';
-import { currentYear, el, friendlyError, icon, refreshIcons, showToast } from './ui.js';
+import { currentYear, DAY_MS, el, friendlyError, icon, refreshIcons, showToast } from './ui.js';
 
 /* ----------------- Widok TV (?tv=token) ----------------- */
 // Telewizor (np. Fully Kiosk Browser) otwiera czytanko.com/?tv=token i bez logowania pokazuje
-// na zmianę: ranking, wyścig 3D, wieże okładek i „Teraz czytają”. Dane przychodzą z funkcji
-// tv-feed, która sprawdza token. Nic tu nie da się kliknąć ani zmienić.
+// na zmianę kilka ekranów ze statystykami. Dane przychodzą z funkcji tv-feed, która sprawdza
+// token. Nic tu nie da się kliknąć ani zmienić.
 
 const TOKEN_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';  // bez l/1/o/0/i: łatwo wpisać pilotem
 const REFRESH_MS = 10 * 60 * 1000;
 const RETRY_MS = 60 * 1000;
-const PANELS = [
-  { id: 'ranking', title: 'Ranking', ms: 15000 },
-  { id: 'race', title: 'Wyścig', ms: 27000 },
-  { id: 'towers', title: 'Wieże z książek', ms: 22000 },
-  { id: 'reading', title: 'Teraz czytają', ms: 18000 },
-];
 const DAYS_PL = ['niedziela', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota'];
 const MONTHS_FULL = ['stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca', 'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia'];
 
@@ -131,6 +125,21 @@ export async function openTvLinkDialog() {
 }
 
 /* ----------------- Sam widok TV ----------------- */
+// Wszystko na zwykłym HTML/CSS (bez WebGL), bo procesory telewizorów nie dają rady scenom 3D.
+// Każdy panel ma render (przy każdych nowych danych), a niektóre enter/leave: animacja rusza
+// od początku przy każdym pokazaniu i staje, gdy panel znika.
+const PANELS = [
+  { id: 'ranking', title: 'Ranking', ms: 14000, render: renderRanking },
+  { id: 'race', title: 'Wyścig roku', ms: 19000, render: renderRaceBars, enter: startRaceBars, leave: stopRaceBars },
+  { id: 'mosaic', title: 'Okładki roku', ms: 18000, render: renderMosaic, enter: startMosaic, leave: stopMosaic },
+  { id: 'numbers', title: 'Rok w liczbach', ms: 14000, render: renderNumbers, enter: startNumbers, leave: stopNumbers },
+  { id: 'records', title: 'Rekordy', ms: 16000, render: renderRecordsTv },
+  { id: 'calendar', title: 'Kalendarz czytania', ms: 15000, render: renderCalendar },
+  { id: 'reading', title: 'Teraz czytają', ms: 16000, render: renderReading },
+];
+const RACE_MS = 13000;     // cały rok w wyścigu słupkowym
+const COUNT_MS = 1800;     // odliczanie liczb w „Rok w liczbach”
+
 const tv = {
   token: null,
   root: null,
@@ -143,8 +152,11 @@ const tv = {
   date: null,
   index: -1,
   timer: null,
-  prize: '',
   loaded: false,
+  race: null,
+  raceFrame: null,
+  countFrame: null,
+  mosaicAnim: null,
 };
 
 export async function startTv(token) {
@@ -167,16 +179,11 @@ function buildTv() {
   tv.stage = el('div', { class: 'tv-stage' });
   tv.message = el('div', { class: 'tv-message', hidden: '' });
   tv.stage.appendChild(tv.message);
-
   PANELS.forEach(p => {
     const panel = el('section', { class: `tv-panel tv-panel-${p.id}`, hidden: '' });
     tv.panels.set(p.id, panel);
     tv.stage.appendChild(panel);
   });
-  // Karty 3D przenosimy z ekranu Statystyki (tam w trybie TV i tak nikt nie zajrzy)
-  tv.panels.get('race').appendChild(document.getElementById('race3d'));
-  tv.panels.get('towers').appendChild(document.getElementById('towers3d'));
-
   tv.root = el('div', { id: 'tv', class: 'tv' }, [
     el('header', { class: 'tv-header' }, [
       el('span', { class: 'tv-brand', text: 'Czytanko' }),
@@ -226,8 +233,7 @@ async function load() {
 // Komunikat to osobna warstwa nad panelami: po udanym wczytaniu po prostu znika
 function showMessage(text) {
   clearTimeout(tv.timer);
-  hideRace3d();
-  hideTowers3d();
+  PANELS[tv.index]?.leave?.();
   tv.panels.forEach(panel => { panel.hidden = true; });
   tv.message.textContent = text;
   tv.message.hidden = false;
@@ -242,45 +248,52 @@ function apply(data) {
   state.readingNow = data.readingNow || [];
   state.statsReaders = groupByReader(rows);
   state.statsRows = rows;
-  tv.prize = data.prize || '';
-  renderRanking();
-  renderReading();
+  PANELS.forEach(p => p.render());
+  refreshIcons();
   tv.message.hidden = true;
   if (!tv.loaded) {
     tv.loaded = true;
     next();
   } else {
-    // Odświeżenie w trakcie: aktualny panel 3D sam przebuduje scenę, jeśli dane się zmieniły
-    const current = PANELS[tv.index]?.id;
-    if (current === 'race') showRace3d(false);
-    if (current === 'towers') showTowers3d(false);
+    // Odświeżenie w trakcie: panel z animacją zaczyna ją od nowa na świeżych danych
+    PANELS[tv.index]?.enter?.();
   }
 }
 
-// Kolejny panel: chowamy poprzedni (3D przestaje rysować), pokazujemy następny
+// Kolejny panel: poprzedni zatrzymuje animacje, następny zaczyna je od początku
 function next() {
   const prev = PANELS[tv.index];
   tv.index = (tv.index + 1) % PANELS.length;
   const panel = PANELS[tv.index];
-  if (prev) tv.panels.get(prev.id).hidden = true;
-  if (prev?.id === 'race') hideRace3d();
-  if (prev?.id === 'towers') hideTowers3d();
-
+  if (prev) {
+    prev.leave?.();
+    tv.panels.get(prev.id).hidden = true;
+  }
   tv.panels.get(panel.id).hidden = false;
   tv.title.textContent = panel.title;
   [...tv.dots.children].forEach((dot, i) => dot.classList.toggle('on', i === tv.index));
-  // Wyścig i wieże za każdym razem odgrywają się od początku
-  if (panel.id === 'race') requestAnimationFrame(() => showRace3d(true));
-  if (panel.id === 'towers') requestAnimationFrame(() => showTowers3d(true));
+  requestAnimationFrame(() => panel.enter?.());
   clearTimeout(tv.timer);
   tv.timer = setTimeout(next, panel.ms);
 }
 
+const sortedReaders = () => [...state.statsReaders].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'pl'));
+const colorsOf = () => seriesColors(state.statsReaders);
+
+function emptyPanel(id, text) {
+  tv.panels.get(id).replaceChildren(el('div', { class: 'tv-message', text }));
+}
+
+/* ----- Ranking ----- */
 function renderRanking() {
-  const readers = [...state.statsReaders].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'pl'));
-  const colors = seriesColors(state.statsReaders);
+  const readers = sortedReaders();
+  const colors = colorsOf();
+  if (!readers.length) {
+    emptyPanel('ranking', 'Jeszcze nikt nic nie przeczytał w tym roku.');
+    return;
+  }
   const max = Math.max(1, ...readers.map(r => r.points));
-  const rows = readers.map((r, i) => {
+  tv.panels.get('ranking').replaceChildren(el('div', { class: 'tv-rank' }, readers.map((r, i) => {
     const bar = el('span', { class: 'tv-bar-fill' });
     bar.style.width = `${(r.points / max) * 100}%`;
     bar.style.background = colors.get(r.key);
@@ -297,19 +310,247 @@ function renderRanking() {
       ]),
       el('strong', { class: 'tv-rank-pts', text: `${compactNumber(r.points)} pkt` }),
     ]);
-  });
-  tv.panels.get('ranking').replaceChildren(
-    el('div', { class: 'tv-rank' }, rows.length ? rows : [el('div', { class: 'tv-message', text: 'Jeszcze nikt nic nie przeczytał w tym roku.' })]),
-    ...(tv.prize ? [el('div', { class: 'tv-prize' }, [icon('gift'), el('span', { text: `Nagroda ${currentYear()}: ${tv.prize}` })])] : []),
-  );
-  refreshIcons();
+  })));
 }
 
+/* ----- Wyścig słupkowy ----- */
+// Paski osób rosną przez cały rok i zamieniają się miejscami, gdy ktoś kogoś wyprzedzi
+function renderRaceBars() {
+  const series = buildRaceSeries(state.statsReaders, state.statsRows);
+  if (!series.length) {
+    tv.race = null;
+    emptyPanel('race', 'Wyścig ruszy po pierwszej książce.');
+    return;
+  }
+  const colors = colorsOf();
+  const byKey = new Map(state.statsReaders.map(r => [r.key, r]));
+  const rowH = Math.min(13, 66 / series.length);  // vh na wiersz
+  const rows = series.map(s => {
+    const fill = el('span', { class: 'tv-race-fill' });
+    fill.style.background = s.color;
+    fill.style.color = s.color;  // poświata (box-shadow: currentColor) w kolorze osoby
+    const value = el('strong', { class: 'tv-race-value' });
+    const crown = el('span', { class: 'tv-crown', hidden: '' }, [icon('crown')]);
+    const row = el('div', { class: 'tv-race-row' }, [
+      avatar(byKey.get(s.key), colors, 'rank-avatar-lg'),
+      el('span', { class: 'tv-race-name' }, [document.createTextNode(firstName(s.name)), crown]),
+      el('span', { class: 'tv-race-track' }, [fill, value]),
+    ]);
+    row.style.height = `${rowH * 0.8}vh`;
+    return { s, row, fill, value, crown };
+  });
+  const date = el('div', { class: 'tv-race-date' });
+  const list = el('div', { class: 'tv-race-list' }, rows.map(r => r.row));
+  list.style.height = `${rowH * series.length}vh`;
+  const t0 = new Date(currentYear(), 0, 1).getTime();
+  tv.race = { rows, date, rowH, t0, t1: Math.max(Date.now(), t0 + DAY_MS) };
+  tv.panels.get('race').replaceChildren(date, list);
+  setRaceFrame(1);
+}
+
+function setRaceFrame(p) {
+  const { rows, date, rowH, t0, t1 } = tv.race;
+  const t = t0 + p * (t1 - t0);
+  const values = rows.map(r => valueAt(r.s, t));
+  const max = Math.max(1, ...values);
+  const order = rows.map((r, i) => i).sort((a, b) => values[b] - values[a] || rows[a].s.name.localeCompare(rows[b].s.name, 'pl'));
+  order.forEach((i, rank) => {
+    const r = rows[i];
+    r.fill.style.width = `${(values[i] / max) * 100}%`;
+    r.value.textContent = `${compactNumber(values[i])} pkt`;
+    r.row.style.transform = `translateY(${rank * rowH}vh)`;
+    r.crown.hidden = rank !== 0 || values[i] === 0;
+  });
+  date.textContent = p >= 1 ? 'dziś' : formatDay(new Date(t));
+}
+
+function startRaceBars() {
+  stopRaceBars();
+  if (!tv.race) return;
+  const start = performance.now();
+  const step = now => {
+    // Pod koniec zwalnia, żeby ostatnie dni było widać
+    const k = Math.min(1, (now - start) / RACE_MS);
+    setRaceFrame(1 - (1 - k) ** 1.6);
+    tv.raceFrame = k < 1 ? requestAnimationFrame(step) : null;
+  };
+  setRaceFrame(0);
+  tv.raceFrame = requestAnimationFrame(step);
+}
+
+function stopRaceBars() {
+  cancelAnimationFrame(tv.raceFrame);
+  tv.raceFrame = null;
+}
+
+/* ----- Mozaika okładek ----- */
+// Wszystkie okładki roku (najnowsze pierwsze); gdy się nie mieszczą, ściana powoli zjeżdża w dół
+function renderMosaic() {
+  const colors = colorsOf();
+  const rows = [...state.statsRows].reverse();
+  if (!rows.length) {
+    emptyPanel('mosaic', 'Tu pojawią się okładki przeczytanych książek.');
+    return;
+  }
+  const grid = el('div', { class: 'tv-mosaic' }, rows.map((r, i) => {
+    const who = el('span', { class: 'tv-tile-who', text: firstName(r.profiles?.display_name) });
+    who.style.background = colors.get(r.user_id);
+    const tile = el('div', { class: 'tv-tile' }, [coverEl(r), who]);
+    tile.style.animationDelay = `${Math.min(i, 30) * 40}ms`;
+    return tile;
+  }));
+  tv.panels.get('mosaic').replaceChildren(el('div', { class: 'tv-mosaic-viewport' }, [grid]));
+}
+
+function startMosaic() {
+  stopMosaic();
+  const viewport = tv.panels.get('mosaic').querySelector('.tv-mosaic-viewport');
+  const grid = viewport?.firstChild;
+  if (!grid) return;
+  const overflow = grid.scrollHeight - viewport.clientHeight;
+  if (overflow <= 0) return;
+  const duration = PANELS.find(p => p.id === 'mosaic').ms - 3000;
+  tv.mosaicAnim = grid.animate(
+    [{ transform: 'translateY(0)' }, { transform: `translateY(${-overflow}px)` }],
+    { duration, delay: 1500, easing: 'ease-in-out', fill: 'forwards' },
+  );
+}
+
+function stopMosaic() {
+  tv.mosaicAnim?.cancel();
+  tv.mosaicAnim = null;
+}
+
+/* ----- Rok w liczbach ----- */
+function renderNumbers() {
+  const rows = state.statsRows;
+  if (!rows.length) {
+    emptyPanel('numbers', 'Liczby pojawią się po pierwszej książce.');
+    return;
+  }
+  const pages = rows.reduce((s, r) => s + r.pages, 0);
+  const points = state.statsReaders.reduce((s, r) => s + r.points, 0);
+  const longest = rows.reduce((a, b) => (b.pages > a.pages ? b : a));
+  const dayOfYear = Math.max(1, Math.ceil((Date.now() - new Date(currentYear(), 0, 1).getTime()) / DAY_MS));
+  // Kartka ma 2 strony i ~0,1 mm grubości
+  const stackCm = Math.round((pages / 2) * 0.01);
+  const stack = stackCm >= 100 ? `${String(Math.round(stackCm / 10) / 10).replace('.', ',')} m` : `${stackCm} cm`;
+  const tile = (value, label, sub = '') => el('div', { class: 'tv-num' }, [
+    el('strong', { class: 'tv-num-value', 'data-target': String(value), text: '0' }),
+    el('span', { class: 'tv-num-label', text: label }),
+    ...(sub ? [el('span', { class: 'tv-num-sub', text: sub })] : []),
+  ]);
+  tv.panels.get('numbers').replaceChildren(el('div', { class: 'tv-nums' }, [
+    tile(pages, 'stron razem', `stos kartek wysokości ok. ${stack}`),
+    tile(rows.length, pl(rows.length, 'książka', 'książki', 'książek')),
+    tile(points, 'punktów'),
+    tile(Math.round(pages / rows.length), 'średnio stron na książkę'),
+    tile(Math.round(pages / dayOfYear), 'stron dziennie (razem)'),
+    tile(longest.pages, 'stron ma najdłuższa', `${longest.title || 'bez tytułu'} · ${firstName(longest.profiles?.display_name)}`),
+  ]));
+  setCounts(1);
+}
+
+function setCounts(k) {
+  tv.panels.get('numbers').querySelectorAll('.tv-num-value').forEach(node => {
+    const target = Number(node.dataset.target);
+    node.textContent = Math.round(target * k).toLocaleString('pl-PL');
+  });
+}
+
+function startNumbers() {
+  stopNumbers();
+  const start = performance.now();
+  const step = now => {
+    const k = Math.min(1, (now - start) / COUNT_MS);
+    setCounts(1 - (1 - k) ** 3);
+    tv.countFrame = k < 1 ? requestAnimationFrame(step) : null;
+  };
+  setCounts(0);
+  tv.countFrame = requestAnimationFrame(step);
+}
+
+function stopNumbers() {
+  cancelAnimationFrame(tv.countFrame);
+  tv.countFrame = null;
+}
+
+/* ----- Rekordy ----- */
+function renderRecordsTv() {
+  const items = recordItems(state.statsReaders, state.statsRows).slice(0, 6);
+  if (!items.length) {
+    emptyPanel('records', 'Rekordy pojawią się po pierwszej książce.');
+    return;
+  }
+  tv.panels.get('records').replaceChildren(el('div', { class: 'tv-records' }, items.map((r, i) => {
+    const card = el('div', { class: 'tv-record' }, [
+      el('span', { class: 'tv-record-icon' }, [icon(r.icon)]),
+      el('span', { class: 'tv-record-label', text: r.label }),
+      el('strong', { class: 'tv-record-main', text: r.main }),
+      el('span', { class: 'tv-record-sub', text: r.sub }),
+    ]);
+    card.style.animationDelay = `${i * 120}ms`;
+    return card;
+  })));
+}
+
+/* ----- Kalendarz czytania ----- */
+// Tydzień po tygodniu: im więcej punktów za skończone w tym tygodniu książki, tym mocniejszy kolor
+function renderCalendar() {
+  const readers = sortedReaders();
+  if (!readers.length) {
+    emptyPanel('calendar', 'Kalendarz zapełni się, gdy zaczniecie czytać.');
+    return;
+  }
+  const colors = colorsOf();
+  const t0 = new Date(currentYear(), 0, 1).getTime();
+  const week = iso => Math.floor((new Date(iso).getTime() - t0) / (7 * DAY_MS));
+  const weeks = Math.max(1, week(new Date().toISOString()) + 1);
+  const sums = new Map(readers.map(r => [r.key, new Array(weeks).fill(0)]));
+  state.statsRows.forEach(row => {
+    const w = week(row.created_at);
+    const list = sums.get(row.user_id);
+    if (list && w >= 0 && w < weeks) list[w] += bookPoints(row);
+  });
+  const max = Math.max(1, ...[...sums.values()].flat());
+
+  const columns = `minmax(0, 11vw) repeat(${weeks}, minmax(0, 1fr))`;
+  const months = el('div', { class: 'tv-cal-row tv-cal-months' }, [el('span')]);
+  months.style.gridTemplateColumns = columns;
+  for (let m = 0; m <= new Date().getMonth(); m++) {
+    const label = el('span', { class: 'tv-cal-month', text: MONTHS_SHORT[m] });
+    label.style.gridColumn = `${week(new Date(currentYear(), m, 1).toISOString()) + 2}`;
+    months.appendChild(label);
+  }
+  const rows = readers.map(r => {
+    const cells = sums.get(r.key).map(v => {
+      const cell = el('i', { class: 'tv-cal-cell' });
+      if (v > 0) {
+        cell.style.background = colors.get(r.key);
+        cell.style.opacity = String(0.35 + 0.65 * (v / max));
+      }
+      return cell;
+    });
+    const row = el('div', { class: 'tv-cal-row' }, [
+      el('span', { class: 'tv-cal-who' }, [avatar(r, colors), el('span', { text: firstName(r.name) })]),
+      ...cells,
+    ]);
+    row.style.gridTemplateColumns = columns;
+    return row;
+  });
+  tv.panels.get('calendar').replaceChildren(el('div', { class: 'tv-cal' }, [
+    months,
+    ...rows,
+    el('p', { class: 'tv-cal-hint', text: 'Każdy kwadrat to tydzień. Im mocniejszy kolor, tym więcej punktów za skończone wtedy książki.' }),
+  ]));
+}
+
+/* ----- Teraz czytają ----- */
 function bookCard(book, lines) {
   return el('div', { class: 'tv-book' }, [
     coverEl(book, 'large'),
     el('strong', { class: 'tv-book-title', text: book.title || 'bez tytułu' }),
-    ...lines.map(text => el('span', { class: 'tv-book-meta', text })),
+    el('span', { class: 'tv-book-meta', text: lines.join(' · ') }),
   ]);
 }
 

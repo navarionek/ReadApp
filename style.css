@@ -3478,11 +3478,6 @@ input[type="date"].plain-input {
   from { opacity: 0; transform: translateY(1.2vh); }
 }
 
-.tv-panel .race3d {
-  height: 100%;
-  border-radius: 1.4vh;
-}
-
 .tv-dots {
   display: flex;
   justify-content: center;
@@ -3606,30 +3601,12 @@ input[type="date"].plain-input {
   font-variant-numeric: tabular-nums;
 }
 
-.tv-prize {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 1vw;
-  font-size: 2.4vh;
-  color: #f0c75e;
-  white-space: nowrap;
-  transform: translateX(-50%);
-}
-
-.tv-prize svg {
-  width: 2.8vh;
-  height: 2.8vh;
-}
-
 /* Teraz czytają / ostatnio skończone */
 .tv-panel-reading {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4vh;
+  gap: 3vh;
 }
 
 .tv-shelf-title {
@@ -3648,13 +3625,13 @@ input[type="date"].plain-input {
   display: flex;
   flex-direction: column;
   gap: 0.5vh;
-  width: 16vh;
+  width: 13vh;
   flex-shrink: 0;
 }
 
 .tv-book .book-cover {
-  width: 16vh;
-  height: 24vh;
+  width: 13vh;
+  height: 19.5vh;
   border-radius: 0.6vh 1vh 1vh 0.6vh;
 }
 
@@ -3674,6 +3651,284 @@ input[type="date"].plain-input {
 }
 
 .tv-book-meta {
+  overflow: hidden;
   font-size: 1.7vh;
   color: #94a3b8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Wyścig słupkowy */
+.tv-panel-race {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4vw;
+}
+
+.tv-race-date {
+  align-self: flex-end;
+  margin-bottom: 2vh;
+  font-size: 7vh;
+  font-weight: 900;
+  color: rgb(255 255 255 / 0.18);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-race-list {
+  position: relative;
+}
+
+.tv-race-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: 9vh 14vw minmax(0, 1fr);
+  align-items: center;
+  gap: 1.6vw;
+  transition: transform 0.6s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.tv-race-row .rank-avatar {
+  display: grid;
+  place-items: center;
+  width: 9vh;
+  height: 9vh;
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: 4vh;
+  font-weight: 800;
+  color: #fff;
+}
+
+.tv-race-name {
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+  font-size: 4vh;
+  font-weight: 800;
+}
+
+.tv-race-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 6.5vh;
+}
+
+.tv-race-fill {
+  height: 100%;
+  min-width: 0.6vh;
+  border-radius: 0 1.2vh 1.2vh 0;
+  box-shadow: 0 0 3vh -0.5vh currentColor;
+}
+
+.tv-race-value {
+  margin-left: 1.2vw;
+  font-size: 3.6vh;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mozaika okładek */
+.tv-mosaic-viewport {
+  height: 100%;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 4%, #000 96%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 4%, #000 96%, transparent);
+}
+
+.tv-mosaic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13vh, 1fr));
+  gap: 1.6vh;
+  padding: 1.5vh 0;
+  will-change: transform;
+}
+
+.tv-tile {
+  position: relative;
+  animation: tv-tile-in 0.6s ease-out backwards;
+}
+
+@keyframes tv-tile-in {
+  from { opacity: 0; transform: scale(0.85); }
+}
+
+.tv-tile .book-cover {
+  border-radius: 0.5vh 0.9vh 0.9vh 0.5vh;
+}
+
+.tv-tile .ph-title {
+  font-size: 1.8vh;
+}
+
+.tv-tile .ph-author {
+  font-size: 1.3vh;
+}
+
+.tv-tile-who {
+  position: absolute;
+  left: 0.6vh;
+  bottom: 0.6vh;
+  padding: 0.2vh 0.8vh;
+  border-radius: 1vh;
+  font-size: 1.5vh;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* Rok w liczbach */
+.tv-nums {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  gap: 3vh 3vw;
+  height: 100%;
+  padding: 0 3vw;
+}
+
+.tv-num {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  padding: 3vh 2vw;
+  border-radius: 2vh;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.tv-num-value {
+  font-size: 9vh;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(120deg, #fff 30%, #a5b4fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-num-label {
+  font-size: 2.6vh;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.tv-num-sub {
+  overflow: hidden;
+  font-size: 1.9vh;
+  color: #94a3b8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Rekordy */
+.tv-records {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: center;
+  gap: 3vh 2.5vw;
+  height: 100%;
+  padding: 0 3vw;
+}
+
+.tv-record {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  padding: 3vh 2vw;
+  border-radius: 2vh;
+  background: rgb(255 255 255 / 0.04);
+  animation: tv-in 0.7s ease-out backwards;
+}
+
+.tv-record-icon svg {
+  width: 5vh;
+  height: 5vh;
+  color: #f0c75e;
+}
+
+.tv-record-label {
+  font-size: 2vh;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.tv-record-main {
+  overflow: hidden;
+  font-size: 3.8vh;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.tv-record-sub {
+  font-size: 2vh;
+  color: #cbd5e1;
+}
+
+/* Kalendarz czytania */
+.tv-cal {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.4vh;
+  height: 100%;
+  padding: 0 2vw;
+}
+
+.tv-cal-row {
+  display: grid;
+  align-items: center;
+  gap: 0.35vw;
+}
+
+.tv-cal-months {
+  margin-bottom: 0.4vh;
+}
+
+.tv-cal-month {
+  font-size: 1.7vh;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.tv-cal-who {
+  display: flex;
+  align-items: center;
+  gap: 0.8vw;
+  font-size: 2.6vh;
+  font-weight: 800;
+}
+
+.tv-cal-who .rank-avatar {
+  display: grid;
+  place-items: center;
+  width: 5vh;
+  height: 5vh;
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: 2.4vh;
+  color: #fff;
+}
+
+.tv-cal-cell {
+  aspect-ratio: 1;
+  border-radius: 0.5vh;
+  background: rgb(255 255 255 / 0.06);
+}
+
+.tv-cal-hint {
+  margin-top: 2vh;
+  font-size: 1.9vh;
+  color: #94a3b8;
+  text-align: center;
 }
