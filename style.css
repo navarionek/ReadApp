@@ -3932,3 +3932,112 @@ input[type="date"].plain-input {
   color: #94a3b8;
   text-align: center;
 }
+
+/* Ściana okładek na cały ekran (animacja „idle”) */
+.tv.tv-full {
+  padding: 0;
+  gap: 0;
+}
+
+.tv-full .tv-header,
+.tv-full .tv-dots {
+  display: none;
+}
+
+.tv-full .tv-stage {
+  grid-row: 1 / -1;
+}
+
+.tv-panel-wall {
+  overflow: hidden;
+  animation-duration: 2s;
+}
+
+.tv-wall {
+  position: absolute;
+  inset: -12vh -8vw;
+  display: flex;
+  justify-content: center;
+  gap: 1.6vh;
+  transform: rotate(-7deg) scale(1.08);
+}
+
+.tv-wall-col {
+  flex: 0 0 17vh;
+}
+
+.tv-wall-strip {
+  animation: tv-wall-up linear infinite;
+  will-change: transform;
+}
+
+.tv-wall-col.down .tv-wall-strip {
+  animation-name: tv-wall-down;
+}
+
+@keyframes tv-wall-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+
+@keyframes tv-wall-down {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+
+/* Odstęp marginesem, nie gap: wtedy połowa paska to dokładnie jedna kopia listy (pętla bez skoku) */
+.tv-wall-tile {
+  position: relative;
+  margin-bottom: 1.6vh;
+  border-radius: 0.6vh 1vh 1vh 0.6vh;
+  transition: transform 0.9s ease, box-shadow 0.9s ease, filter 0.9s ease;
+  filter: brightness(0.82) saturate(0.9);
+}
+
+.tv-wall-tile .book-cover {
+  border-radius: inherit;
+}
+
+.tv-wall-tile .ph-title {
+  font-size: 2.2vh;
+}
+
+.tv-wall-tile .ph-author {
+  font-size: 1.5vh;
+}
+
+.tv-wall-tile .tv-tile-who {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.tv-wall-tile.glow {
+  z-index: 2;
+  filter: none;
+  transform: scale(1.14);
+  box-shadow: 0 0 5vh rgb(240 199 94 / 0.45), 0 2vh 4vh rgb(0 0 0 / 0.6);
+}
+
+.tv-wall-tile.glow .tv-tile-who {
+  opacity: 1;
+}
+
+.tv-wall-shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgb(5 6 12 / 0.75) 100%),
+    linear-gradient(transparent 70%, rgb(5 6 12 / 0.55));
+}
+
+.tv-mini-clock {
+  position: absolute;
+  right: 3vw;
+  bottom: 3vh;
+  font-size: 5vh;
+  font-weight: 800;
+  color: rgb(255 255 255 / 0.85);
+  text-shadow: 0 0.4vh 2vh rgb(0 0 0 / 0.7);
+  font-variant-numeric: tabular-nums;
+}

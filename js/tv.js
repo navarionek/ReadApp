@@ -127,8 +127,9 @@ export async function openTvLinkDialog() {
 /* ----------------- Sam widok TV ----------------- */
 // Wszystko na zwykłym HTML/CSS (bez WebGL), bo procesory telewizorów nie dają rady scenom 3D.
 // Każdy panel ma render (przy każdych nowych danych), a niektóre enter/leave: animacja rusza
-// od początku przy każdym pokazaniu i staje, gdy panel znika.
+// od początku przy każdym pokazaniu i staje, gdy panel znika. full = bez nagłówka, cały ekran.
 const PANELS = [
+  { id: 'wall', title: '', ms: 0, full: true, render: renderWall, enter: startWall, leave: stopWall },
   { id: 'ranking', title: 'Ranking', ms: 14000, render: renderRanking },
   { id: 'race', title: 'Wyścig roku', ms: 19000, render: renderRaceBars, enter: startRaceBars, leave: stopRaceBars },
   { id: 'mosaic', title: 'Okładki roku', ms: 18000, render: renderMosaic, enter: startMosaic, leave: stopMosaic },
@@ -137,8 +138,13 @@ const PANELS = [
   { id: 'calendar', title: 'Kalendarz czytania', ms: 15000, render: renderCalendar },
   { id: 'reading', title: 'Teraz czytają', ms: 16000, render: renderReading },
 ];
+// Na razie telewizor pokazuje tylko ścianę okładek (animacja „idle”); pozostałe ekrany są gotowe,
+// wystarczy dopisać ich id, żeby wróciły do rotacji
+const SHOWN = ['wall'];
+const ROTATION = PANELS.filter(p => SHOWN.includes(p.id));
 const RACE_MS = 13000;     // cały rok w wyścigu słupkowym
 const COUNT_MS = 1800;     // odliczanie liczb w „Rok w liczbach”
+const GLOW_MS = 3200;      // co ile na ścianie podświetla się któraś okładka
 
 const tv = {
   token: null,
@@ -157,6 +163,9 @@ const tv = {
   raceFrame: null,
   countFrame: null,
   mosaicAnim: null,
+  miniClock: null,
+  wallSig: null,
+  glowTimer: null,
 };
 
 export async function startTv(token) {
@@ -175,11 +184,12 @@ function buildTv() {
   tv.title = el('h2', { class: 'tv-title' });
   tv.clock = el('strong', { class: 'tv-clock' });
   tv.date = el('span', { class: 'tv-date' });
-  tv.dots = el('div', { class: 'tv-dots' }, PANELS.map(() => el('i')));
+  tv.miniClock = el('div', { class: 'tv-mini-clock' });
+  tv.dots = el('div', { class: 'tv-dots' }, ROTATION.map(() => el('i')));
   tv.stage = el('div', { class: 'tv-stage' });
   tv.message = el('div', { class: 'tv-message', hidden: '' });
   tv.stage.appendChild(tv.message);
-  PANELS.forEach(p => {
+  ROTATION.forEach(p => {
     const panel = el('section', { class: `tv-panel tv-panel-${p.id}`, hidden: '' });
     tv.panels.set(p.id, panel);
     tv.stage.appendChild(panel);
@@ -194,11 +204,22 @@ function buildTv() {
     tv.dots,
   ]);
   document.body.appendChild(tv.root);
+  // Ściana okładek liczy kolumny z rozmiaru ekranu
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!tv.loaded) return;
+      ROTATION.forEach(p => p.render());
+      ROTATION[tv.index]?.enter?.();
+    }, 300);
+  });
 }
 
 function tickClock() {
   const now = new Date();
   tv.clock.textContent = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+  tv.miniClock.textContent = tv.clock.textContent;
   tv.date.textContent = `${DAYS_PL[now.getDay()]}, ${now.getDate()} ${MONTHS_FULL[now.getMonth()]}`;
   // W nocy przygaszamy ekran
   const h = now.getHours();
@@ -233,7 +254,8 @@ async function load() {
 // Komunikat to osobna warstwa nad panelami: po udanym wczytaniu po prostu znika
 function showMessage(text) {
   clearTimeout(tv.timer);
-  PANELS[tv.index]?.leave?.();
+  ROTATION[tv.index]?.leave?.();
+  tv.root.classList.remove('tv-full');
   tv.panels.forEach(panel => { panel.hidden = true; });
   tv.message.textContent = text;
   tv.message.hidden = false;
@@ -248,7 +270,7 @@ function apply(data) {
   state.readingNow = data.readingNow || [];
   state.statsReaders = groupByReader(rows);
   state.statsRows = rows;
-  PANELS.forEach(p => p.render());
+  ROTATION.forEach(p => p.render());
   refreshIcons();
   tv.message.hidden = true;
   if (!tv.loaded) {
@@ -256,25 +278,27 @@ function apply(data) {
     next();
   } else {
     // Odświeżenie w trakcie: panel z animacją zaczyna ją od nowa na świeżych danych
-    PANELS[tv.index]?.enter?.();
+    ROTATION[tv.index]?.enter?.();
   }
 }
 
-// Kolejny panel: poprzedni zatrzymuje animacje, następny zaczyna je od początku
+// Kolejny panel: poprzedni zatrzymuje animacje, następny zaczyna je od początku.
+// Jeden panel w rotacji = zostaje na stałe.
 function next() {
-  const prev = PANELS[tv.index];
-  tv.index = (tv.index + 1) % PANELS.length;
-  const panel = PANELS[tv.index];
-  if (prev) {
+  const prev = ROTATION[tv.index];
+  tv.index = (tv.index + 1) % ROTATION.length;
+  const panel = ROTATION[tv.index];
+  if (prev && prev !== panel) {
     prev.leave?.();
     tv.panels.get(prev.id).hidden = true;
   }
   tv.panels.get(panel.id).hidden = false;
+  tv.root.classList.toggle('tv-full', !!panel.full);
   tv.title.textContent = panel.title;
   [...tv.dots.children].forEach((dot, i) => dot.classList.toggle('on', i === tv.index));
   requestAnimationFrame(() => panel.enter?.());
   clearTimeout(tv.timer);
-  tv.timer = setTimeout(next, panel.ms);
+  if (ROTATION.length > 1) tv.timer = setTimeout(next, panel.ms);
 }
 
 const sortedReaders = () => [...state.statsReaders].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'pl'));
@@ -282,6 +306,99 @@ const colorsOf = () => seriesColors(state.statsReaders);
 
 function emptyPanel(id, text) {
   tv.panels.get(id).replaceChildren(el('div', { class: 'tv-message', text }));
+}
+
+/* ----- Ściana okładek (animacja „idle”) ----- */
+// Okładki z tego roku (i te czytane teraz) w kolumnach na cały ekran. Każda kolumna to pasek
+// okładek powtórzony dwa razy, przesuwany animacją CSS o połowę swojej wysokości: pętla bez
+// przeskoku. Kolumny na zmianę jadą w górę i w dół, każda w swoim tempie.
+function shuffle(list) {
+  const a = [...list];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function wallBooks() {
+  const colors = colorsOf();
+  const book = (r, userId, who) => ({
+    title: r.title, author: r.author, cover_url: r.cover_url,
+    who: firstName(who), color: colors.get(userId) || 'var(--series-other)',
+  });
+  return [
+    ...state.statsRows.map(r => book(r, r.user_id, r.profiles?.display_name)),
+    ...state.readingNow.map(i => book(i, i.user_id, i.profiles?.display_name)),
+  ];
+}
+
+function wallTile(b) {
+  const cover = coverEl(b);
+  if (cover.tagName === 'IMG') cover.loading = 'eager';  // kafelki wjeżdżają w kadr ruchem, nie przewijaniem
+  const who = el('span', { class: 'tv-tile-who', text: b.who });
+  who.style.background = b.color;
+  return el('div', { class: 'tv-wall-tile' }, [cover, who]);
+}
+
+function renderWall() {
+  const books = wallBooks();
+  // Bez zmian w okładkach i rozmiarze ekranu nie budujemy od nowa (animacja by przeskoczyła)
+  const sig = `${window.innerWidth}x${window.innerHeight}|${books.map(b => `${b.title}|${b.cover_url}|${b.who}`).join('~')}`;
+  if (sig === tv.wallSig) return;
+  tv.wallSig = sig;
+  if (!books.length) {
+    emptyPanel('wall', 'Tu pojawią się okładki przeczytanych książek.');
+    return;
+  }
+  const vh = window.innerHeight / 100;
+  const tileW = 17 * vh;
+  const tileH = tileW * 1.5 + 1.6 * vh;  // okładka 2:3 + odstęp
+  // Ściana jest lekko obrócona i powiększona, więc kolumn i kafelków potrzeba z zapasem
+  const cols = Math.ceil((window.innerWidth * 1.35) / (tileW + 1.6 * vh)) + 1;
+  const perColumn = Math.ceil((window.innerHeight * 1.5) / tileH) + 1;
+  // Każda kolumna dostaje własny losowy wybór (nie wszystkie okładki), żeby telewizor nie miał
+  // na ekranie tysiąca obrazków; z zapasem na kilka ekranów, żeby pętla się nie rzucała w oczy
+  const take = Math.max(perColumn + 2, Math.min(books.length, perColumn * 2));
+  const columns = Array.from({ length: cols }, (_, c) => {
+    let list = shuffle(books);
+    while (list.length < take) list = list.concat(shuffle(books));
+    list = list.slice(0, take);
+    const strip = el('div', { class: 'tv-wall-strip' }, [...list, ...list].map(wallTile));
+    const loopS = (list.length * tileH) / ((1.8 + Math.random() * 1.8) * vh);  // tempo: 1,8–3,6 vh/s
+    strip.style.animationDuration = `${loopS}s`;
+    strip.style.animationDelay = `${-Math.random() * loopS}s`;  // każda kolumna startuje w innym miejscu
+    return el('div', { class: `tv-wall-col${c % 2 ? ' down' : ''}` }, [strip]);
+  });
+  tv.panels.get('wall').replaceChildren(
+    el('div', { class: 'tv-wall' }, columns),
+    el('div', { class: 'tv-wall-shade' }),
+    tv.miniClock,
+  );
+}
+
+// Co kilka sekund któraś okładka w środkowej części ekranu delikatnie się powiększa i świeci
+function startWall() {
+  stopWall();
+  tv.glowTimer = setInterval(() => {
+    const tiles = [...tv.panels.get('wall').querySelectorAll('.tv-wall-tile:not(.glow)')];
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    for (let tries = 0; tries < 12 && tiles.length; tries++) {
+      const tile = tiles[Math.floor(Math.random() * tiles.length)];
+      const r = tile.getBoundingClientRect();
+      if (r.left > w * 0.12 && r.right < w * 0.88 && r.top > h * 0.12 && r.bottom < h * 0.88) {
+        tile.classList.add('glow');
+        setTimeout(() => tile.classList.remove('glow'), GLOW_MS * 0.85);
+        break;
+      }
+    }
+  }, GLOW_MS);
+}
+
+function stopWall() {
+  clearInterval(tv.glowTimer);
+  tv.glowTimer = null;
 }
 
 /* ----- Ranking ----- */
