@@ -417,3 +417,7 @@ enabled = true
 [functions.notify-new-read]
 # Wywoływana przez trigger w bazie (pg_net) bez tokenu; sama sprawdza wpis w bazie
 verify_jwt = false
+
+[functions.tv-feed]
+# Wywoływana przez telewizor bez logowania; sama sprawdza token z tv_tokens
+verify_jwt = false

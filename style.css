@@ -3372,3 +3372,308 @@ input[type="date"].plain-input {
   font-size: 0.875rem;
   color: var(--text-muted);
 }
+
+/* ----------------- Czytanko na telewizorze ----------------- */
+/* Okienko z linkiem w ustawieniach */
+.tv-link {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
+  border: 1px solid var(--border);
+  font-size: 0.875rem;
+  word-break: break-all;
+  user-select: all;
+}
+
+.tv-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.tv-link-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Sam widok TV (?tv=token): wszystko w jednostkach ekranu, żeby 1080p i 4K wyglądały tak samo */
+.tv-mode body {
+  padding: 0;
+  overflow: hidden;
+  cursor: none;
+  background: #07080f;
+}
+
+.tv {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 1.6vh;
+  padding: 2.4vh 2.6vw 2vh;
+  color: #f1f5f9;
+  background: radial-gradient(ellipse at 50% 0%, #161a33 0%, #07080f 70%);
+  transition: filter 2s ease;
+}
+
+.tv-night .tv {
+  filter: brightness(0.5);
+}
+
+.tv-header {
+  display: flex;
+  align-items: center;
+  gap: 2vw;
+}
+
+.tv-brand {
+  font-size: 3.4vh;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #a5b4fc;
+}
+
+.tv-title {
+  flex: 1;
+  font-size: 3.6vh;
+  font-weight: 800;
+  text-align: center;
+}
+
+.tv-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+}
+
+.tv-clock {
+  font-size: 4.6vh;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-date {
+  font-size: 1.9vh;
+  color: #94a3b8;
+}
+
+.tv-stage {
+  position: relative;
+  min-height: 0;
+}
+
+.tv-panel {
+  position: absolute;
+  inset: 0;
+  animation: tv-in 0.9s ease-out;
+}
+
+@keyframes tv-in {
+  from { opacity: 0; transform: translateY(1.2vh); }
+}
+
+.tv-panel .race3d {
+  height: 100%;
+  border-radius: 1.4vh;
+}
+
+.tv-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.8vw;
+}
+
+.tv-dots i {
+  width: 1.1vh;
+  height: 1.1vh;
+  border-radius: 1vh;
+  background: #334155;
+  transition: width 0.4s ease, background 0.4s ease;
+}
+
+.tv-dots i.on {
+  width: 3.4vh;
+  background: #f0c75e;
+}
+
+.tv-stage > .tv-message {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+.tv-message {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 10vw;
+  font-size: 3vh;
+  text-align: center;
+  color: #cbd5e1;
+}
+
+/* Ranking */
+.tv-rank {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2.2vh;
+  height: 100%;
+  max-width: 72vw;
+  margin: 0 auto;
+}
+
+.tv-rank-row {
+  display: grid;
+  grid-template-columns: 5vh 10vh minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2vw;
+  padding: 1.8vh 2.2vw;
+  border-radius: 1.8vh;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.tv-rank-row.lead {
+  background: rgb(240 199 94 / 0.09);
+  box-shadow: inset 0 0 0 0.25vh rgb(240 199 94 / 0.55);
+}
+
+.tv-rank-pos {
+  font-size: 4.2vh;
+  font-weight: 900;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.tv-rank-row .rank-avatar {
+  display: grid;
+  place-items: center;
+  width: 10vh;
+  height: 10vh;
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: 4.4vh;
+  font-weight: 800;
+  color: #fff;
+}
+
+.tv-rank-line {
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+}
+
+.tv-rank-name {
+  font-size: 4.4vh;
+  font-weight: 800;
+}
+
+.tv-crown svg {
+  width: 4vh;
+  height: 4vh;
+  color: #f0c75e;
+}
+
+.tv-rank-books {
+  margin-left: auto;
+  font-size: 2.2vh;
+  color: #94a3b8;
+}
+
+.tv-bar {
+  display: block;
+  height: 1.5vh;
+  margin-top: 1.1vh;
+  border-radius: 1vh;
+  background: rgb(255 255 255 / 0.08);
+  overflow: hidden;
+}
+
+.tv-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.tv-rank-pts {
+  font-size: 4.8vh;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-prize {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 1vw;
+  font-size: 2.4vh;
+  color: #f0c75e;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.tv-prize svg {
+  width: 2.8vh;
+  height: 2.8vh;
+}
+
+/* Teraz czytają / ostatnio skończone */
+.tv-panel-reading {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4vh;
+}
+
+.tv-shelf-title {
+  margin-bottom: 1.6vh;
+  font-size: 2.8vh;
+  color: #94a3b8;
+}
+
+.tv-books {
+  display: flex;
+  gap: 2.2vw;
+  overflow: hidden;
+}
+
+.tv-book {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+  width: 16vh;
+  flex-shrink: 0;
+}
+
+.tv-book .book-cover {
+  width: 16vh;
+  height: 24vh;
+  border-radius: 0.6vh 1vh 1vh 0.6vh;
+}
+
+.tv-book .ph-title {
+  font-size: 2.2vh;
+}
+
+.tv-book .ph-author {
+  font-size: 1.6vh;
+}
+
+.tv-book-title {
+  overflow: hidden;
+  font-size: 2vh;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-book-meta {
+  font-size: 1.7vh;
+  color: #94a3b8;
+}

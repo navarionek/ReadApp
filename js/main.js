@@ -8,10 +8,18 @@ import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSetting
 import { state } from './state.js';
 import { playRace } from './stats.js';
 import { supabaseClient } from './supabase.js';
+import { openTvLinkDialog, startTv } from './tv.js';
 import { currentYear } from './ui.js';
 
 /* ----------------- Init ----------------- */
 window.addEventListener('DOMContentLoaded', () => {
+  // Telewizor z prywatnym linkiem: sam widok TV, bez logowania i reszty apki
+  const tvToken = new URLSearchParams(window.location.search).get('tv');
+  if (tvToken) {
+    startTv(tvToken);
+    return;
+  }
+
   document.getElementById('google-login-btn').addEventListener('click', handleGoogleLogin);
   document.getElementById('logout-btn').addEventListener('click', handleLogout);
   document.getElementById('theme-toggle').addEventListener('click', toggleTheme);  // menu zostaje otwarte, widać przełącznik
@@ -28,6 +36,7 @@ window.addEventListener('DOMContentLoaded', () => {
     closeSettings();
     saveMyColor(null);
   });
+  document.getElementById('tv-link-btn').addEventListener('click', openTvLinkDialog);
   document.getElementById('settings-admin').addEventListener('click', () => {
     closeSettings();
     goTo('admin');
