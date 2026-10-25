@@ -4204,15 +4204,16 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 /* Intro po włączeniu apki (js/coverwall.js): ściana na pierwszym planie, potem odjeżdża w tło.
-   Bez przezroczystości na przodkach kart: przodek z opacity < 1 wyłącza im blur tła
-   (karta wjeżdżałaby bez szkła, a blur wskakiwałby na końcu), więc każda karta znika i
-   wjeżdża sama, a reszta strony do tego czasu jest tylko visibility: hidden. */
+   Karty ani ich przodkowie nie dostają opacity < 1: przeglądarki wtedy nie rysują blura tła
+   (karta byłaby półprzezroczysta, a blur wskakiwałby na końcu). Zamiast tego szkło się
+   „skrapla”: rośnie blur i tło karty, a jej treść wjeżdża osobno. Strona do tego czasu jest
+   tylko visibility: hidden. */
 .cover-bg .tv-wall {
-  transition: transform 1.1s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .cover-bg::after {
-  transition: opacity 0.8s ease;
+  transition: opacity 0.6s ease;
 }
 
 .wall-intro .cover-bg .tv-wall {
@@ -4228,12 +4229,32 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 .wall-intro-reveal :is(main.container > header, .app-nav) {
-  animation: intro-fade-in 0.4s ease both;
+  animation: intro-fade-in 0.3s ease both;
 }
 
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
-  animation: intro-card-in 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: intro-glass-in 0.4s ease-out both;
   animation-delay: var(--intro-delay, 0s);
+}
+
+.wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
+  animation: intro-content-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--intro-delay, 0s);
+}
+
+/* Tylko „from”: kończy się na zwykłym wyglądzie karty (szkło albo baner nagrody) */
+@keyframes intro-glass-in {
+  from {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: blur(0px) saturate(1);
+    backdrop-filter: blur(0px) saturate(1);
+  }
+}
+
+@keyframes intro-content-in {
+  from { opacity: 0; transform: translateY(12px); }
 }
 
 @keyframes intro-fade-in {
@@ -4241,7 +4262,3 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   to { opacity: 1; }
 }
 
-@keyframes intro-card-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.96); }
-  to { opacity: 1; transform: none; }
-}

@@ -139,8 +139,8 @@ function mountStartWall(books) {
 // Ściana na pierwszym planie (karty schowane, bez przygaszenia), kolumny się rozpędzają,
 // a na szczycie prędkości karty wjeżdżają, ściana się oddala, gaśnie i zwalnia do zwykłego
 // tempa tła. Okładki są z pamięci (z ostatniego razu), więc nie czekamy na dane.
-const INTRO_UP = 900;     // rozpędzanie
-const INTRO_DOWN = 900;   // hamowanie, w tym czasie wjeżdżają karty
+const INTRO_UP = 600;     // rozpędzanie
+const INTRO_DOWN = 700;   // hamowanie, w tym czasie wjeżdżają karty
 const INTRO_PEAK = 16;    // ile razy szybciej niż zwykle na szczycie
 
 const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner)')]
@@ -175,7 +175,7 @@ export function playStartIntro() {
     if (t >= INTRO_UP && !revealed) {
       revealed = true;
       // Karty wjeżdżają po kolei, od góry
-      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.05}s`));
+      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.04}s`));
       body.classList.replace('wall-intro', 'wall-intro-reveal');
     }
     if (t < INTRO_UP + INTRO_DOWN) {
