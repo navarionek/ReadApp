@@ -136,16 +136,17 @@ function mountStartWall(books) {
 }
 
 /* ----- Intro po włączeniu apki ----- */
-// Najpierw mnóstwo drobnych okładek (ściana z daleka), kamera przybliża się do zwykłego
-// rozmiaru tła, a kolumny w tym czasie rozpędzają się i hamują. Potem ściana gaśnie w tło,
-// a karty wjeżdżają. Oddalona ściana to jeden canvas, bo tyle okładek w DOM (a zwłaszcza tak
+// Najpierw mnóstwo drobnych, pędzących okładek (ściana z daleka), kamera przybliża się do
+// zwykłego rozmiaru tła, a kolumny w tym czasie hamują do zwykłego tempa. W połowie drogi
+// karty już wjeżdżają, a na końcu ściana gaśnie w tło. Oddalona ściana to jeden canvas, bo tyle okładek w DOM (a zwłaszcza tak
 // wielkie warstwy do przeskalowania) to za dużo dla telefonu; na koniec canvas przenika się
 // ze zwykłą ścianą pod spodem. Okładki są z pamięci (z ostatniego razu), więc nie czekamy na dane.
 const INTRO_ZOOM = 1150;   // przybliżanie
-const INTRO_REVEAL = 700;  // ściana gaśnie w tło, wjeżdżają karty
+const INTRO_CARDS = 500;   // od tej chwili wjeżdżają karty (jeszcze w trakcie przybliżania)
+const INTRO_FADE = 450;    // na końcu przybliżania oddalona ściana przenika się ze zwykłą
 const INTRO_FROM = 0.3;    // skala na starcie (ile razy mniejsze okładki niż w tle)
 const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
-const INTRO_PEAK = 22;     // ile razy szybciej niż zwykle jadą kolumny w połowie przybliżania
+const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
 
 const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner)')]
   .filter(card => card.offsetParent !== null);
@@ -250,24 +251,26 @@ export function playStartIntro() {
   let t0 = null;
   let prev = 0;
   let revealed = false;
+  let faded = false;
   const step = now => {
     t0 ??= now;
     const t = now - t0;
     const dt = Math.min(50, now - (prev || now));
     prev = now;
     const z = Math.min(1, t / INTRO_ZOOM);
-    if (!revealed) {
-      // Przybliżanie z wygładzeniem; kolumny najszybciej w połowie drogi
-      draw(INTRO_FROM + (INTRO_TO - INTRO_FROM) * easeInOut(z), 1 + (INTRO_PEAK - 1) * Math.sin(Math.PI * z) ** 2, dt);
-    }
-    if (t >= INTRO_ZOOM && !revealed) {
+    // Przybliżanie z wygładzeniem; kolumny pędzą od pierwszej klatki i hamują do zwykłego tempa
+    draw(INTRO_FROM + (INTRO_TO - INTRO_FROM) * easeInOut(z), 1 + (INTRO_PEAK - 1) * (1 - z) ** 1.6, dt);
+    if (t >= INTRO_CARDS && !revealed) {
       revealed = true;
-      // Canvas przenika się ze zwykłą ścianą, a karty wjeżdżają po kolei, od góry
-      canvas.classList.add('gone');
-      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.04}s`));
+      // Karty wjeżdżają po kolei, od góry, na tle jeszcze przybliżającej się ściany
+      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.03}s`));
       body.classList.replace('wall-intro', 'wall-intro-reveal');
     }
-    if (t < INTRO_ZOOM + INTRO_REVEAL) {
+    if (t >= INTRO_ZOOM && !faded) {
+      faded = true;
+      canvas.classList.add('gone');  // przenika się ze zwykłą ścianą pod spodem
+    }
+    if (t < INTRO_ZOOM + INTRO_FADE) {
       requestAnimationFrame(step);
       return;
     }

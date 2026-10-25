@@ -4240,12 +4240,12 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
-  animation: intro-glass-in 0.4s ease-out both;
+  animation: intro-glass-in 0.35s ease-out both;
   animation-delay: var(--intro-delay, 0s);
 }
 
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
-  animation: intro-content-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: intro-content-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: var(--intro-delay, 0s);
 }
 
