@@ -1551,10 +1551,6 @@ select.plain-input {
   margin-bottom: 1rem;
 }
 
-.finishing-note {
-  margin: -0.5rem 0 1rem;
-  font-size: 0.875rem;
-}
 
 .reading-now-list {
   display: grid;
@@ -2846,18 +2842,33 @@ img.rank-avatar {
 }
 
 .pages-hint {
-  margin-top: 0.375rem;
+  margin-top: 0.5rem;
 }
 
+.pages-hint[hidden] {
+  display: none;
+}
+
+/* Podpowiedź liczby stron: wyraźny przycisk (pełny niebieski, biały napis) */
 .pages-hint-btn {
-  padding: 0.125rem 0.5rem;
-  border: 1px solid var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border: none;
   border-radius: 999px;
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--primary);
+  color: #fff;
   font: inherit;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 4px 12px -4px var(--primary);
+}
+
+.pages-hint-btn svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* Błysk na pasku nie może wychodzić poza sam pasek (przy krótkich paskach było go widać na tle toru) */

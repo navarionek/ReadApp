@@ -5,7 +5,6 @@ import { goTo } from './shell.js';
 import { showAddSummary, snapshotRanking } from './summary.js';
 import { lookupBook } from './shelf.js';
 import { state } from './state.js';
-import { formatDay } from './stats.js';
 import { supabaseClient } from './supabase.js';
 import { DAY_MS, el, friendlyError, hideError, icon, refreshIcons, showError, showToast } from './ui.js';
 
@@ -90,7 +89,7 @@ export function renderFinishPick() {
   const select = document.getElementById('finish-pick');
   const items = myReadingNow();
   select.replaceChildren(
-    ...items.map(item => el('option', { value: String(item.id), text: `${item.title} (od ${formatDay(new Date(item.started_at))})` })),
+    ...items.map(item => el('option', { value: String(item.id), text: item.title })),
     el('option', { value: 'new', text: 'Nowa książka (wpisz tytuł)' }),
   );
   select.value = state.finishing ? String(state.finishing.id) : 'new';
@@ -133,13 +132,6 @@ export function updateFormUI() {
   document.getElementById('multiplier-group').hidden = slim;
   document.getElementById('unfinished-group').hidden = slim;
   document.getElementById('pages').required = !slim;
-
-  const note = document.getElementById('finishing-note');
-  note.hidden = !state.finishing || slim;
-  if (state.finishing) {
-    const days = daysSince(state.finishing.startedAt);
-    note.textContent = `Zaczęte ${formatDay(new Date(state.finishing.startedAt))} (${days} ${days === 1 ? 'dzień' : 'dni'} temu). Wpisz liczbę stron.`;
-  }
 }
 
 /* ----------------- Podpowiedź liczby stron ----------------- */
@@ -153,20 +145,22 @@ function hidePagesHint() {
   document.getElementById('pages-hint').hidden = true;
 }
 
+// Jeden wyraźny przycisk „Wpisz 352 str.”; skąd ta liczba, mówi podpowiedź po przytrzymaniu
 function showPagesHint(pages) {
   const hint = document.getElementById('pages-hint');
-  const use = el('button', { type: 'button', class: 'pages-hint-btn', text: `Wpisz ${pages}` });
+  const use = el('button', { type: 'button', class: 'pages-hint-btn', title: 'Z baz książek (zależy od wydania)' }, [
+    icon('sparkles'),
+    el('span', { text: `Wpisz ${pages} str.` }),
+  ]);
   use.addEventListener('click', () => {
     const input = document.getElementById('pages');
     input.value = String(pages);
     hint.hidden = true;
     input.focus({ preventScroll: true });
   });
-  hint.replaceChildren(
-    document.createTextNode(`Podpowiedź z baz książek: ${pages} str. (zależy od wydania) `),
-    use,
-  );
+  hint.replaceChildren(use);
   hint.hidden = false;
+  refreshIcons();
 }
 
 export async function suggestPages() {
