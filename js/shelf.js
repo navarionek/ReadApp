@@ -344,7 +344,7 @@ export function renderShelf() {
             { title: item.title, author: item.author, cover_url: item.cover_url },
             () => openQueueModal(item),
           )))]
-        : [el('p', { class: 'hint', text: 'Dodasz je na ekranie „Dodaj” (zakładka „Do przeczytania”). Znajomi będą mogli je podejrzeć.' })]),
+        : [el('p', { class: 'hint', text: 'Pusto.' })]),
     ]));
   }
 

@@ -96,8 +96,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBadgePo
 window.addEventListener('scroll', closeBadgePop, true);
 window.addEventListener('resize', closeBadgePop);
 
-// Pasek jednej osoby: długość = punkty względem lidera, a w środku kolejne książki jako segmenty
-function renderBar(reader, rank, leaderPoints, colors, ranked) {
+// Rozwinięte wiersze (klucze osób): zostają rozwinięte po odświeżeniu danych, np. po edycji książki
+const openRows = new Set();
+
+// Pasek jednej osoby: długość = punkty względem lidera, a w środku kolejne książki jako segmenty.
+// Stuknięcie w wiersz rozwija pod nim wszystkie książki tej osoby (booksOf buduje listę).
+function renderBar(reader, rank, leaderPoints, colors, ranked, booksOf) {
   const pages = reader.books.reduce((sum, b) => sum + b.pages, 0);
   const n = reader.books.length;
   const gap = leaderPoints - reader.points;
@@ -124,8 +128,9 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
 
   const earned = earnedBadges(reader, rank, ranked);
   const isMe = reader.key === viewerId();
-  const row = el('div', { class: `rank-row${isMe ? ' me' : ''}${rank === 1 ? ' leader' : ''}` }, [
-    el('div', { class: 'rank-head' }, [
+  const inner = el('div', { class: 'rank-books-inner' });
+  const panel = el('div', { class: 'rank-books' }, [inner]);
+  const head = el('div', { class: 'rank-head', role: 'button', tabindex: '0', 'aria-expanded': 'false', 'aria-label': `${firstName(reader.name)}: pokaż książki` }, [
       el('span', { class: 'rank-pos', text: `#${rank}` }),
       avatar(reader, colors),
       el('span', { class: 'rank-name', text: firstName(reader.name) + (isMe ? ' (ty)' : '') }),
@@ -133,7 +138,9 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
         ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
         : []),
       el('span', { class: 'rank-total', 'data-count': String(reader.points), text: `${reader.points} pkt` }),
-    ]),
+    ]);
+  const row = el('div', { class: `rank-row${isMe ? ' me' : ''}${rank === 1 ? ' leader' : ''}` }, [
+    head,
     ...(earned.length
       ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
           earned.map(b => {
@@ -149,9 +156,33 @@ function renderBar(reader, rank, leaderPoints, colors, ranked) {
     el('div', { class: 'rank-meta' }, [
       el('span', { text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron` }),
       ...(rank > 1 ? [el('span', { class: 'rank-gap', text: `−${gap} do lidera` })] : []),
+      el('span', { class: 'rank-more' }, [icon('chevron-down')]),
     ]),
+    panel,
   ]);
   row.style.setProperty('--row', String(rank - 1));
+
+  const setOpen = open => {
+    if (open && !inner.childElementCount) {
+      inner.replaceChildren(...booksOf(reader, colors));
+      refreshIcons();
+    }
+    row.classList.toggle('open', open);
+    head.setAttribute('aria-expanded', String(open));
+    if (open) openRows.add(reader.key);
+    else openRows.delete(reader.key);
+  };
+  // Klik w wiersz (poza segmentami paska, medalami i samą listą książek) rozwija i zwija
+  row.addEventListener('click', e => {
+    if (e.target.closest('.rank-books')) return;
+    setOpen(!row.classList.contains('open'));
+  });
+  head.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    setOpen(!row.classList.contains('open'));
+  });
+  if (openRows.has(reader.key)) setOpen(true);
   return row;
 }
 
@@ -169,7 +200,8 @@ function everyThirdLeaderVisit() {
 let viewerIsFirst = false;
 let introWanted = false;
 
-export function renderRankingViz(ranked) {
+// booksOf(reader, colors): lista książek osoby, pokazywana po rozwinięciu jej wiersza
+export function renderRankingViz(ranked, booksOf) {
   const container = document.getElementById('ranking-viz');
   viewerIsFirst = ranked.length > 0 && ranked[0].key === viewerId();
   if (!ranked.length) {
@@ -178,7 +210,7 @@ export function renderRankingViz(ranked) {
   }
   const colors = seriesColors(ranked);
   const leaderPoints = ranked[0].points;
-  const bars = el('div', { class: 'rank-bars' }, ranked.map((r, i) => renderBar(r, i + 1, leaderPoints, colors, ranked)));
+  const bars = el('div', { class: 'rank-bars' }, ranked.map((r, i) => renderBar(r, i + 1, leaderPoints, colors, ranked, booksOf)));
   container.replaceChildren(
     ...(ranked.length > 1 ? [renderPodium(ranked, colors)] : []),
     bars,

@@ -56,6 +56,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;  /* bez niebieskiego błysku przeglądarki przy stuknięciu */
 }
 
 body {
@@ -2348,6 +2349,74 @@ header {
 
 .rank-gap {
   font-variant-numeric: tabular-nums;
+}
+
+/* Wiersz osoby rozwija się w jej listę książek (dawne „Szczegółowe postępy”) */
+.rank-row {
+  cursor: pointer;
+  transition: box-shadow 0.25s ease;
+}
+
+.rank-row.open {
+  box-shadow: var(--shadow);
+}
+
+.rank-head:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.rank-more {
+  display: flex;
+  margin-left: auto;
+  transition: transform 0.3s ease;
+}
+
+.rank-gap + .rank-more {
+  margin-left: 0;
+}
+
+.rank-more svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.rank-row.open .rank-more {
+  transform: rotate(180deg);
+}
+
+/* Wysuwanie bez znajomości wysokości: wiersz siatki rośnie od 0fr do 1fr */
+.rank-books {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  cursor: default;
+}
+
+.rank-row.open .rank-books {
+  grid-template-rows: 1fr;
+}
+
+.rank-books-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rank-books-inner > :first-child {
+  margin-top: 0.75rem;
+}
+
+.rank-books .pp-reading {
+  padding: 0 0 0.5rem;
+}
+
+.rank-books .pp-books {
+  padding: 0;
+}
+
+.rank-books .pp-book {
+  background: var(--bg-body);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -59,6 +59,5 @@ export function updateUI(user) {
     });
     resetForm();
     document.getElementById('ranking-viz').replaceChildren();
-    document.getElementById('user-progress-container').replaceChildren();
   }
 }
