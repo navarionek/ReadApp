@@ -276,7 +276,7 @@ export function actionButton(iconName, label, onClick) {
   return btn;
 }
 
-// Postępy: każda osoba to rozwijana karta (moja otwarta, reszta zwinięta) z awatarem, sumą i listą książek
+// Postępy (karta na Rankingu): każda osoba to rozwijana karta (moja otwarta, reszta zwinięta) z awatarem, sumą i listą książek
 // od najnowszej. Książka: tytuł, data, strony i mnożnik po lewej, wynik (oraz własne akcje) po prawej.
 export function renderUserProgress(readers) {
   const container = document.getElementById('user-progress-container');

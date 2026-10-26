@@ -111,10 +111,6 @@
         <i data-lucide="trophy"></i>
         <span>Ranking</span>
       </a>
-      <a href="#postepy" class="nav-item" data-screen="postepy">
-        <i data-lucide="library-big"></i>
-        <span>Postępy</span>
-      </a>
       <a href="#polka" class="nav-item" data-screen="polka">
         <i data-lucide="book-copy"></i>
         <span>Półka</span>
@@ -297,6 +293,15 @@
           <div id="ranking-viz" class="ranking-viz"></div>
         </div>
 
+        <!-- Postępy: rozwijana karta każdej osoby z listą jej książek (dawniej osobny ekran) -->
+        <div id="progress-card" class="card">
+          <div class="card-header">
+            <i data-lucide="users" class="card-icon"></i>
+            <h2>Szczegółowe postępy <span class="current-year"></span></h2>
+          </div>
+          <div id="user-progress-container" class="progress-list"></div>
+        </div>
+
         <!-- Książki roku ułożone według ocen (kciuk w górę / w dół) -->
         <div id="book-ranking-card" class="card" hidden>
           <div class="card-header">
@@ -316,17 +321,6 @@
             <h2>Czytanko Wrapped <span class="current-year"></span></h2>
           </div>
           <div id="wrapped-content" class="wrapped-grid"></div>
-        </div>
-      </section>
-
-      <!-- Ekran: Postępy -->
-      <section class="screen" data-screen="postepy" hidden>
-        <div class="card">
-          <div class="card-header">
-            <i data-lucide="users" class="card-icon"></i>
-            <h2>Szczegółowe postępy <span class="current-year"></span></h2>
-          </div>
-          <div id="user-progress-container" class="progress-list"></div>
         </div>
       </section>
 

@@ -3029,7 +3029,7 @@ input[type="date"].plain-input {
   text-align: left;
 }
 
-/* ----------------- Postępy: rozwijane karty osób ----------------- */
+/* ----------------- Postępy (karta na Rankingu): rozwijane karty osób ----------------- */
 .pp-person {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -3213,7 +3213,7 @@ input[type="date"].plain-input {
   height: 0.9375rem;
 }
 
-/* Chipy na ekranie Postępy: bez niebieskiego na niebieskim (słaby kontrast w ciemnym motywie) */
+/* Chipy w Postępach: bez niebieskiego na niebieskim (słaby kontrast w ciemnym motywie) */
 .pp-reading-chip {
   background: var(--bg-card);
   border: 1px solid var(--border);

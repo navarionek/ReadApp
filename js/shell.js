@@ -22,6 +22,9 @@ export function currentScreen() {
 export function showScreen(name) {
   if (name === 'admin' && !state.isAdmin) name = 'start';
   if (name === 'wrapped') name = 'start';  // Wrapped ukryty, dopóki nie będzie dopracowany
+  // Postępy są teraz kartą na Rankingu; stare linki (np. z powiadomień) prowadzą prosto do niej
+  const toProgress = name === 'postepy';
+  if (toProgress) name = 'ranking';
   // Wyjście z formularza w trakcie kończenia książki = porzucenie, żeby „Dodaj” było znowu puste
   if (name !== 'dodaj' && state.finishing) resetForm();
   document.querySelectorAll('.screen').forEach(screen => {
@@ -34,6 +37,7 @@ export function showScreen(name) {
     else item.removeAttribute('aria-current');
   });
   window.scrollTo(0, 0);
+  if (toProgress) requestAnimationFrame(() => document.getElementById('progress-card')?.scrollIntoView({ block: 'start' }));
 
   if (name === 'polka' && state.currentUser) loadShelf();
   if (name === 'ranking') playRankingIntro();
