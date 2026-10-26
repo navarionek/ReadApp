@@ -91,6 +91,7 @@ export function renderStartWall() {
   }
   if (intro) {
     intro.pending = true;
+    intro.dataDone?.();  // dane wczytane i narysowane: intro może ruszać
     return;
   }
   // Bez danych zostaje to, co jest (np. ściana z pamięci po intro), zamiast pustego tła
@@ -152,6 +153,7 @@ const INTRO_FADE = 450;    // na końcu przybliżania canvas znika, zostaje zwyk
 const INTRO_FROM = 0.6;    // skala na starcie (ile razy mniejsze okładki niż w tle)
 const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
 const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
+const INTRO_WAIT_MAX = 2500;  // najdłużej tyle czekamy na dane i okładki przed animacją
 
 const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner)')]
   .filter(card => card.offsetParent !== null);
@@ -305,18 +307,41 @@ export function playStartIntro() {
   mountStartWall(cached);
   const bg = document.getElementById('cover-bg');
   if (!bg) return;
-  intro = { pending: false };
+  intro = { pending: false, dataDone: null };
   const body = document.body;
   body.classList.add('wall-intro');
-  // Ściana staje się widoczna dopiero, gdy Start się pokaże (chwilę po zalogowaniu), więc
-  // canvas budujemy w pierwszej klatce, w której już ma wymiary i animacje
+
+  // Najpierw wszystko się wczytuje (dane z bazy, karty Startu, okładki ściany), a w tym czasie
+  // widać sam napis „Czytanko”. Animacja rusza dopiero, gdy telefon nie robi nic ciężkiego
+  // w tle (inaczej przycinała), najpóźniej po INTRO_WAIT_MAX.
+  const wait = el('div', { class: 'cover-intro-wait', text: 'Czytanko' });
+  bg.appendChild(wait);
+  bg.classList.add('intro-waiting');
+  const dataReady = new Promise(resolve => { intro.dataDone = resolve; });
+  const coversReady = () => {
+    const urls = new Map();
+    bg.querySelectorAll('.tv-wall img').forEach(img => { if (!urls.has(img.src)) urls.set(img.src, img); });
+    return Promise.allSettled([...urls.values()].map(img => img.decode()));
+  };
+  const timeout = new Promise(resolve => setTimeout(resolve, INTRO_WAIT_MAX));
+  // Ściana ma wymiary i obrazki dopiero, gdy Start jest widoczny (chwilę po zalogowaniu): klatka zwłoki
+  requestAnimationFrame(() => {
+    Promise.race([Promise.all([dataReady, coversReady()]), timeout])
+      .then(() => requestAnimationFrame(() => requestAnimationFrame(start)));
+  });
+
   let scene = null;
   let t0 = null;
   let prev = 0;
   let revealed = false;
   let faded = false;
+  const start = now => {
+    wait.remove();
+    bg.classList.remove('intro-waiting');
+    scene = introScene(bg);
+    step(now);
+  };
   const step = now => {
-    scene ??= introScene(bg);
     t0 ??= now;
     const t = now - t0;
     const dt = Math.min(50, now - (prev || now));
@@ -346,7 +371,6 @@ export function playStartIntro() {
     intro = null;
     if (pending) renderStartWall();
   };
-  requestAnimationFrame(step);
 }
 
 let resizeTimer = null;
