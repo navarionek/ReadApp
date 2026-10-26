@@ -9,7 +9,7 @@ import { renderWrapped } from './wrapped.js';
 import { icon, refreshIcons } from './ui.js';
 
 export const AUTH_ONLY_SECTIONS = ['user-panel', 'app-nav', 'app-screens'];
-export const SCREENS = ['start', 'dodaj', 'ranking', 'postepy', 'polka', 'statystyki', 'wrapped', 'admin'];
+export const SCREENS = ['start', 'dodaj', 'polka', 'ranking', 'statystyki', 'postepy', 'wrapped', 'admin'];
 /* ----------------- Ekrany (menu) ----------------- */
 // Ekran wynika z #hash w adresie, więc działa przycisk Wstecz.
 // Nieznany hash (np. #access_token po powrocie z logowania Google) = Start; nie nadpisujemy go,

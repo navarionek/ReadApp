@@ -4392,8 +4392,9 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 /* ----------------- Edycja książki (js/bookeditor.js) ----------------- */
-/* Jeden pełnoekranowy ekran: rozmyta okładka w tle, duża okładka do stuknięcia, tytuł i autor
-   jak na okładce, punkty na żywo, karty z ustawieniami i przyklejony „Zapisz” na dole. */
+/* Pełnoekranowy ekran: u góry okładka obok tytułu, autora, roku i punktów (na rozmytej okładce),
+   pod spodem ustawienia jako lista wierszy jak w telefonie, mnożniki jako pigułki,
+   przyklejony „Zapisz” na dole, a usuwanie jako kosz w górnym pasku. */
 body.be-lock {
   overflow: hidden;
 }
@@ -4417,6 +4418,8 @@ body.be-lock {
 .be-picker {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4427,22 +4430,33 @@ body.be-lock {
   display: none;
 }
 
+/* Ramka o szerokości ekranu przycina rozmycie (::before jest większy, żeby brzegi nie były jaśniejsze) */
 .be-backdrop {
   position: absolute;
-  inset: -40px -40px auto;
-  height: 380px;
-  background-size: cover;
-  background-position: center;
-  filter: blur(34px) saturate(1.4);
-  opacity: 0.55;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 330px;
+  overflow: hidden;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(#000 40%, transparent);
-  mask-image: linear-gradient(#000 40%, transparent);
+  -webkit-mask-image: linear-gradient(#000 45%, transparent);
+  mask-image: linear-gradient(#000 45%, transparent);
 }
 
-.be-backdrop.flat {
+.be-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  background-image: var(--cover);
+  background-size: cover;
+  background-position: center;
+  filter: blur(36px) saturate(1.4);
+  opacity: 0.5;
+}
+
+.be-backdrop.flat::before {
   filter: blur(10px);
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 .be-bar {
@@ -4453,17 +4467,20 @@ body.be-lock {
   grid-template-columns: 2.5rem 1fr 2.5rem;
   align-items: center;
   gap: 0.5rem;
-  padding: calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem;
-  background: color-mix(in srgb, var(--bg-body) 55%, transparent);
+  padding: calc(0.5rem + env(safe-area-inset-top)) 0.75rem 0.5rem;
+  background: color-mix(in srgb, var(--bg-body) 50%, transparent);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 
 .be-bar-title {
   margin: 0;
+  overflow: hidden;
   font-size: 1rem;
   font-weight: 700;
   text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .be-icon-btn {
@@ -4479,25 +4496,30 @@ body.be-lock {
 }
 
 .be-icon-btn svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
+.be-icon-btn.be-danger {
+  color: var(--error);
+}
+
+/* Nagłówek: okładka z lewej, tekst obok */
 .be-hero {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
   align-items: center;
-  gap: 0.35rem;
-  max-width: 34rem;
+  gap: 1.1rem;
+  width: 100%;
+  max-width: 36rem;
   margin: 0 auto;
-  padding: 0.5rem 1.25rem 1rem;
+  padding: 0.75rem 1.1rem 1.25rem;
 }
 
 .be-cover {
   position: relative;
-  width: 9.5rem;
-  margin-bottom: 0.9rem;
+  width: 100%;
   padding: 0;
   border: none;
   background: none;
@@ -4510,41 +4532,54 @@ body.be-lock {
 }
 
 .be-cover .book-cover {
-  border-radius: 6px 12px 12px 6px;
-  box-shadow: 0 22px 40px -14px rgb(0 0 0 / 0.65), inset 4px 0 0 rgb(0 0 0 / 0.12);
+  border-radius: 4px 9px 9px 4px;
+  box-shadow: 0 16px 30px -12px rgb(0 0 0 / 0.65), inset 3px 0 0 rgb(0 0 0 / 0.12);
 }
 
 .be-cover-badge {
   position: absolute;
-  right: -0.5rem;
-  bottom: -0.5rem;
+  left: 50%;
+  bottom: -0.6rem;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.65rem;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
   border-radius: 999px;
   background: var(--primary);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
+  white-space: nowrap;
   box-shadow: 0 6px 14px -4px rgb(0 0 0 / 0.45);
 }
 
 .be-cover-badge svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.be-hero-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-width: 0;
 }
 
 /* Tytuł, autor i rok wyglądają jak napis, a nie jak formularz; ramka pojawia się przy pisaniu */
 .book-editor .be-title,
 .book-editor .be-author,
 .book-editor .be-year {
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.35rem;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-main);
   font: inherit;
-  text-align: center;
+  text-align: left;
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
@@ -4564,39 +4599,34 @@ body.be-lock {
 }
 
 .book-editor .be-title {
-  width: 100%;
-  padding: 0.25rem 0.5rem;
-  font-size: 1.45rem;
+  overflow: hidden;
+  resize: none;
+  font-size: 1.3rem;
   font-weight: 800;
   line-height: 1.25;
 }
 
-/* Autor pod tytułem, rok pod autorem jako mała pigułka: wszystko wyśrodkowane w kolumnie */
-.be-byline {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  width: 100%;
+.book-editor .be-author {
   color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
-.book-editor .be-author {
-  width: 100%;
-  padding: 0.2rem 0.5rem;
-  color: var(--text-muted);
-  font-size: 1rem;
-  text-align: center;
+.be-hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding-left: 0.35rem;
 }
 
 .book-editor .be-year {
-  width: 5.5rem;
-  padding: 0.2rem 0.5rem;
+  width: 5.25rem;
+  padding: 0.25rem 0.5rem;
   border-color: var(--border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--bg-card) 60%, transparent);
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-align: center;
   -moz-appearance: textfield;
 }
@@ -4610,128 +4640,137 @@ body.be-lock {
 .be-points {
   display: flex;
   align-items: baseline;
-  gap: 0.35rem;
-  margin-top: 0.6rem;
-  padding: 0.45rem 1rem;
+  gap: 0.25rem;
+  padding: 0.2rem 0.7rem;
   border-radius: 999px;
   background: var(--primary-light);
   color: var(--primary);
 }
 
 .be-points-value {
-  font-size: 1.35rem;
+  font-size: 1rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 
 .be-points small {
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
 .be-points-calc {
-  margin-left: 0.4rem;
+  padding-left: 0.4rem;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
+/* Ustawienia */
 .be-body {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  max-width: 34rem;
+  gap: 1.1rem;
+  width: 100%;
+  max-width: 36rem;
   margin: 0 auto;
-  padding: 0.5rem 1rem 1.5rem;
+  padding: 0 1rem 1rem;
+  flex: 1;
+}
+
+.be-group-title {
+  margin: 0 0 0.45rem 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .be-card {
-  padding: 1rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   box-shadow: var(--shadow-sm);
 }
 
-.be-card-title {
+/* Lista wierszy: etykieta z lewej, pole z prawej, kreska między wierszami */
+.be-row {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 0.8rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.be-card-title svg {
-  width: 1rem;
-  height: 1rem;
-  color: var(--primary);
-}
-
-.be-stepper {
-  display: grid;
-  grid-template-columns: 3.25rem 1fr 3.25rem;
-  gap: 0.5rem;
-}
-
-.be-step {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-body);
-  color: var(--text-main);
-  font: inherit;
-  font-weight: 700;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.4rem;
+  padding: 0.55rem 0.9rem 0.55rem 1rem;
   cursor: pointer;
 }
 
-.be-step:active {
-  background: var(--primary-light);
+.be-row + .be-row {
+  border-top: 1px solid var(--border);
 }
 
-.book-editor .be-pages {
+.be-row-label {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 0.55rem;
+  font-weight: 600;
+}
+
+.be-row-label small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.book-editor .be-num {
+  width: 5.5rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.6rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-body);
   color: var(--text-main);
   font: inherit;
-  font-size: 1.5rem;
-  font-weight: 800;
-  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.book-editor .be-pages:focus {
+.book-editor .be-num:focus {
   outline: none;
+  box-shadow: none;
   border-color: var(--primary);
 }
 
-.be-switch-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 0.85rem;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--text-main);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+.book-editor .be-date {
+  width: auto;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-.be-switch-text {
+/* Przełącznik: prawdziwy checkbox pod spodem (klik w cały wiersz), widać tylko .switch */
+.be-switch {
+  position: relative;
   display: flex;
-  flex-direction: column;
 }
 
-.be-switch-text small {
-  color: var(--text-muted);
-  font-size: 0.75rem;
+.be-switch .switch {
+  margin-left: 0;
+}
+
+.be-check {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.be-check:focus-visible + .switch {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.be-chips-card {
+  padding: 0.85rem;
 }
 
 .be-chips {
@@ -4743,8 +4782,8 @@ body.be-lock {
 .be-chip {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.85rem;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--bg-body);
@@ -4770,66 +4809,26 @@ body.be-lock {
   color: #fff;
 }
 
-.be-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.be-field > span {
-  font-weight: 600;
-}
-
-.book-editor .be-date {
-  width: auto;
-  max-width: 11rem;
-  padding: 0.55rem 0.7rem;
-}
-
 .be-note {
   margin: 0.6rem 0 0;
   color: var(--text-muted);
   font-size: 0.8rem;
 }
 
-.be-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
-  margin-top: 0.4rem;
-  padding: 0.75rem;
-  border: none;
-  border-radius: var(--radius);
-  background: none;
-  color: var(--error);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.be-remove:hover {
-  background: var(--error-bg);
-}
-
-.be-remove svg {
-  width: 1.1rem;
-  height: 1.1rem;
-}
-
 .be-footer {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  max-width: 34rem;
+  width: 100%;
+  max-width: 36rem;
   margin: 0 auto;
-  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
-  background: linear-gradient(transparent, var(--bg-body) 35%);
+  padding: 0.6rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--bg-body) 30%);
 }
 
 .be-picker-body {
-  max-width: 34rem;
+  width: 100%;
+  max-width: 36rem;
   margin: 0 auto;
   padding: 0.5rem 1rem 2rem;
 }

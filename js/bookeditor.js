@@ -80,15 +80,22 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   let cover = { cover_url: row.cover_url ?? null, info_url: row.info_url ?? null, description: row.description ?? null };
   let coverChanged = false;
 
-  /* --- Nagłówek: rozmyta okładka w tle, okładka, tytuł, autor, rok --- */
+  /* --- Nagłówek: okładka z lewej, obok tytuł, autor, rok i punkty; rozmyta okładka w tle --- */
   const backdrop = el('div', { class: 'be-backdrop', 'aria-hidden': 'true' });
   const coverSlot = el('span', { class: 'be-cover-img' });
   const coverBtn = el('button', { type: 'button', class: 'be-cover', 'aria-label': 'Zmień okładkę' }, [
     coverSlot,
     el('span', { class: 'be-cover-badge' }, [icon('image'), el('span', { text: 'Zmień' })]),
   ]);
-  const title = el('input', { type: 'text', class: 'be-title', maxlength: '300', 'aria-label': 'Tytuł', placeholder: 'Tytuł książki', autocomplete: 'off' });
+  // Tytuł w textarea, żeby długi łamał się na kilka linii (wysokość rośnie z tekstem)
+  const title = el('textarea', { class: 'be-title', rows: '1', maxlength: '300', 'aria-label': 'Tytuł', placeholder: 'Tytuł książki', autocomplete: 'off' });
   title.value = row.title || '';
+  const fitTitle = () => {
+    title.style.height = 'auto';
+    title.style.height = `${title.scrollHeight}px`;
+  };
+  title.addEventListener('input', fitTitle);
+  title.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });  // tytuł bez nowych linii
   const author = el('input', { type: 'text', class: 'be-author', maxlength: '200', 'aria-label': 'Autor', placeholder: 'Autor', autocomplete: 'off' });
   author.value = row.author || '';
   const year = el('input', { type: 'number', class: 'be-year', inputmode: 'numeric', min: '0', max: String(maxYear), step: '1', 'aria-label': 'Rok wydania', placeholder: 'rok wyd.', autocomplete: 'off' });
@@ -98,23 +105,29 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     const book = { title: title.value.trim() || row.title, author: author.value.trim(), cover_url: cover.cover_url };
     coverSlot.replaceChildren(coverEl(book, 'large'));
     if (cover.cover_url) {
-      backdrop.style.backgroundImage = `url("${cover.cover_url.replace(/"/g, '%22')}")`;
+      backdrop.style.setProperty('--cover', `url("${cover.cover_url.replace(/"/g, '%22')}")`);
       backdrop.classList.remove('flat');
     } else {
       const h = titleHue(book.title);
-      backdrop.style.backgroundImage = `linear-gradient(160deg, hsl(${h} 55% 45%), hsl(${(h + 40) % 360} 55% 25%))`;
+      backdrop.style.setProperty('--cover', `linear-gradient(160deg, hsl(${h} 55% 45%), hsl(${(h + 40) % 360} 55% 25%))`);
       backdrop.classList.add('flat');
     }
   };
 
-  /* --- Przeczytana: strony, niedokończona, mnożniki, punkty na żywo --- */
-  const sections = [];
+  /* --- Ustawienia jako lista wierszy (jak ustawienia w telefonie) --- */
+  const rows = [];
+  const listRow = (label, control, hint) => el('label', { class: 'be-row' }, [
+    el('span', { class: 'be-row-label' }, [el('span', { text: label }), ...(hint ? [el('small', { text: hint })] : [])]),
+    control,
+  ]);
+
   const pointsValue = el('strong', { class: 'be-points-value' });
   const pointsCalc = el('span', { class: 'be-points-calc' });
   let pages = null;
   let unfinished = null;
   let selected = null;     // Set nazw zaznaczonych mnożników
   let keepOld = false;     // mnożnik spoza obecnych opcji zostaje, dopóki nikt nie ruszy zaznaczenia
+  let chipsCard = null;
   const multiplierNow = () => (keepOld ? Number(row.multiplier) : product(state.multipliers.filter(m => selected.has(m.label)).map(m => m.value)));
 
   const updatePoints = () => {
@@ -125,37 +138,27 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     pointsCalc.textContent = mult === 1 ? `${p} str.` : `${p} str. × ${formatMultiplier(mult).replace('.', ',')}`;
   };
 
+  let finishedDate = null;
+  let startedDate = null;
+  let pageCount = null;
+
   if (isRead) {
-    pages = el('input', { type: 'number', class: 'be-pages', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', 'aria-label': 'Liczba stron' });
+    pages = el('input', { type: 'number', class: 'be-num', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', 'aria-label': 'Liczba stron' });
     pages.value = row.pages ?? '';
-    const stepBtn = (delta, label) => {
-      const b = el('button', { type: 'button', class: 'be-step', 'aria-label': `${delta > 0 ? 'Dodaj' : 'Odejmij'} ${Math.abs(delta)} stron`, text: label });
-      b.addEventListener('click', () => {
-        pages.value = String(Math.min(MAX_PAGES, Math.max(1, (parseInt(pages.value, 10) || 0) + delta)));
-        updatePoints();
-      });
-      return b;
-    };
     pages.addEventListener('input', updatePoints);
+    rows.push(listRow('Strony', pages));
 
-    unfinished = el('button', { type: 'button', class: 'be-switch-row', role: 'switch', 'aria-checked': String(!!row.unfinished) }, [
-      el('span', { class: 'be-switch-text' }, [
-        el('span', { text: 'Niedokończona' }),
-        el('small', { text: 'Liczą się przeczytane strony' }),
-      ]),
-      el('span', { class: `switch${row.unfinished ? ' on' : ''}`, 'aria-hidden': 'true' }),
-    ]);
-    unfinished.addEventListener('click', () => {
-      const on = unfinished.getAttribute('aria-checked') !== 'true';
-      unfinished.setAttribute('aria-checked', String(on));
-      unfinished.querySelector('.switch').classList.toggle('on', on);
-    });
+    const sw = el('span', { class: `switch${row.unfinished ? ' on' : ''}`, 'aria-hidden': 'true' });
+    unfinished = el('input', { type: 'checkbox', class: 'be-check', role: 'switch', 'aria-label': 'Niedokończona' });
+    unfinished.checked = !!row.unfinished;
+    unfinished.addEventListener('change', () => sw.classList.toggle('on', unfinished.checked));
+    rows.push(listRow('Niedokończona', el('span', { class: 'be-switch' }, [unfinished, sw]), 'Liczą się przeczytane strony'));
 
-    sections.push(el('section', { class: 'be-card' }, [
-      el('h3', { class: 'be-card-title' }, [icon('layers'), el('span', { text: 'Strony' })]),
-      el('div', { class: 'be-stepper' }, [stepBtn(-10, '−10'), pages, stepBtn(10, '+10')]),
-      unfinished,
-    ]));
+    finishedDate = el('input', { type: 'date', class: 'be-num be-date', max: todayInputValue(), 'aria-label': 'Data skończenia' });
+    finishedDate.value = dayInputValue(row.created_at);
+    if (row.started_at) finishedDate.min = dayInputValue(row.started_at);
+    const started = row.started_at ? new Date(row.started_at) : null;
+    rows.push(listRow('Skończona', finishedDate, started ? `Zaczęta ${formatDay(started)} ${started.getFullYear()}` : null));
 
     // Mnożniki jako przełączane „pigułki”
     const initial = initialLabels(row);
@@ -181,48 +184,27 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
       });
       return chip;
     });
-    sections.push(el('section', { class: 'be-card' }, [
-      el('h3', { class: 'be-card-title' }, [icon('sparkles'), el('span', { text: 'Mnożniki' })]),
-      chips.length ? el('div', { class: 'be-chips' }, chips) : el('p', { class: 'be-note', text: 'Brak mnożników.' }),
-      note,
-    ]));
-  }
-
-  /* --- Daty --- */
-  let finishedDate = null;
-  let startedDate = null;
-  if (isRead) {
-    finishedDate = el('input', { type: 'date', class: 'plain-input be-date', max: todayInputValue(), 'aria-label': 'Data skończenia' });
-    finishedDate.value = dayInputValue(row.created_at);
-    if (row.started_at) finishedDate.min = dayInputValue(row.started_at);
-    sections.push(el('section', { class: 'be-card' }, [
-      el('h3', { class: 'be-card-title' }, [icon('calendar'), el('span', { text: 'Daty' })]),
-      el('label', { class: 'be-field' }, [el('span', { text: 'Skończona' }), finishedDate]),
-      ...(row.started_at ? [el('p', { class: 'be-note', text: `Zaczęta ${formatDay(new Date(row.started_at))} ${new Date(row.started_at).getFullYear()}` })] : []),
-    ]));
-  } else if (kind === 'reading_now') {
-    startedDate = el('input', { type: 'date', class: 'plain-input be-date', max: todayInputValue(), 'aria-label': 'Data rozpoczęcia' });
-    startedDate.value = dayInputValue(row.started_at);
-    sections.push(el('section', { class: 'be-card' }, [
-      el('h3', { class: 'be-card-title' }, [icon('calendar'), el('span', { text: 'Daty' })]),
-      el('label', { class: 'be-field' }, [el('span', { text: 'Zaczęta' }), startedDate]),
-    ]));
-  }
-
-  // Zaczęta i w kolejce: liczba stron wydania (podpowiedź przy kończeniu książki)
-  let pageCount = null;
-  if (!isRead) {
-    pageCount = el('input', { type: 'number', class: 'plain-input be-date', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', placeholder: 'np. 320', 'aria-label': 'Liczba stron wydania' });
+    chipsCard = el('section', { class: 'be-group' }, [
+      el('h3', { class: 'be-group-title', text: 'Mnożniki' }),
+      el('div', { class: 'be-card be-chips-card' }, [
+        chips.length ? el('div', { class: 'be-chips' }, chips) : el('p', { class: 'be-note', text: 'Brak mnożników.' }),
+        note,
+      ]),
+    ]);
+  } else {
+    if (kind === 'reading_now') {
+      startedDate = el('input', { type: 'date', class: 'be-num be-date', max: todayInputValue(), 'aria-label': 'Data rozpoczęcia' });
+      startedDate.value = dayInputValue(row.started_at);
+      rows.push(listRow('Zaczęta', startedDate));
+    }
+    // Liczba stron wydania: podpowiedź przy kończeniu książki
+    pageCount = el('input', { type: 'number', class: 'be-num', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', placeholder: '—', 'aria-label': 'Liczba stron wydania' });
     pageCount.value = row.page_count ?? '';
-    sections.push(el('section', { class: 'be-card' }, [
-      el('h3', { class: 'be-card-title' }, [icon('layers'), el('span', { text: 'Strony' })]),
-      el('label', { class: 'be-field' }, [el('span', { text: 'W tym wydaniu' }), pageCount]),
-      el('p', { class: 'be-note', text: 'Podpowiemy je, gdy skończysz książkę.' }),
-    ]));
+    rows.push(listRow('Stron w wydaniu', pageCount, 'Podpowiemy je przy kończeniu'));
   }
 
-  /* --- Usuwanie --- */
-  const removeBtn = el('button', { type: 'button', class: 'be-remove' }, [icon('trash-2'), el('span', { text: cfg.remove })]);
+  /* --- Usuwanie (kosz w górnym pasku) --- */
+  const removeBtn = el('button', { type: 'button', class: 'be-icon-btn be-danger', 'aria-label': cfg.remove, title: cfg.remove }, [icon('trash-2')]);
   removeBtn.addEventListener('click', async () => {
     let removed = false;
     if (kind === 'reads') removed = await handleDelete(row);
@@ -248,7 +230,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     field?.focus();
   };
   saveBtn.addEventListener('click', async () => {
-    const titleText = title.value.trim();
+    const titleText = title.value.replace(/\s+/g, ' ').trim();
     if (!titleText) return fail('Podaj tytuł książki.', title);
     const yearText = year.value.trim();
     const publishedYear = yearText === '' ? null : Number(yearText);
@@ -263,7 +245,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
       values.pages = p;
       values.multiplier = multiplierNow();
       values.multiplier_labels = keepOld ? row.multiplier_labels ?? null : state.multipliers.filter(m => selected.has(m.label)).map(m => m.label);
-      values.unfinished = unfinished.getAttribute('aria-checked') === 'true';
+      values.unfinished = unfinished.checked;
       const day = finishedDate.value;
       if (day && day !== dayInputValue(row.created_at)) {
         if (day > todayInputValue()) return fail('Data skończenia nie może być w przyszłości.', finishedDate);
@@ -345,14 +327,23 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   closeBtn.addEventListener('click', closeBookEditor);
   const main = el('div', { class: 'be-main' }, [
     backdrop,
-    el('header', { class: 'be-bar' }, [closeBtn, el('h2', { class: 'be-bar-title', text: cfg.heading }), el('span')]),
+    el('header', { class: 'be-bar' }, [closeBtn, el('h2', { class: 'be-bar-title', text: cfg.heading }), removeBtn]),
     el('div', { class: 'be-hero' }, [
       coverBtn,
-      title,
-      el('div', { class: 'be-byline' }, [author, year]),
-      ...(isRead ? [el('div', { class: 'be-points' }, [pointsValue, el('small', { text: 'pkt' }), pointsCalc])] : []),
+      el('div', { class: 'be-hero-text' }, [
+        title,
+        author,
+        el('div', { class: 'be-hero-meta' }, [
+          year,
+          ...(isRead ? [el('span', { class: 'be-points' }, [pointsValue, el('small', { text: 'pkt' })])] : []),
+        ]),
+        ...(isRead ? [pointsCalc] : []),
+      ]),
     ]),
-    el('div', { class: 'be-body' }, [...sections, removeBtn]),
+    el('div', { class: 'be-body' }, [
+      el('section', { class: 'be-group' }, [el('div', { class: 'be-card be-list' }, rows)]),
+      ...(chipsCard ? [chipsCard] : []),
+    ]),
     el('footer', { class: 'be-footer' }, [saveBtn]),
   ]);
   const root = el('div', { class: 'book-editor', role: 'dialog', 'aria-modal': 'true', 'aria-label': cfg.heading }, [main, picker]);
@@ -378,5 +369,6 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   };
   drawCover();
   updatePoints();
+  fitTitle();
   refreshIcons();
 }
