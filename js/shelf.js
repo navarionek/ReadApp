@@ -109,33 +109,22 @@ export async function settleBookInfo(table, row) {
   return { info_checked_at: new Date().toISOString() };
 }
 
-export function openReadingModal(item) {
+// source: element okładki, z którego otwarto okno (okładka przeleci z niego na środek)
+export function openReadingModal(item, source = null) {
   const info = readingCoverOf(item);
   openReadingId = item.id;
   const book = { title: item.title, cover_url: info?.cover_url, author: item.author || info?.author };
   const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
   const days = daysSince(item.started_at);
-
-  const body = [
-    el('div', { class: 'book-modal-top' }, [
-      coverEl(book, 'large'),
-      el('div', { class: 'book-modal-info' }, [
-        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: item.title }),
-        ...(book.author || item.published_year
-          ? [el('p', { class: 'book-modal-author', text: [book.author, item.published_year].filter(Boolean).join(' · ') })]
-          : []),
-        el('p', { class: 'book-modal-author', text: `Czytane od ${formatDay(new Date(item.started_at))} · ${days} ${days === 1 ? 'dzień' : 'dni'}` }),
-      ]),
-    ]),
-  ];
-
+  const started = new Date(item.started_at);
+  const actions = [];
   if (own) {
     const done = el('button', { type: 'button', class: 'btn btn-primary btn-block' }, [icon('check'), el('span', { text: 'Skończone' })]);
     done.addEventListener('click', async () => {
-      await closeBookModal();
+      await closeBookModal({ animate: false });
       startFinishing(item);
     });
-    body.push(done, editButton('reading_now', item, {
+    actions.push(done, editButton('reading_now', item, {
       onSaved: () => {
         if (currentScreen() === 'polka') renderShelf();
         const fresh = state.readingNow.find(i => i.id === item.id);
@@ -144,10 +133,19 @@ export function openReadingModal(item) {
       onRemoved: () => { if (currentScreen() === 'polka') renderShelf(); },
     }));
   }
-
-  document.getElementById('book-modal-body').replaceChildren(...body);
-  showBookModal();
-  refreshIcons();
+  showSheet(bookSheet({
+    book,
+    year: item.published_year,
+    kicker: own ? 'Czytam teraz' : 'Czyta teraz',
+    facts: [
+      [days ? String(days) : 'dziś', days ? plural(days, 'dzień', 'dni', 'dni') : 'zaczęta'],
+      ...(item.page_count ? [[String(item.page_count), 'stron']] : []),
+    ],
+    meta: `Zaczęta ${formatDay(started)} ${started.getFullYear()}`,
+    description: item.description,
+    link: item.info_url,
+    actions,
+  }), source);
 }
 
 export function titleHue(title) {
@@ -183,27 +181,11 @@ async function fillMissingQueueInfo(userId) {
   });
 }
 
-export function openQueueModal(item) {
+export function openQueueModal(item, source = null) {
   openReadingId = null;
   const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
-
-  const body = [
-    el('div', { class: 'book-modal-top' }, [
-      coverEl({ title: item.title, cover_url: item.cover_url, author: item.author }, 'large'),
-      el('div', { class: 'book-modal-info' }, [
-        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: item.title }),
-        ...(item.author || item.published_year
-          ? [el('p', { class: 'book-modal-author', text: [item.author, item.published_year].filter(Boolean).join(' · ') })]
-          : []),
-        el('p', { class: 'book-modal-author', text: `W kolejce od ${formatDay(new Date(item.created_at))}` }),
-        ...(item.info_url
-          ? [el('a', { class: 'book-modal-link', href: item.info_url, target: '_blank', rel: 'noopener noreferrer', text: item.info_url.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' })]
-          : []),
-      ]),
-    ]),
-    ...(item.description ? [el('p', { class: 'book-modal-desc', text: item.description })] : []),
-  ];
-
+  const added = new Date(item.created_at);
+  const actions = [];
   if (own) {
     const start = el('button', { type: 'button', class: 'btn btn-primary btn-block' }, [icon('book-open'), el('span', { text: 'Zaczynam czytać' })]);
     start.addEventListener('click', async () => {
@@ -214,14 +196,13 @@ export function openQueueModal(item) {
         showToast('Nie udało się: ' + friendlyError(error));
         return;
       }
-      await closeBookModal();
+      await closeBookModal({ animate: false });
       showToast('Zaczęte! Książka jest teraz w „Czyta teraz”.');
       shelfSignature = null;
       await loadReads();
       await loadShelf();
     });
-
-    body.push(start, editButton('reading_queue', item, {
+    actions.push(start, editButton('reading_queue', item, {
       onSaved: () => {
         renderShelf();
         openQueueModal(item);
@@ -232,10 +213,16 @@ export function openQueueModal(item) {
       },
     }));
   }
-
-  document.getElementById('book-modal-body').replaceChildren(...body);
-  showBookModal();
-  refreshIcons();
+  showSheet(bookSheet({
+    book: { title: item.title, cover_url: item.cover_url, author: item.author },
+    year: item.published_year,
+    kicker: 'Do przeczytania',
+    facts: item.page_count ? [[String(item.page_count), 'stron']] : [],
+    meta: `W kolejce od ${formatDay(added)} ${added.getFullYear()}`,
+    description: item.description,
+    link: item.info_url,
+    actions,
+  }), source);
 }
 
 const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, page_count, info_url, description, info_checked_at, created_at';
@@ -402,7 +389,7 @@ export function renderShelf() {
             el('span', { class: 'shelf-now-days' }, [icon('bookmark'), el('span', { text: days ? `${days}. dzień` : 'od dziś' })]),
           ]),
         ]);
-        card.addEventListener('click', () => openReadingModal(item));
+        card.addEventListener('click', () => openReadingModal(item, card.querySelector('.book-cover')));
         return card;
       })),
     ]));
@@ -420,7 +407,7 @@ export function renderShelf() {
               coverEl(book),
               el('span', { class: 'shelf-stack-title', text: item.title }),
             ]);
-            tile.addEventListener('click', () => openQueueModal(item));
+            tile.addEventListener('click', () => openQueueModal(item, tile.querySelector('.book-cover')));
             return tile;
           }))
         : el('p', { class: 'shelf-empty-line', text: 'Pusto.' }),
@@ -457,7 +444,7 @@ function bookTile(row) {
     ...(row.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
     ...(row.author ? [el('span', { class: 'book-tile-author', text: row.author })] : []),
   ]);
-  tile.addEventListener('click', () => openBookModal(row));
+  tile.addEventListener('click', () => openBookModal(row, tile.querySelector('.book-cover')));
   return tile;
 }
 
@@ -471,100 +458,210 @@ export async function fillMissingBookInfo(userId) {
 }
 
 /* ----------------- Szczegóły książki ----------------- */
+// Jedno okno dla przeczytanej, czytanej i czekającej książki: rozmyta okładka w tle, duża
+// okładka, tytuł i autor szeryfowo, kafelki z liczbami, data, ocena, rozwijany opis, link
+// i przyciski. Otwarte z okładki na półce: okładka przelatuje z półki na środek (shared
+// element), a przy zamykaniu wraca na swoje miejsce. Na półce w tym czasie jej nie widać.
+
 // „Edytuj książkę” w oknie: zamyka okno i otwiera jeden wspólny ekran edycji (js/bookeditor.js)
 function editButton(kind, row, callbacks) {
   const btn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('pencil'), el('span', { text: 'Edytuj książkę' })]);
   btn.addEventListener('click', async () => {
-    await closeBookModal();
+    await closeBookModal({ animate: false });
     openBookEditor(kind, row, callbacks);
   });
   return btn;
 }
+
+function bookSheet({ book, year, kicker, facts = [], meta, extra = [], description, link, actions = [] }) {
+  const backdrop = el('div', { class: 'bs-bg', 'aria-hidden': 'true' });
+  if (book.cover_url) backdrop.style.setProperty('--cover', `url("${book.cover_url.replace(/"/g, '%22')}")`);
+  else {
+    const h = titleHue(book.title);
+    backdrop.style.setProperty('--cover', `linear-gradient(160deg, hsl(${h} 55% 45%), hsl(${(h + 40) % 360} 55% 25%))`);
+  }
+  // Długi opis zwinięty do kilku linii, z przyciskiem „Więcej”
+  let desc = [];
+  if (description) {
+    const text = el('p', { class: 'bs-desc', text: description });
+    desc = [text];
+    if (description.length > 260) {
+      text.classList.add('clamped');
+      const more = el('button', { type: 'button', class: 'bs-more', text: 'Więcej' });
+      more.addEventListener('click', () => {
+        const open = text.classList.toggle('clamped');
+        more.textContent = open ? 'Więcej' : 'Mniej';
+      });
+      desc.push(more);
+    }
+  }
+  return [
+    backdrop,
+    el('div', { class: 'bs-hero' }, [
+      el('div', { class: 'bs-cover' }, [coverEl(book, 'large')]),
+      el('span', { class: 'bs-kicker', text: kicker }),
+      el('h2', { id: 'book-modal-title', class: 'bs-title', text: book.title || 'bez tytułu' }),
+      ...(book.author || year ? [el('p', { class: 'bs-author', text: [book.author, year].filter(Boolean).join(' · ') })] : []),
+    ]),
+    el('div', { class: 'bs-body' }, [
+      ...(facts.length
+        ? [el('div', { class: 'bs-facts' }, facts.map(([value, label]) => el('div', { class: 'bs-fact' }, [el('strong', { text: value }), el('span', { text: label })])))]
+        : []),
+      ...(meta ? [el('p', { class: 'bs-meta' }, [icon('calendar'), el('span', { text: meta })])] : []),
+      ...extra,
+      ...desc,
+      ...(link
+        ? [el('a', { class: 'bs-link', href: link, target: '_blank', rel: 'noopener noreferrer' }, [
+            el('span', { text: link.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' }),
+            icon('arrow-up-right'),
+          ])]
+        : []),
+      ...(actions.length ? [el('div', { class: 'bs-actions' }, actions)] : []),
+    ]),
+  ];
+}
+
+const calmMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let sheetSource = null;   // okładka na półce, z której przyleciała okładka okna
+let sheetClosing = null;  // trwające zamykanie (obietnica)
+
+// Kopia okładki leci nad oknem między okładką na półce (small) a tą w oknie (large).
+// Kopia ma rozmiar dużej okładki i jest zmniejszana, więc w locie się nie rozmywa.
+// way: 'in' = z półki do okna, 'out' = z okna z powrotem na półkę
+function flyCover(small, large, cover, way) {
+  const ghost = cover.cloneNode(true);
+  ghost.classList.add('bs-ghost');
+  ghost.style.visibility = 'visible';
+  Object.assign(ghost.style, { left: `${large.left}px`, top: `${large.top}px`, width: `${large.width}px`, height: `${large.height}px` });
+  document.body.appendChild(ghost);
+  const shrunk = { transform: `translate(${small.left - large.left}px, ${small.top - large.top}px) scale(${small.width / large.width}, ${small.height / large.height})` };
+  const frames = way === 'in' ? [shrunk, { transform: 'none' }] : [{ transform: 'none' }, shrunk];
+  const anim = ghost.animate(frames, { duration: way === 'in' ? 420 : 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' });
+  // Bezpiecznik: gdyby animacja stanęła (np. karta w tle), okładka i tak wraca na miejsce
+  const timeout = new Promise(resolve => setTimeout(resolve, way === 'in' ? 700 : 550));
+  return Promise.race([anim.finished.catch(() => {}), timeout]).then(() => ghost.remove());
+}
+
+function showSheet(children, source) {
+  const modal = document.getElementById('book-modal');
+  const wasOpen = !modal.hidden;
+  document.getElementById('book-modal-body').replaceChildren(...children);
+  showBookModal();
+  refreshIcons();
+  if (wasOpen || !source?.isConnected || calmMotion()) return;
+  const target = modal.querySelector('.bs-cover .book-cover');
+  const from = source.getBoundingClientRect();
+  if (!target || !from.width) return;
+  sheetSource = source;
+  source.style.visibility = 'hidden';
+  target.style.visibility = 'hidden';
+  flyCover(from, target.getBoundingClientRect(), target, 'in').then(() => { target.style.visibility = ''; });
+}
+
+// Wyjście: okładka wraca na półkę (jeśli jej miejsce jest widoczne), okno gaśnie
+function animateClose(animate) {
+  const modal = document.getElementById('book-modal');
+  const source = sheetSource;
+  sheetSource = null;
+  const target = modal.querySelector('.bs-cover .book-cover');
+  const back = animate && !calmMotion() && source?.isConnected && target ? source.getBoundingClientRect() : null;
+  const finish = () => {
+    modal.hidden = true;
+    modal.classList.remove('closing');
+    if (source) source.style.visibility = '';
+  };
+  if (!animate || calmMotion()) {
+    finish();
+    return Promise.resolve();
+  }
+  modal.classList.add('closing');
+  const waits = [new Promise(resolve => setTimeout(resolve, 240))];
+  if (back?.width && back.bottom > 0 && back.top < window.innerHeight) {
+    const from = target.getBoundingClientRect();
+    target.style.visibility = 'hidden';
+    waits.push(flyCover(back, from, target, 'out'));
+  }
+  return Promise.all(waits).then(finish);
+}
+
 // Okno ma własny wpis w historii, więc „Wstecz” zamyka tylko okno i zostaje na tej samej stronie.
 // Zwraca obietnicę, która kończy się po zamknięciu (cofnięcie historii jest asynchroniczne),
 // żeby kolejna nawigacja nie została przez nie cofnięta.
-export function closeBookModal() {
+export function closeBookModal({ animate = true } = {}) {
   const modal = document.getElementById('book-modal');
-  if (modal.hidden) return Promise.resolve();
-  modal.hidden = true;
+  if (modal.hidden) return sheetClosing || Promise.resolve();
   openReadingId = null;
-  if (!history.state?.bookModal) return Promise.resolve();
-  return new Promise(resolve => {
-    window.addEventListener('popstate', resolve, { once: true });
-    history.back();
-  });
+  const leaving = history.state?.bookModal
+    ? new Promise(resolve => {
+        window.addEventListener('popstate', resolve, { once: true });
+        history.back();
+      })
+    : Promise.resolve();
+  sheetClosing = Promise.all([animateClose(animate), leaving]).then(() => { sheetClosing = null; });
+  return sheetClosing;
 }
 
 function showBookModal() {
   const modal = document.getElementById('book-modal');
   if (modal.hidden) history.pushState({ bookModal: true }, '');
+  modal.classList.remove('closing');
   modal.hidden = false;
 }
 
+// „Wstecz” w telefonie: okno zamyka się z animacją (gdy zamykamy sami, okno jest już w trakcie)
 window.addEventListener('popstate', () => {
-  document.getElementById('book-modal').hidden = true;
+  const modal = document.getElementById('book-modal');
+  if (!modal.hidden && !modal.classList.contains('closing')) {
+    openReadingId = null;
+    animateClose(true);
+  }
 });
 
-export function openBookModal(row) {
+export function openBookModal(row, source = null) {
   openReadingId = null;
   const own = row.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
   const finished = new Date(row.created_at);
-  const dates = row.started_at
-    ? `${formatDay(new Date(row.started_at))} – ${formatDay(finished)} ${finished.getFullYear()}`
-    : `dodane ${formatDay(finished)} ${finished.getFullYear()}`;
-
-  const facts = el('dl', { class: 'book-facts' }, [
-    el('div', {}, [el('dt', { text: 'Strony' }), el('dd', { text: row.unfinished ? `${row.pages} (niedokończona)` : String(row.pages) })]),
-    el('div', {}, [el('dt', { text: 'Mnożnik' }), el('dd', { text: `${formatMultiplier(row.multiplier)}x` })]),
-    el('div', {}, [el('dt', { text: 'Punkty' }), el('dd', { text: String(bookPoints(row)) })]),
-    el('div', {}, [el('dt', { text: 'Przeczytane' }), el('dd', { text: dates })]),
-  ]);
-
-  const body = [
-    el('div', { class: 'book-modal-top' }, [
-      coverEl(row, 'large'),
-      el('div', { class: 'book-modal-info' }, [
-        el('h2', { id: 'book-modal-title', class: 'book-modal-title', text: row.title || 'bez tytułu' }),
-        ...(row.author || row.published_year
-          ? [el('p', { class: 'book-modal-author', text: [row.author, row.published_year].filter(Boolean).join(' · ') })]
-          : []),
-        ...(row.info_url
-          ? [el('a', { class: 'book-modal-link', href: row.info_url, target: '_blank', rel: 'noopener noreferrer', text: row.info_url.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' })]
-          : []),
-      ]),
-    ]),
-    facts,
-    ...(row.description ? [el('p', { class: 'book-modal-desc', text: row.description })] : []),
-  ];
+  const started = row.started_at ? new Date(row.started_at) : null;
+  const days = started ? Math.max(1, Math.round((finished - started) / 86400000)) : null;
+  const meta = started
+    ? `${formatDay(started)} – ${formatDay(finished)} ${finished.getFullYear()}`
+    : `Skończona ${formatDay(finished)} ${finished.getFullYear()}`;
+  const mult = Number(row.multiplier);
 
   // Ocena: własna książka = kciuki (zapis od razu), cudza = sama ocena, jeśli jest
   const rating = ratingControl(row, own, () => {
     renderShelf();
     openBookModal(row);
   });
-  if (rating) {
-    body.splice(2, 0, el('div', { class: 'book-modal-rate' }, [
-      el('span', { text: own ? 'Jak ci się podobała?' : 'Ocena' }),
-      rating,
-    ]));
-  }
+  const extra = rating ? [el('div', { class: 'book-modal-rate' }, [el('span', { text: own ? 'Jak ci się podobała?' : 'Ocena' }), rating])] : [];
 
-  if (own) {
-    body.push(editButton('reads', row, {
-      onSaved: () => {
-        renderShelf();
-        openBookModal(row);
-      },
-      onRemoved: () => {
-        shelfSignature = null;
-        loadShelf();
-      },
-    }));
-  }
-
-  document.getElementById('book-modal-body').replaceChildren(...body);
-  showBookModal();
-  refreshIcons();
+  showSheet(bookSheet({
+    book: row,
+    year: row.published_year,
+    kicker: row.unfinished ? 'Niedokończona' : 'Przeczytana',
+    facts: [
+      [String(row.pages), 'stron'],
+      [String(bookPoints(row)), 'punktów'],
+      ...(mult !== 1 ? [[`×${formatMultiplier(mult).replace('.', ',')}`, 'mnożnik']] : []),
+      ...(days ? [[String(days), plural(days, 'dzień', 'dni', 'dni')]] : []),
+    ].slice(0, 3),
+    meta,
+    extra,
+    description: row.description,
+    link: row.info_url,
+    actions: own
+      ? [editButton('reads', row, {
+          onSaved: () => {
+            renderShelf();
+            openBookModal(row);
+          },
+          onRemoved: () => {
+            shelfSignature = null;
+            loadShelf();
+          },
+        })]
+      : [],
+  }), source);
 }
 
 // Okładkę z Google/Open Library kopiujemy do naszego bucketa (funkcja cover-copy), żeby ładowała się

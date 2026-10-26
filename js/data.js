@@ -8,7 +8,7 @@ import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFi
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { ratingControl, renderBookRanking } from './ratings.js';
 import { renderWrapped } from './wrapped.js';
-import { coverEl, readingCoverOf } from './shelf.js';
+import { coverEl, openReadingModal, readingCoverOf } from './shelf.js';
 import { state } from './state.js';
 import { formatDay, renderStats, seriesColors } from './stats.js';
 import { supabaseClient } from './supabase.js';
@@ -144,12 +144,17 @@ export function renderReadingNow() {
         ]
       : [];
     const info = readingCoverOf(item);
-    return el('div', { class: 'reading-now-item' }, [
+    // Okładka i tytuł otwierają okno książki (okładka przelatuje do niego)
+    const open = el('button', { type: 'button', class: 'reading-now-open', 'aria-label': `${item.title}: szczegóły` }, [
       ...(info?.cover_url ? [coverEl({ title: item.title, cover_url: info.cover_url }, 'mini')] : []),
       el('div', { class: 'reading-now-info' }, [
         el('span', { class: 'reading-now-title', text: item.title }),
         el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
       ]),
+    ]);
+    open.addEventListener('click', () => openReadingModal(item, open.querySelector('.book-cover')));
+    return el('div', { class: 'reading-now-item' }, [
+      open,
       el('div', { class: 'reading-now-actions' }, actions),
     ]);
   }));
