@@ -4696,8 +4696,8 @@ body.be-lock {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 3.4rem;
-  padding: 0.55rem 0.9rem 0.55rem 1rem;
+  min-height: 3.6rem;
+  padding: 0.5rem 0.75rem 0.5rem 1rem;
   cursor: pointer;
 }
 
@@ -4718,16 +4718,18 @@ body.be-lock {
   font-weight: 400;
 }
 
+/* Pola po prawej: jednakowa szerokość i wysokość, lekkie tło (ramka dopiero przy edycji) */
 .book-editor .be-num {
-  width: 5.5rem;
+  width: 9rem;
+  height: 2.5rem;
   flex-shrink: 0;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--border);
+  padding: 0 0.75rem;
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--bg-body);
+  background: color-mix(in srgb, var(--bg-body) 70%, transparent);
   color: var(--text-main);
   font: inherit;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -4740,9 +4742,7 @@ body.be-lock {
 }
 
 .book-editor .be-date {
-  width: auto;
   font-size: 0.95rem;
-  font-weight: 600;
 }
 
 /* Przełącznik: prawdziwy checkbox pod spodem (klik w cały wiersz), widać tylko .switch */
