@@ -4312,30 +4312,13 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   opacity: 0;
 }
 
-/* Zanim ruszy intro (czekamy na dane i okładki): sam pulsujący napis, ściana schowana */
+/* Zanim ruszy intro (czekamy na dane i okładki): samo tło, ściana schowana */
 .cover-bg.intro-waiting .tv-wall {
   visibility: hidden;
 }
 
 .cover-intro {
   animation: intro-fade-in 0.3s ease backwards;
-}
-
-.cover-intro-wait {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--primary);
-  font-size: 2.4rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  animation: intro-wait-pulse 1.4s ease-in-out infinite;
-}
-
-@keyframes intro-wait-pulse {
-  0%, 100% { opacity: 0.45; transform: scale(0.98); }
-  50% { opacity: 1; transform: scale(1); }
 }
 
 .wall-intro main.container {

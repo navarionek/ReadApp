@@ -312,10 +312,8 @@ export function playStartIntro() {
   body.classList.add('wall-intro');
 
   // Najpierw wszystko się wczytuje (dane z bazy, karty Startu, okładki ściany), a w tym czasie
-  // widać sam napis „Czytanko”. Animacja rusza dopiero, gdy telefon nie robi nic ciężkiego
+  // ekran jest pusty (samo tło). Animacja rusza dopiero, gdy telefon nie robi nic ciężkiego
   // w tle (inaczej przycinała), najpóźniej po INTRO_WAIT_MAX.
-  const wait = el('div', { class: 'cover-intro-wait', text: 'Czytanko' });
-  bg.appendChild(wait);
   bg.classList.add('intro-waiting');
   const dataReady = new Promise(resolve => { intro.dataDone = resolve; });
   const coversReady = () => {
@@ -336,7 +334,6 @@ export function playStartIntro() {
   let revealed = false;
   let faded = false;
   const start = now => {
-    wait.remove();
     bg.classList.remove('intro-waiting');
     scene = introScene(bg);
     step(now);
