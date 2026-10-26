@@ -4644,8 +4644,9 @@ body.be-lock {
   gap: 0.25rem;
   padding: 0.2rem 0.7rem;
   border-radius: 999px;
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px -4px var(--primary);
 }
 
 .be-points-value {
