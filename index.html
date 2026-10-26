@@ -316,16 +316,9 @@
 
       <!-- Ekran: Półka (przeczytane książki z okładkami) -->
       <section class="screen" data-screen="polka" hidden>
-        <div class="card shelf-head">
-          <div class="card-header">
-            <i data-lucide="book-copy" class="card-icon"></i>
-            <h2 id="shelf-title">Twoja półka</h2>
-          </div>
-          <div class="shelf-controls">
-            <select id="shelf-person" class="plain-input" aria-label="Czyja półka"></select>
-          </div>
-          <p id="shelf-summary" class="shelf-summary"></p>
-        </div>
+        <!-- Nagłówek osoby i wybór, czyją półkę oglądamy (js/shelf.js) -->
+        <div id="shelf-hero" class="shelf-hero"></div>
+        <div id="shelf-people" class="shelf-people" aria-label="Czyja półka"></div>
         <div id="shelf" class="shelf"></div>
       </section>
 

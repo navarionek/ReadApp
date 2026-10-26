@@ -1,4 +1,4 @@
-import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs, viewerId } from './admin.js';
+import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { playStartIntro, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
@@ -53,10 +53,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
   document.getElementById('queue-pick').addEventListener('change', handleQueuePick);
-  document.getElementById('shelf-person').addEventListener('change', e => {
-    state.shelfUserId = e.target.value === viewerId() ? null : e.target.value;
-    loadShelf();
-  });
   document.getElementById('book-modal-close').addEventListener('click', closeBookModal);
   document.getElementById('book-modal').addEventListener('click', e => {
     if (e.target.id === 'book-modal') closeBookModal();  // kliknięcie w tło
