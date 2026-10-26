@@ -298,19 +298,14 @@ export async function loadShelf() {
   fillMissingQueueInfo(userId);
 }
 
-/* ----------------- Półka: przytulny regał ----------------- */
+/* ----------------- Półka ----------------- */
 // U góry nagłówek osoby (zdjęcie, liczby, w tle rozmyta okładka ostatniej książki) i wybór, czyją
-// półkę oglądamy. Niżej „Czytam teraz” jako karty, stos „Do przeczytania” i drewniany regał:
-// przeczytane książki stoją okładkami do nas na półkach, rok po roku. Książki mają lekko różne
-// rozmiary (jak prawdziwe), a polubione mają serduszko. Stuknięcie otwiera okno książki.
+// półkę oglądamy. Niżej „Czytam teraz” jako karty, stos „Do przeczytania” i przeczytane książki
+// w siatce okładek, rok po roku. Stuknięcie otwiera okno książki.
 const firstName = name => (name || '?').split(' ')[0];
 const plural = (n, one, few, many) => (n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many);
-const SHELF_TILE = 62;   // px, docelowa szerokość miejsca na książkę na półce (telefon: 4 w rzędzie)
-const SHELF_GAP = 10;
 
 let shelfPeople = [];    // [{ key, name, avatarUrl, color }] z profili
-let shelfYears = [];     // [{ year, rows, box }] do rozkładania książek na półki
-let shelfCols = 0;
 
 export async function loadShelfPeople() {
   const { data, error } = await supabaseClient.from('profiles').select('id, display_name, avatar_url, color').order('display_name');
@@ -432,86 +427,38 @@ export function renderShelf() {
     ]));
   }
 
-  // Regał: rok po roku, książki na półkach
+  // Przeczytane: rok po roku, siatka okładek z tytułami
   const byYear = new Map();
   state.shelfRows.forEach(r => {
     const y = new Date(r.created_at).getFullYear();
     if (!byYear.has(y)) byYear.set(y, []);
     byYear.get(y).push(r);
   });
-  shelfYears = [...byYear].map(([year, rows]) => ({ year, rows, box: el('div', { class: 'shelf-rows' }) }));
-  if (shelfYears.length) {
+  byYear.forEach((rows, year) => {
     sections.push(el('section', { class: 'shelf-section' }, [
-      heading('Przeczytane', state.shelfRows.length),
-      el('div', { class: 'bookcase' }, shelfYears.flatMap(y => [
-        el('div', { class: 'shelf-plate' }, [
-          el('span', { class: 'shelf-plate-year', text: String(y.year) }),
-          el('span', { text: `${y.rows.length} ${plural(y.rows.length, 'książka', 'książki', 'książek')}` }),
-        ]),
-        y.box,
-      ])),
+      heading(String(year), rows.length),
+      el('div', { class: 'shelf-grid' }, rows.map(bookTile)),
     ]));
-  } else if (!current.length) {
-    sections.push(el('div', { class: 'bookcase bookcase-empty' }, [
-      el('p', { text: isOwn ? 'Pusta półka czeka na pierwszą przeczytaną książkę.' : 'Ta osoba nie ma jeszcze książek na półce.' }),
-      el('div', { class: 'shelf-plank' }),
-    ]));
+  });
+
+  if (!current.length && !byYear.size) {
+    sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
   }
 
   document.getElementById('shelf').replaceChildren(...sections);
-  shelfCols = 0;
-  layoutShelves();
   refreshIcons();
 }
 
-// Ile książek mieści się na jednej półce zależy od szerokości ekranu: rozkładamy je w JS,
-// żeby pod każdym rzędem była cała deska regału
-function layoutShelves() {
-  const box = document.querySelector('#shelf .bookcase');
-  if (!box || !shelfYears.length) return;
-  const width = box.clientWidth - 2 * 14;  // wewnętrzny margines regału
-  const cols = Math.max(3, Math.floor((width + SHELF_GAP) / (SHELF_TILE + SHELF_GAP)));
-  if (cols === shelfCols) return;
-  shelfCols = cols;
-  shelfYears.forEach(({ rows, box: yearBox }) => {
-    const shelves = [];
-    for (let i = 0; i < rows.length; i += cols) {
-      const books = el('div', { class: 'shelf-books' }, rows.slice(i, i + cols).map(shelfBook));
-      books.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-      shelves.push(el('div', { class: 'shelf-row' }, [books, el('div', { class: 'shelf-plank' })]));
-    }
-    yearBox.replaceChildren(...shelves);
-  });
-  refreshIcons();
-}
-
-let shelfResizeTimer = null;
-const shelfBox = document.getElementById('shelf');
-if (shelfBox) {
-  new ResizeObserver(() => {
-    clearTimeout(shelfResizeTimer);
-    shelfResizeTimer = setTimeout(layoutShelves, 150);
-  }).observe(shelfBox);
-}
-
-// Książka stojąca na półce: rozmiar lekko różny (stały dla danej książki), serduszko przy
-// polubionych, zakładka przy niedokończonych
-function shelfBook(row) {
-  let seed = 0;
-  for (const ch of String(row.id) + (row.title || '')) seed = (seed * 31 + ch.charCodeAt(0)) % 997;
-  const btn = el('button', {
-    type: 'button',
-    class: 'shelf-book',
-    title: row.title || '',
-    'aria-label': [row.title || 'bez tytułu', row.author].filter(Boolean).join(', '),
-  }, [
+// Przeczytana książka w siatce: okładka, tytuł, autor
+function bookTile(row) {
+  const tile = el('button', { type: 'button', class: 'book-tile', title: row.title || '' }, [
     coverEl(row),
-    ...(row.rating === 1 ? [el('span', { class: 'shelf-book-love', 'aria-hidden': 'true' }, [icon('heart')])] : []),
-    ...(row.unfinished ? [el('span', { class: 'shelf-book-mark', title: 'niedokończona', 'aria-hidden': 'true' })] : []),
+    el('span', { class: 'book-tile-title', text: row.title || 'bez tytułu' }),
+    ...(row.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
+    ...(row.author ? [el('span', { class: 'book-tile-author', text: row.author })] : []),
   ]);
-  btn.style.setProperty('--size', String(0.86 + (seed % 15) / 100));
-  btn.addEventListener('click', () => openBookModal(row));
-  return btn;
+  tile.addEventListener('click', () => openBookModal(row));
+  return tile;
 }
 
 // Okładki wpisów na półce, których jeszcze nie ma w bazie (patrz enrichBooks)

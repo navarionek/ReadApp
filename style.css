@@ -1628,27 +1628,10 @@ select.plain-input {
   opacity: 0.5;
 }
 
-/* ----------------- Półka: przytulny regał (js/shelf.js) ----------------- */
-/* Ciepłe drewno i lampka nad regałem; nagłówki szeryfowe jak na grzbietach książek */
+/* ----------------- Półka (js/shelf.js) ----------------- */
+/* Nagłówki szeryfowe jak na grzbietach książek */
 :root {
-  --wood-1: #c99a6b;
-  --wood-2: #9c6b43;
-  --wood-edge: #6e4529;
-  --case-back-1: #f6ecdc;
-  --case-back-2: #ead7bb;
-  --case-frame: #8a5a3a;
-  --lamp: rgb(255 214 150 / 0.45);
   --shelf-serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
-}
-
-:root.dark-mode {
-  --wood-1: #7d5538;
-  --wood-2: #5b3b26;
-  --wood-edge: #3a2416;
-  --case-back-1: #2c2119;
-  --case-back-2: #1d1611;
-  --case-frame: #4b3121;
-  --lamp: rgb(255 190 120 / 0.16);
 }
 
 /* Nagłówek osoby: rozmyta okładka ostatniej książki w tle, zdjęcie, liczby */
@@ -1960,144 +1943,11 @@ select.plain-input {
   -webkit-box-orient: vertical;
 }
 
-/* Regał: drewniana rama, ciepła lampka u góry, półki z deskami */
-.bookcase {
-  position: relative;
-  padding: 1rem 14px 0.5rem;
-  border: 6px solid var(--case-frame);
-  border-radius: 14px;
-  background:
-    radial-gradient(ellipse 80% 160px at 50% 0, var(--lamp), transparent),
-    linear-gradient(var(--case-back-1), var(--case-back-2));
-  box-shadow: inset 0 0 34px rgb(0 0 0 / 0.2), 0 14px 30px -14px rgb(0 0 0 / 0.5);
-}
-
-.shelf-plate {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 0.5rem;
-  width: max-content;
-  margin: 0.25rem auto 1rem;
-  padding: 0.25rem 0.95rem;
-  border-radius: 6px;
-  background: linear-gradient(#ecd093, #b98f4d);
-  color: #3d2a12;
-  font-size: 0.72rem;
-  font-weight: 700;
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55), 0 2px 5px rgb(0 0 0 / 0.3);
-}
-
-.shelf-plate-year {
-  font-family: var(--shelf-serif);
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.shelf-row {
-  margin-bottom: 1.5rem;
-}
-
-.shelf-books {
+/* Przeczytane: siatka okładek z tytułami */
+.shelf-grid {
   display: grid;
-  gap: 10px;
-  align-items: end;
-  padding: 0 4px;
-}
-
-/* Książka stoi na desce: wyrównana do dołu, lekko różne rozmiary */
-.shelf-book {
-  position: relative;
-  justify-self: center;
-  width: calc(var(--size, 1) * 100%);
-  padding: 0;
-  border: none;
-  background: none;
-  cursor: pointer;
-  transform-origin: bottom center;
-  transition: transform 0.25s ease;
-}
-
-.shelf-book:hover,
-.shelf-book:focus-visible {
-  outline: none;
-  transform: translateY(-7px);
-}
-
-.shelf-book .book-cover {
-  border-radius: 2px 5px 5px 2px;
-  box-shadow: 0 9px 10px -6px rgb(0 0 0 / 0.65), inset 3px 0 0 rgb(0 0 0 / 0.16);
-}
-
-.shelf-book:focus-visible .book-cover {
-  outline: 3px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.shelf-book .book-cover.placeholder {
-  padding: 0.4rem 0.3rem;
-}
-
-.shelf-book .ph-title {
-  font-size: 0.6rem;
-}
-
-.shelf-book .ph-author {
-  font-size: 0.5rem;
-}
-
-.shelf-book-love {
-  position: absolute;
-  top: -0.45rem;
-  right: -0.4rem;
-  display: grid;
-  place-items: center;
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 50%;
-  background: #ef4444;
-  color: #fff;
-  box-shadow: 0 3px 8px -2px rgb(0 0 0 / 0.5);
-}
-
-.shelf-book-love svg {
-  width: 0.75rem;
-  height: 0.75rem;
-  fill: currentColor;
-}
-
-/* Niedokończona: zakładka wystająca z książki */
-.shelf-book-mark {
-  position: absolute;
-  top: -0.4rem;
-  left: 20%;
-  width: 0.5rem;
-  height: 1.4rem;
-  background: #f59e0b;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
-}
-
-.shelf-plank {
-  position: relative;
-  height: 14px;
-  margin: 0 -14px;
-  border-radius: 2px;
-  background:
-    repeating-linear-gradient(90deg, rgb(0 0 0 / 0.05) 0 2px, transparent 2px 27px),
-    linear-gradient(var(--wood-1), var(--wood-2) 55%, var(--wood-edge));
-  box-shadow: 0 12px 14px -8px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.25);
-}
-
-.bookcase-empty {
-  padding-bottom: 1.5rem;
-}
-
-.bookcase-empty p {
-  padding: 2.5rem 1rem 1.25rem;
-  color: var(--text-muted);
-  font-family: var(--shelf-serif);
-  font-style: italic;
-  text-align: center;
+  grid-template-columns: repeat(auto-fill, minmax(min(7rem, 30%), 1fr));
+  gap: 1.25rem 0.875rem;
 }
 
 .book-tile,
