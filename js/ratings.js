@@ -25,11 +25,27 @@ async function rateBook(book, value, after) {
   await loadReads();
 }
 
-// Własne książki: dwa przyciski; cudze: sama ocena, jeśli jest
-export function ratingControl(book, editable, after) {
+// Własne książki: dwa przyciski; cudze: sama ocena, jeśli jest.
+// big: duże przyciski z podpisem (okno książki), inaczej małe ikonki
+export function ratingControl(book, editable, after, { big = false } = {}) {
   if (!editable) {
     const known = RATINGS.find(r => r.value === book.rating);
-    return known ? el('span', { class: `rating-badge rating-${known.value > 0 ? 'up' : 'down'}`, title: known.label }, [icon(known.icon)]) : null;
+    if (!known) return null;
+    return el('span', { class: `rating-badge rating-${known.value > 0 ? 'up' : 'down'}${big ? ' rating-badge-big' : ''}`, title: known.label }, [
+      icon(known.icon),
+      ...(big ? [el('span', { text: known.label })] : []),
+    ]);
+  }
+  if (big) {
+    return el('div', { class: 'rating-big', role: 'group', 'aria-label': 'Ocena książki' }, RATINGS.map(r => {
+      const on = book.rating === r.value;
+      const btn = el('button', { type: 'button', class: `rating-big-btn rating-${r.value > 0 ? 'up' : 'down'}${on ? ' active' : ''}`, 'aria-pressed': String(on) }, [
+        icon(r.icon),
+        el('span', { text: r.label }),
+      ]);
+      btn.addEventListener('click', () => rateBook(book, r.value, after));
+      return btn;
+    }));
   }
   const group = el('span', { class: 'rating-buttons', role: 'group', 'aria-label': 'Ocena książki' }, RATINGS.map(r => {
     const btn = el('button', {

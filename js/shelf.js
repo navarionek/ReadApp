@@ -473,7 +473,7 @@ function editButton(kind, row, callbacks) {
   return btn;
 }
 
-function bookSheet({ book, year, kicker, facts = [], meta, extra = [], description, link, actions = [] }) {
+function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = [], description, link, actions = [] }) {
   const backdrop = el('div', { class: 'bs-bg', 'aria-hidden': 'true' });
   if (book.cover_url) backdrop.style.setProperty('--cover', `url("${book.cover_url.replace(/"/g, '%22')}")`);
   else {
@@ -504,6 +504,7 @@ function bookSheet({ book, year, kicker, facts = [], meta, extra = [], descripti
       ...(book.author || year ? [el('p', { class: 'bs-author', text: [book.author, year].filter(Boolean).join(' · ') })] : []),
     ]),
     el('div', { class: 'bs-body' }, [
+      ...lead,
       ...(facts.length
         ? [el('div', { class: 'bs-facts' }, facts.map(([value, label]) => el('div', { class: 'bs-fact' }, [el('strong', { text: value }), el('span', { text: label })])))]
         : []),
@@ -545,16 +546,19 @@ function flyCover(small, large, cover, way) {
 function showSheet(children, source) {
   const modal = document.getElementById('book-modal');
   const wasOpen = !modal.hidden;
+  const from = !wasOpen && source?.isConnected && !calmMotion() ? source.getBoundingClientRect() : null;
+  const flying = !!from?.width;
+  // Przy przelocie okno tylko się rozjaśnia (bez przesuwania i skalowania): okładka w oknie stoi
+  // od początku w swoim miejscu, więc kopia ląduje dokładnie na niej, bez przeskoku na końcu
+  modal.classList.toggle('flying', flying);
   document.getElementById('book-modal-body').replaceChildren(...children);
+  const target = modal.querySelector('.bs-cover .book-cover');
+  if (flying && target) target.style.visibility = 'hidden';
   showBookModal();
   refreshIcons();
-  if (wasOpen || !source?.isConnected || calmMotion()) return;
-  const target = modal.querySelector('.bs-cover .book-cover');
-  const from = source.getBoundingClientRect();
-  if (!target || !from.width) return;
+  if (!flying || !target) return;
   sheetSource = source;
   source.style.visibility = 'hidden';
-  target.style.visibility = 'hidden';
   flyCover(from, target.getBoundingClientRect(), target, 'in').then(() => { target.style.visibility = ''; });
 }
 
@@ -628,12 +632,12 @@ export function openBookModal(row, source = null) {
     : `Skończona ${formatDay(finished)} ${finished.getFullYear()}`;
   const mult = Number(row.multiplier);
 
-  // Ocena: własna książka = kciuki (zapis od razu), cudza = sama ocena, jeśli jest
+  // Ocena zaraz pod tytułem: własna książka = dwa duże przyciski (zapis od razu), cudza = sama ocena
   const rating = ratingControl(row, own, () => {
     renderShelf();
     openBookModal(row);
-  });
-  const extra = rating ? [el('div', { class: 'book-modal-rate' }, [el('span', { text: own ? 'Jak ci się podobała?' : 'Ocena' }), rating])] : [];
+  }, { big: true });
+  const lead = rating ? [el('div', { class: 'bs-rate' }, [...(own ? [el('span', { class: 'bs-rate-label', text: 'Jak ci się podobała?' })] : []), rating])] : [];
 
   showSheet(bookSheet({
     book: row,
@@ -646,7 +650,7 @@ export function openBookModal(row, source = null) {
       ...(days ? [[String(days), plural(days, 'dzień', 'dni', 'dni')]] : []),
     ].slice(0, 3),
     meta,
-    extra,
+    lead,
     description: row.description,
     link: row.info_url,
     actions: own
