@@ -11,19 +11,22 @@ const RATINGS = [
   { value: -1, icon: 'thumbs-down', label: 'Słaba' },
 ];
 
-// Ocena zapisuje się od razu; kliknięcie w już wybrany kciuk zdejmuje ocenę
-async function rateBook(book, value) {
+// Ocena zapisuje się od razu; kliknięcie w już wybrany kciuk zdejmuje ocenę.
+// after: odrysowanie miejsca, w którym oceniono (okno książki na Półce)
+async function rateBook(book, value, after) {
   const next = book.rating === value ? null : value;
   const { data, error } = await supabaseClient.from('reads').update({ rating: next }).eq('id', book.id).select('id');
   if (error || !data?.length) {
     alert('Nie udało się zapisać oceny: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
     return;
   }
+  book.rating = next;
+  after?.();
   await loadReads();
 }
 
 // Własne książki: dwa przyciski; cudze: sama ocena, jeśli jest
-export function ratingControl(book, editable) {
+export function ratingControl(book, editable, after) {
   if (!editable) {
     const known = RATINGS.find(r => r.value === book.rating);
     return known ? el('span', { class: `rating-badge rating-${known.value > 0 ? 'up' : 'down'}`, title: known.label }, [icon(known.icon)]) : null;
@@ -36,7 +39,7 @@ export function ratingControl(book, editable) {
       'aria-pressed': String(book.rating === r.value),
       title: r.label,
     }, [icon(r.icon)]);
-    btn.addEventListener('click', () => rateBook(book, r.value));
+    btn.addEventListener('click', () => rateBook(book, r.value, after));
     return btn;
   }));
   return group;
@@ -57,8 +60,8 @@ export function renderBookRanking() {
 
   const rated = mine.filter(r => r.rating !== null && r.rating !== undefined).length;
   document.getElementById('book-ranking-hint').textContent = rated
-    ? `Ocenione: ${rated} z ${mine.length}. Oceny dodasz na ekranie Postępy.`
-    : 'Oceń książki kciukiem na ekranie Postępy, a ułożą się tu od najfajniejszych.';
+    ? `Ocenione: ${rated} z ${mine.length}. Oceniasz na Półce, w oknie książki.`
+    : 'Oceń książki kciukiem na Półce (stuknij okładkę), a ułożą się tu od najfajniejszych.';
 
   list.replaceChildren(...sortByRating(mine).map((book, i) => el('li', { class: 'book-rank-item' }, [
     el('span', { class: 'book-rank-pos', text: String(i + 1) }),

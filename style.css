@@ -4390,3 +4390,457 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 .city-hint.gone {
   opacity: 0;
 }
+
+/* ----------------- Edycja książki (js/bookeditor.js) ----------------- */
+/* Jeden pełnoekranowy ekran: rozmyta okładka w tle, duża okładka do stuknięcia, tytuł i autor
+   jak na okładce, punkty na żywo, karty z ustawieniami i przyklejony „Zapisz” na dole. */
+body.be-lock {
+  overflow: hidden;
+}
+
+.book-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  background: var(--bg-body);
+  animation: be-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes be-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+
+.be-main,
+.be-picker {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.be-main[hidden],
+.be-picker[hidden] {
+  display: none;
+}
+
+.be-backdrop {
+  position: absolute;
+  inset: -40px -40px auto;
+  height: 380px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(34px) saturate(1.4);
+  opacity: 0.55;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
+}
+
+.be-backdrop.flat {
+  filter: blur(10px);
+  opacity: 0.45;
+}
+
+.be-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: calc(0.6rem + env(safe-area-inset-top)) 0.75rem 0.6rem;
+  background: color-mix(in srgb, var(--bg-body) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.be-bar-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.be-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-card) 70%, transparent);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.be-icon-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.be-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.5rem 1.25rem 1rem;
+}
+
+.be-cover {
+  position: relative;
+  width: 9.5rem;
+  margin-bottom: 0.9rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.be-cover:active {
+  transform: scale(0.97);
+}
+
+.be-cover .book-cover {
+  border-radius: 6px 12px 12px 6px;
+  box-shadow: 0 22px 40px -14px rgb(0 0 0 / 0.65), inset 4px 0 0 rgb(0 0 0 / 0.12);
+}
+
+.be-cover-badge {
+  position: absolute;
+  right: -0.5rem;
+  bottom: -0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 6px 14px -4px rgb(0 0 0 / 0.45);
+}
+
+.be-cover-badge svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+/* Tytuł, autor i rok wyglądają jak napis, a nie jak formularz; ramka pojawia się przy pisaniu */
+.book-editor .be-title,
+.book-editor .be-author,
+.book-editor .be-year {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-main);
+  font: inherit;
+  text-align: center;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.book-editor .be-title:hover,
+.book-editor .be-author:hover,
+.book-editor .be-year:hover {
+  border-color: var(--border);
+}
+
+.book-editor .be-title:focus,
+.book-editor .be-author:focus,
+.book-editor .be-year:focus {
+  outline: none;
+  box-shadow: none;
+  border-color: var(--primary);
+  background: var(--bg-card);
+}
+
+.book-editor .be-title {
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.be-byline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  width: 100%;
+  color: var(--text-muted);
+}
+
+.book-editor .be-author {
+  flex: 0 1 15rem;
+  min-width: 0;
+  field-sizing: content;  /* szerokość jak tekst, więc autor i rok stoją razem na środku */
+  max-width: 70%;
+  padding: 0.2rem 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.book-editor .be-year {
+  width: 4.5rem;
+  field-sizing: content;
+  min-width: 3ch;
+  padding: 0.2rem 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-align: left;
+  -moz-appearance: textfield;
+}
+
+.book-editor .be-year::-webkit-inner-spin-button,
+.book-editor .be-year::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.be-points {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.6rem;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.be-points-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.be-points small {
+  font-weight: 700;
+}
+
+.be-points-calc {
+  margin-left: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.be-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 1.5rem;
+}
+
+.be-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.be-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.be-card-title svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--primary);
+}
+
+.be-stepper {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr 3.25rem;
+  gap: 0.5rem;
+}
+
+.be-step {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-body);
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.be-step:active {
+  background: var(--primary-light);
+}
+
+.book-editor .be-pages {
+  min-width: 0;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-body);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.book-editor .be-pages:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.be-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.be-switch-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.be-switch-text small {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.be-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.be-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-body);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.be-chip b {
+  color: var(--primary);
+}
+
+.be-chip[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 6px 14px -6px var(--primary);
+}
+
+.be-chip[aria-pressed="true"] b {
+  color: #fff;
+}
+
+.be-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.be-field > span {
+  font-weight: 600;
+}
+
+.book-editor .be-date {
+  width: auto;
+  max-width: 11rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.be-note {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.be-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.4rem;
+  padding: 0.75rem;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--error);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.be-remove:hover {
+  background: var(--error-bg);
+}
+
+.be-remove svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.be-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--bg-body) 35%);
+}
+
+.be-picker-body {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.5rem 1rem 2rem;
+}
+
+/* Ocena w oknie książki na Półce */
+.book-modal-rate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-weight: 600;
+}

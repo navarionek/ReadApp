@@ -1,5 +1,5 @@
 import { playRankingIntro } from './ranking.js';
-import { cancelEdit } from './form.js';
+import { resetForm } from './form.js';
 import { hideCity3d, showCity3d } from './city3d.js';
 import { hideRaceCard, showRaceCard } from './flight.js';
 import { closeBookModal, loadShelf } from './shelf.js';
@@ -22,8 +22,8 @@ export function currentScreen() {
 export function showScreen(name) {
   if (name === 'admin' && !state.isAdmin) name = 'start';
   if (name === 'wrapped') name = 'start';  // Wrapped ukryty, dopóki nie będzie dopracowany
-  // Wyjście z formularza w trakcie edycji = porzucenie edycji, żeby „Dodaj” było znowu puste
-  if (name !== 'dodaj' && (state.editingId || state.finishing)) cancelEdit();
+  // Wyjście z formularza w trakcie kończenia książki = porzucenie, żeby „Dodaj” było znowu puste
+  if (name !== 'dodaj' && state.finishing) resetForm();
   document.querySelectorAll('.screen').forEach(screen => {
     screen.hidden = screen.dataset.screen !== name;
   });

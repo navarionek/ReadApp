@@ -218,7 +218,7 @@
 
       </section>
 
-      <!-- Ekran: Dodaj / edytuj wpis -->
+      <!-- Ekran: Dodaj (edycja książki: js/bookeditor.js) -->
       <section class="screen" data-screen="dodaj" hidden>
         <form id="read-form" class="card">
           <div class="card-header">
@@ -272,12 +272,6 @@
             <label>Mnożnik</label>
             <!-- Checkboxy budowane z tabeli multipliers (zarządza admin) -->
             <div id="multiplier-container" class="multiplier-grid"></div>
-            <small id="multiplier-note" class="hint" hidden></small>
-          </div>
-          <!-- Tylko przy edycji: data, kiedy książka została skończona -->
-          <div id="read-date-group" class="form-group" hidden>
-            <label for="read-date">Data przeczytania</label>
-            <input type="date" id="read-date" class="plain-input" />
           </div>
           <div id="unfinished-group" class="form-group">
             <label class="checkbox-label unfinished-label">
@@ -288,10 +282,6 @@
           <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">
             <i data-lucide="send"></i>
             <span id="submit-label">Dodaj wpis</span>
-          </button>
-          <button type="button" id="cancel-edit-btn" class="btn btn-outline btn-block cancel-btn" hidden>
-            <i data-lucide="x"></i>
-            <span>Anuluj edycję</span>
           </button>
           <div id="error-message" class="error-msg" hidden></div>
         </form>

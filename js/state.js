@@ -2,17 +2,11 @@
 // zmiennych nie da się przypisywać z innych plików.
 export const state = {
   currentUser: null,
-  editingId: null,         // id wpisu edytowanego w formularzu, null = dodawanie
   hasData: false,          // czy coś już jest pokazane (wtedy błąd odświeżenia nie czyści tabel)
   isAdmin: false,
 
   // Formularz
   multipliers: [],         // [{ id, label, value }]
-  editingMultiplier: null, // mnożnik edytowanego wpisu, zachowany, jeśli nie da się go odtworzyć z checkboxów
-  editingLabels: null,     // nazwy mnożników edytowanego wpisu (null = nie wiadomo, stary wpis)
-  editingCreatedAt: null,   // data skończenia edytowanego wpisu (ISO)
-  editingStartedAt: null,   // data rozpoczęcia edytowanego wpisu (ISO) albo null
-  multiplierTouched: false,
   entryMode: 'finished',   // 'finished' albo 'started' (dodaj do „Teraz czytam”)
   finishing: null,         // { id, title, startedAt } gdy kończymy książkę z „Teraz czytam”
   finishPickedNew: false,  // ktoś świadomie wybrał „Inna książka” zamiast zaczętej

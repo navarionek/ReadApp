@@ -2,7 +2,7 @@ import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loa
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { playStartIntro, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
-import { cancelEdit, handleFinishPick, handleQueuePick, loadMultipliers, setEntryMode, todayInputValue } from './form.js';
+import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme } from './shell.js';
@@ -50,10 +50,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', e => {
     if (!e.target.closest('.settings-wrap')) closeSettings();
   });
-  document.getElementById('cancel-edit-btn').addEventListener('click', () => {
-    cancelEdit();
-    goTo('postepy');
-  });
   document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
   document.getElementById('queue-pick').addEventListener('change', handleQueuePick);
@@ -73,9 +69,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('started-date').value = todayInputValue();
   document.getElementById('started-date').max = todayInputValue();
   window.addEventListener('hashchange', () => showScreen(currentScreen()));
-  // Kliknięcie „Dodaj” w menu zawsze otwiera pusty formularz, także w trakcie edycji
+  // Kliknięcie „Dodaj” w menu zawsze otwiera pusty formularz, także w trakcie kończenia książki
   document.querySelector('.nav-item[data-screen="dodaj"]').addEventListener('click', () => {
-    if (state.editingId || state.finishing) cancelEdit();
+    if (state.finishing) resetForm();
   });
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);

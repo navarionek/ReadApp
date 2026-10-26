@@ -1,8 +1,10 @@
+import { openBookEditor } from './bookeditor.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
-import { handleDropReading, loadReads, renderReadingNow } from './data.js';
+import { loadReads, renderReadingNow } from './data.js';
 import { daysSince, formatMultiplier, startFinishing } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
+import { ratingControl } from './ratings.js';
 import { currentScreen } from './shell.js';
 import { state } from './state.js';
 import { formatDay } from './stats.js';
@@ -90,7 +92,7 @@ export function readingCoverOf(item) {
 // z wyszukiwarki. Zanim zapiszemy rok ręcznie, niech to uzupełnienie się odbędzie, inaczej
 // nadpisałoby nasz rok. Gdy serwer nie da rady (np. Google nie odpowiada), sami oznaczamy wpis
 // jako sprawdzony: rok zostaje, a okładkę można wtedy wybrać ręcznie.
-async function settleBookInfo(table, row) {
+export async function settleBookInfo(table, row) {
   if (row.info_checked_at) return {};
   try {
     const { data, error } = await supabaseClient.functions.invoke('fill-book-info', { body: { table, ids: [row.id] } });
@@ -104,48 +106,6 @@ async function settleBookInfo(table, row) {
     console.error('fill-book-info failed:', err);
   }
   return { info_checked_at: new Date().toISOString() };
-}
-
-// „Zmień autora / rok wydania” w oknie książki: przycisk, który odsłania pola z zapisem
-// (reads, reading_now albo reading_queue)
-function bookFactsEditor(table, row, afterSave) {
-  const author = el('input', { type: 'text', class: 'plain-input', maxlength: '200', 'aria-label': 'Autor', placeholder: 'Autor, np. Andrzej Sapkowski', autocomplete: 'off' });
-  author.value = row.author || '';
-  const maxYear = new Date().getFullYear() + 1;
-  const year = el('input', { type: 'number', class: 'plain-input', inputmode: 'numeric', min: '0', max: String(maxYear), step: '1', 'aria-label': 'Rok wydania', placeholder: 'Rok', autocomplete: 'off' });
-  year.value = row.published_year ?? '';
-  const save = el('button', { type: 'submit', class: 'btn btn-primary', text: 'Zapisz' });
-  const form = el('form', { class: 'author-form', hidden: '' }, [author, year, save]);
-  const toggle = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('pencil'), el('span', { text: 'Zmień autora / rok wydania' })]);
-
-  toggle.addEventListener('click', () => {
-    toggle.hidden = true;
-    form.hidden = false;
-    author.focus();
-  });
-  form.addEventListener('submit', async e => {
-    e.preventDefault();
-    const yearText = year.value.trim();
-    const publishedYear = yearText === '' ? null : Number(yearText);
-    if (publishedYear !== null && (!Number.isInteger(publishedYear) || publishedYear < 0 || publishedYear > maxYear)) {
-      showToast(`Rok wydania: liczba od 0 do ${maxYear}.`);
-      year.focus();
-      return;
-    }
-    const values = { author: author.value.trim().slice(0, 200) || null, published_year: publishedYear };
-    save.disabled = true;
-    Object.assign(values, await settleBookInfo(table, row));
-    const { error } = await supabaseClient.from(table).update(values).eq('id', row.id);
-    save.disabled = false;
-    if (error) {
-      showToast('Nie udało się zapisać: ' + friendlyError(error));
-      return;
-    }
-    Object.assign(row, values);
-    showToast('Zapisano.');
-    afterSave();
-  });
-  return el('div', { class: 'author-edit' }, [toggle, form]);
 }
 
 export function openReadingModal(item) {
@@ -174,26 +134,14 @@ export function openReadingModal(item) {
       await closeBookModal();
       startFinishing(item);
     });
-    const drop = el('button', { type: 'button', class: 'btn btn-outline btn-block cancel-btn' }, [icon('x'), el('span', { text: 'Usuń z „Teraz czytam”' })]);
-    drop.addEventListener('click', async () => {
-      closeBookModal();
-      await handleDropReading(item);
-      if (currentScreen() === 'polka') renderShelf();
-    });
-    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
-    const picker = el('div', { class: 'cover-picker', hidden: '' });
-    pickBtn.addEventListener('click', () => {
-      pickBtn.hidden = true;
-      picker.hidden = false;
-      renderCoverPicker(picker, item, item.title, saveReadingInfo);
-    });
-    const authorEdit = bookFactsEditor('reading_now', item, () => {
-      renderReadingNow();
-      if (currentScreen() === 'polka') renderShelf();
-      openReadingModal(item);
-      refreshIcons();
-    });
-    body.push(authorEdit, pickBtn, picker, done, drop);
+    body.push(done, editButton('reading_now', item, {
+      onSaved: () => {
+        if (currentScreen() === 'polka') renderShelf();
+        const fresh = state.readingNow.find(i => i.id === item.id);
+        if (fresh) openReadingModal(fresh);
+      },
+      onRemoved: () => { if (currentScreen() === 'polka') renderShelf(); },
+    }));
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
@@ -246,12 +194,6 @@ async function fillMissingQueueInfo(userId) {
   });
 }
 
-async function saveQueueInfo(item, info) {
-  if (!await updateBookInfo('reading_queue', item, info)) return;
-  renderShelf();
-  openQueueModal(item);
-}
-
 export function openQueueModal(item) {
   openReadingId = null;
   const own = item.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
@@ -290,31 +232,16 @@ export function openQueueModal(item) {
       await loadShelf();
     });
 
-    const drop = el('button', { type: 'button', class: 'btn btn-outline btn-block cancel-btn' }, [icon('x'), el('span', { text: 'Usuń z kolejki' })]);
-    drop.addEventListener('click', async () => {
-      if (!confirm(`Usunąć „${item.title}” z kolejki?`)) return;
-      const { data, error } = await supabaseClient.from('reading_queue').delete().eq('id', item.id).select('id');
-      if (error || !data?.length) {
-        showToast('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
-        return;
-      }
-      await closeBookModal();
-      shelfSignature = null;
-      await loadShelf();
-    });
-
-    const authorEdit = bookFactsEditor('reading_queue', item, () => {
-      renderShelf();
-      openQueueModal(item);
-    });
-    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
-    const picker = el('div', { class: 'cover-picker', hidden: '' });
-    pickBtn.addEventListener('click', () => {
-      pickBtn.hidden = true;
-      picker.hidden = false;
-      renderCoverPicker(picker, item, item.title, saveQueueInfo);
-    });
-    body.push(start, authorEdit, pickBtn, picker, drop);
+    body.push(start, editButton('reading_queue', item, {
+      onSaved: () => {
+        renderShelf();
+        openQueueModal(item);
+      },
+      onRemoved: () => {
+        shelfSignature = null;
+        loadShelf();
+      },
+    }));
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
@@ -333,7 +260,7 @@ function shelfSig(userId, rows, queue = []) {
   return JSON.stringify([
     userId,
     queue.map(q => [q.id, q.title, q.author, q.cover_url, q.info_checked_at]),
-    rows.map(r => [r.id, r.title, r.pages, r.multiplier, r.unfinished, r.cover_url, r.author, r.info_checked_at]),
+    rows.map(r => [r.id, r.title, r.pages, r.multiplier, r.unfinished, r.rating, r.created_at, r.cover_url, r.author, r.published_year, r.info_checked_at]),
     current.map(i => [i.id, i.title, i.cover_url, i.info_checked_at]),
   ]);
 }
@@ -351,7 +278,7 @@ export async function loadShelf() {
   const [readsResult, queueResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, unfinished, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
+      .select('id, user_id, title, pages, multiplier, multiplier_labels, unfinished, rating, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false }),
@@ -464,6 +391,15 @@ export async function fillMissingBookInfo(userId) {
 }
 
 /* ----------------- Szczegóły książki ----------------- */
+// „Edytuj książkę” w oknie: zamyka okno i otwiera jeden wspólny ekran edycji (js/bookeditor.js)
+function editButton(kind, row, callbacks) {
+  const btn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('pencil'), el('span', { text: 'Edytuj książkę' })]);
+  btn.addEventListener('click', async () => {
+    await closeBookModal();
+    openBookEditor(kind, row, callbacks);
+  });
+  return btn;
+}
 // Okno ma własny wpis w historii, więc „Wstecz” zamyka tylko okno i zostaje na tej samej stronie.
 // Zwraca obietnicę, która kończy się po zamknięciu (cofnięcie historii jest asynchroniczne),
 // żeby kolejna nawigacja nie została przez nie cofnięta.
@@ -521,19 +457,29 @@ export function openBookModal(row) {
     ...(row.description ? [el('p', { class: 'book-modal-desc', text: row.description })] : []),
   ];
 
+  // Ocena: własna książka = kciuki (zapis od razu), cudza = sama ocena, jeśli jest
+  const rating = ratingControl(row, own, () => {
+    renderShelf();
+    openBookModal(row);
+  });
+  if (rating) {
+    body.splice(2, 0, el('div', { class: 'book-modal-rate' }, [
+      el('span', { text: own ? 'Jak ci się podobała?' : 'Ocena' }),
+      rating,
+    ]));
+  }
+
   if (own) {
-    const pickBtn = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [icon('image'), el('span', { text: 'Zmień okładkę / dopasowanie' })]);
-    const picker = el('div', { class: 'cover-picker', hidden: '' });
-    pickBtn.addEventListener('click', () => {
-      pickBtn.hidden = true;
-      picker.hidden = false;
-      renderCoverPicker(picker, row, row.title || '', saveBookInfo);
-    });
-    const authorEdit = bookFactsEditor('reads', row, () => {
-      renderShelf();
-      openBookModal(row);
-    });
-    body.push(authorEdit, pickBtn, picker);
+    body.push(editButton('reads', row, {
+      onSaved: () => {
+        renderShelf();
+        openBookModal(row);
+      },
+      onRemoved: () => {
+        shelfSignature = null;
+        loadShelf();
+      },
+    }));
   }
 
   document.getElementById('book-modal-body').replaceChildren(...body);
@@ -563,7 +509,7 @@ async function uploadCoverPhoto(blob) {
   return supabaseClient.storage.from('covers').getPublicUrl(path).data.publicUrl;
 }
 
-// save(row, info) zapisuje wybór: saveBookInfo dla przeczytanych, saveReadingInfo dla „Teraz czytam”
+// save(row, info) dostaje wybór (okładka i informacje z bazy książek); zapisuje go edytor książki
 export function renderCoverPicker(container, row, query, save) {
   const input = el('input', { type: 'search', class: 'plain-input', 'aria-label': 'Szukaj książki', placeholder: 'Tytuł, autor…' });
   input.value = query;
@@ -648,33 +594,6 @@ export function renderCoverPicker(container, row, query, save) {
     run(input.value.trim() || row.title || '');
   });
   run(query);
-}
-
-export async function updateBookInfo(table, row, info) {
-  const values = { ...info, info_checked_at: new Date().toISOString() };
-  if (table === 'reads') delete values.page_count;  // liczba stron jest tylko w „Teraz czytam” i „Do przeczytania”
-  const { error } = await supabaseClient.from(table).update(values).eq('id', row.id);
-  if (error) {
-    showToast('Nie udało się zapisać: ' + friendlyError(error));
-    return false;
-  }
-  Object.assign(row, values);
-  showToast('Zapisano.');
-  return true;
-}
-
-export async function saveBookInfo(row, info) {
-  if (!await updateBookInfo('reads', row, info)) return;
-  renderShelf();
-  openBookModal(row);
-}
-
-export async function saveReadingInfo(item, info) {
-  if (!await updateBookInfo('reading_now', item, info)) return;
-  renderReadingNow();
-  if (currentScreen() === 'polka') renderShelf();
-  openReadingModal(item);
-  refreshIcons();
 }
 
 // Po wylogowaniu: następne konto na tym urządzeniu nie dostaje cudzych okładek ani wyników

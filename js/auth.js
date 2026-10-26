@@ -1,4 +1,4 @@
-import { cancelEdit } from './form.js';
+import { resetForm } from './form.js';
 import { disablePush } from './push.js';
 import { invalidateReads } from './data.js';
 import { closeBookModal, resetShelfCaches } from './shelf.js';
@@ -57,7 +57,7 @@ export function updateUI(user) {
     ['settings-admin', 'prize-banner', 'goal-card', 'view-as-banner'].forEach(id => {
       document.getElementById(id).hidden = true;
     });
-    cancelEdit();
+    resetForm();
     document.getElementById('ranking-viz').replaceChildren();
     document.getElementById('user-progress-container').replaceChildren();
   }

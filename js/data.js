@@ -3,7 +3,8 @@ import { loadPrize, viewerId } from './admin.js';
 import { renderBadgesCard } from './badges.js';
 import { renderStartWall } from './coverwall.js';
 import { avatar, renderRankingViz } from './ranking.js';
-import { applyFinishDefault, daysSince, formatMultiplier, handleDelete, myReadingNow, selectFinishing, startEdit, startFinishing, updateFormUI } from './form.js';
+import { openBookEditor } from './bookeditor.js';
+import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFinishing, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { ratingControl, renderBookRanking } from './ratings.js';
 import { renderWrapped } from './wrapped.js';
@@ -72,7 +73,7 @@ export async function loadReads() {
   const [readsResult, nowResult, queueResult] = await Promise.all([
     supabaseClient
       .from('reads')
-      .select('id, user_id, title, pages, multiplier, unfinished, rating, created_at, started_at, author, published_year, cover_url, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
+      .select('id, user_id, title, pages, multiplier, unfinished, rating, created_at, started_at, author, published_year, cover_url, info_url, description, info_checked_at, multiplier_labels, profiles(display_name, in_money_prize, avatar_url, color)')
       .gte('created_at', new Date(year, 0, 1).toISOString())
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),
@@ -101,12 +102,10 @@ export async function loadReads() {
   if (queueResult.error) console.error('Error loading reading queue:', queueResult.error);
   state.myQueue = queueResult.data || [];
   if (state.startingFromQueue && !state.myQueue.some(q => q.id === state.startingFromQueue.id)) state.startingFromQueue = null;
-  // Formularz nie jest w trakcie edycji: odśwież listę zaczętych i domyślny wybór
-  if (!state.editingId) {
-    if (state.finishing && !myReadingNow().some(item => item.id === state.finishing.id)) selectFinishing(null);
-    applyFinishDefault();
-    updateFormUI();
-  }
+  // Formularz: odśwież listę zaczętych i domyślny wybór
+  if (state.finishing && !myReadingNow().some(item => item.id === state.finishing.id)) selectFinishing(null);
+  applyFinishDefault();
+  updateFormUI();
 
   state.hasData = true;
   const readers = groupByReader(rows || []);
@@ -159,13 +158,14 @@ export function renderReadingNow() {
 }
 
 export async function handleDropReading(item) {
-  if (!confirm(`Usunąć „${item.title}” z „Teraz czytam”? Książka nie trafi do rankingu.`)) return;
+  if (!confirm(`Usunąć „${item.title}” z „Teraz czytam”? Książka nie trafi do rankingu.`)) return false;
   const { data, error } = await supabaseClient.from('reading_now').delete().eq('id', item.id).select('id');
   if (error || !data?.length) {
     alert('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
-    return;
+    return false;
   }
   await loadReads();
+  return true;
 }
 
 /* ----------------- Plan na 1. miejsce ----------------- */
@@ -308,12 +308,12 @@ export function renderUserProgress(readers) {
         ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
       ];
       const side = [
-        ...[ratingControl(book, isMine)].filter(Boolean),
+        // Ocenia się na Półce (w oknie książki), tu tylko widać ocenę
+        ...[ratingControl(book, false)].filter(Boolean),
         el('span', { class: 'pp-score' }, [document.createTextNode(String(bookPoints(book))), el('small', { text: ' pkt' })]),
         ...(isMine
           ? [el('span', { class: 'pp-actions' }, [
-              actionButton('pencil', 'Edytuj wpis', () => startEdit(book)),
-              actionButton('trash-2', 'Usuń wpis', () => handleDelete(book)),
+              actionButton('pencil', 'Edytuj książkę', () => openBookEditor('reads', book)),
             ])]
           : []),
       ];
