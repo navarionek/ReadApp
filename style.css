@@ -4402,6 +4402,7 @@ body.be-lock {
   position: fixed;
   inset: 0;
   z-index: 2500;
+  overflow: hidden;
   background: var(--bg-body);
   animation: be-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -4411,10 +4412,12 @@ body.be-lock {
   to { opacity: 1; transform: none; }
 }
 
+/* overflow-x: hidden, bo rozmyta okładka w tle wystaje poza ekran (inaczej da się przesuwać na boki) */
 .be-main,
 .be-picker {
   position: absolute;
   inset: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -4568,34 +4571,33 @@ body.be-lock {
   line-height: 1.25;
 }
 
+/* Autor pod tytułem, rok pod autorem jako mała pigułka: wszystko wyśrodkowane w kolumnie */
 .be-byline {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.15rem;
+  gap: 0.35rem;
   width: 100%;
   color: var(--text-muted);
 }
 
 .book-editor .be-author {
-  flex: 0 1 15rem;
-  min-width: 0;
-  field-sizing: content;  /* szerokość jak tekst, więc autor i rok stoją razem na środku */
-  max-width: 70%;
-  padding: 0.2rem 0.4rem;
+  width: 100%;
+  padding: 0.2rem 0.5rem;
   color: var(--text-muted);
-  font-size: 0.95rem;
-  text-align: right;
+  font-size: 1rem;
+  text-align: center;
 }
 
 .book-editor .be-year {
-  width: 4.5rem;
-  field-sizing: content;
-  min-width: 3ch;
-  padding: 0.2rem 0.4rem;
+  width: 5.5rem;
+  padding: 0.2rem 0.5rem;
+  border-color: var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
   color: var(--text-muted);
-  font-size: 0.95rem;
-  text-align: left;
+  font-size: 0.85rem;
+  text-align: center;
   -moz-appearance: textfield;
 }
 

@@ -91,7 +91,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   title.value = row.title || '';
   const author = el('input', { type: 'text', class: 'be-author', maxlength: '200', 'aria-label': 'Autor', placeholder: 'Autor', autocomplete: 'off' });
   author.value = row.author || '';
-  const year = el('input', { type: 'number', class: 'be-year', inputmode: 'numeric', min: '0', max: String(maxYear), step: '1', 'aria-label': 'Rok wydania', placeholder: 'rok', autocomplete: 'off' });
+  const year = el('input', { type: 'number', class: 'be-year', inputmode: 'numeric', min: '0', max: String(maxYear), step: '1', 'aria-label': 'Rok wydania', placeholder: 'rok wyd.', autocomplete: 'off' });
   year.value = row.published_year ?? '';
 
   const drawCover = () => {
@@ -349,7 +349,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     el('div', { class: 'be-hero' }, [
       coverBtn,
       title,
-      el('div', { class: 'be-byline' }, [author, el('span', { class: 'be-dot', text: '·' }), year]),
+      el('div', { class: 'be-byline' }, [author, year]),
       ...(isRead ? [el('div', { class: 'be-points' }, [pointsValue, el('small', { text: 'pkt' }), pointsCalc])] : []),
     ]),
     el('div', { class: 'be-body' }, [...sections, removeBtn]),
