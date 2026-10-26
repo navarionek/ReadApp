@@ -122,7 +122,6 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   ]);
 
   const pointsValue = el('strong', { class: 'be-points-value' });
-  const pointsCalc = el('span', { class: 'be-points-calc' });
   let pages = null;
   let unfinished = null;
   let selected = null;     // Set nazw zaznaczonych mnożników
@@ -135,7 +134,6 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     const p = parseInt(pages.value, 10) || 0;
     const mult = multiplierNow();
     pointsValue.textContent = String(bookPoints({ pages: p, multiplier: mult }));
-    pointsCalc.textContent = mult === 1 ? `${p} str.` : `${p} str. × ${formatMultiplier(mult).replace('.', ',')}`;
   };
 
   let finishedDate = null;
@@ -337,7 +335,6 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
           year,
           ...(isRead ? [el('span', { class: 'be-points' }, [pointsValue, el('small', { text: 'pkt' })])] : []),
         ]),
-        ...(isRead ? [pointsCalc] : []),
       ]),
     ]),
     el('div', { class: 'be-body' }, [

@@ -4658,11 +4658,6 @@ body.be-lock {
   font-weight: 700;
 }
 
-.be-points-calc {
-  padding-left: 0.4rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
 
 /* Ustawienia */
 .be-body {
