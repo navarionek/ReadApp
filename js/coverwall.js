@@ -1,4 +1,4 @@
-import { coverEl } from './shelf.js';
+import { coverEl, titleHue } from './shelf.js';
 import { state } from './state.js';
 import { el } from './ui.js';
 
@@ -83,7 +83,9 @@ export function toggleStartWall() {
   renderStartWall();
 }
 
-export function renderStartWall() {
+// keepWall: zaraz po intro nie tasujemy ściany od nowa (okładki podmieniłyby się na oczach),
+// tylko zapamiętujemy aktualną listę; nowe okładki pojawią się przy następnym uruchomieniu
+export function renderStartWall({ keepWall = false } = {}) {
   if (!startWallEnabled()) {
     document.getElementById('cover-bg')?.remove();
     startSig = null;
@@ -105,16 +107,18 @@ export function renderStartWall() {
       localStorage.setItem(CACHE_KEY, JSON.stringify(books.slice(-150)));
     } catch {}
   }
-  mountStartWall(books);
+  mountStartWall(books, keepWall);
 }
 
-function mountStartWall(books) {
+function mountStartWall(books, keepWall = false) {
   const width = window.innerWidth;
   const height = window.innerHeight;
   // Wysokość zmienia się na telefonie przy chowaniu paska adresu; ściana ma zapas, więc liczy się szerokość
   const sig = `${width}|${books.map(b => `${b.title}|${b.cover_url}`).join('~')}`;
   if (sig === startSig) return;
+  const hadWall = startSig !== null && !!document.getElementById('cover-bg');
   startSig = sig;
+  if (keepWall && hadWall && books.length) return;
   let bg = document.getElementById('cover-bg');
   if (!books.length) {
     bg?.remove();
@@ -160,12 +164,6 @@ const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] 
 
 const easeInOut = x => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
 
-function placeholderColor(text) {
-  let h = 0;
-  for (const ch of text || '') h = (h * 31 + ch.charCodeAt(0)) % 360;
-  return `hsl(${h} 40% 32%)`;
-}
-
 // Odczyt zwykłej ściany (musi już być widoczna, inaczej nie ma animacji ani wymiarów)
 function introScene(bg) {
   const wall = bg.querySelector('.tv-wall');
@@ -188,6 +186,25 @@ function introScene(bg) {
   const cx = wall.offsetLeft + wall.offsetWidth / 2;
   const cy = wall.offsetTop + wall.offsetHeight / 2;
 
+  // Ta sama okładka jest w ścianie wiele razy; bierzemy ten egzemplarz, który już się wczytał
+  const loaded = new Map();
+  wall.querySelectorAll('img').forEach(img => {
+    if (img.complete && img.naturalWidth && !loaded.has(img.src)) loaded.set(img.src, img);
+  });
+  // Zastępcza okładka narysowana tak jak w ścianie (ten sam gradient z tytułu i tytuł),
+  // żeby przy przejściu na zwykłą ścianę nic się nie podmieniało
+  const drawPlaceholder = (g, it, y) => {
+    const h = titleHue(it.title);
+    const grad = g.createLinearGradient(0, y, tileW, y + tileH);
+    grad.addColorStop(0, `hsl(${h} 45% 42%)`);
+    grad.addColorStop(1, `hsl(${(h + 40) % 360} 50% 24%)`);
+    g.fillStyle = grad;
+    g.fillRect(0, y, tileW, tileH);
+    g.fillStyle = '#fff';
+    g.font = `700 ${Math.round(tileW * 0.12)}px system-ui, sans-serif`;
+    g.textBaseline = 'top';
+    g.fillText(it.title || 'bez tytułu', tileW * 0.1, y + tileH * 0.08, tileW * 0.8);
+  };
   // Gotowy pasek kolumny: okładki narysowane raz, jedna pod drugą (okres powtarzania)
   const bake = col => {
     const g = col.bitmap.getContext('2d');
@@ -195,11 +212,13 @@ function introScene(bg) {
     g.fillRect(0, 0, col.bitmap.width, col.bitmap.height);
     col.waiting = 0;
     col.items.forEach((it, j) => {
-      if (it.img?.complete && it.img.naturalWidth) g.drawImage(it.img, 0, j * step, tileW, tileH);
-      else {
-        if (it.img) col.waiting++;
-        g.fillStyle = it.color || '#334';
-        g.fillRect(0, j * step, tileW, tileH);
+      const img = it.src ? loaded.get(it.src) || it.img : null;
+      if (img?.complete && img.naturalWidth) {
+        loaded.set(it.src, img);
+        g.drawImage(img, 0, j * step, tileW, tileH);
+      } else {
+        if (it.src) col.waiting++;
+        drawPlaceholder(g, it, j * step);
       }
     });
   };
@@ -207,7 +226,8 @@ function introScene(bg) {
     const tiles = [...strip.children];
     const items = tiles.slice(0, tiles.length / 2).map(tile => {
       const img = tile.querySelector('img');
-      return img ? { img } : { color: placeholderColor(tile.textContent) };
+      const title = img ? img.alt.replace(/^Okładka: /, '') : tile.querySelector('.ph-title')?.textContent;
+      return { img, src: img?.src || null, title };
     });
     const anim = strip.getAnimations()[0] || null;
     anim?.pause();
@@ -316,10 +336,15 @@ export function playStartIntro() {
   // w tle (inaczej przycinała), najpóźniej po INTRO_WAIT_MAX.
   bg.classList.add('intro-waiting');
   const dataReady = new Promise(resolve => { intro.dataDone = resolve; });
+  // Po jednym egzemplarzu każdej okładki (canvas i tak rysuje ten, który już się wczytał)
   const coversReady = () => {
     const urls = new Map();
     bg.querySelectorAll('.tv-wall img').forEach(img => { if (!urls.has(img.src)) urls.set(img.src, img); });
-    return Promise.allSettled([...urls.values()].map(img => img.decode()));
+    // Czekamy na wczytanie (load), nie na decode(): decode() potrafi czekać, aż strona się narysuje
+    return Promise.all([...urls.values()].map(img => (img.complete ? null : new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    }))));
   };
   const timeout = new Promise(resolve => setTimeout(resolve, INTRO_WAIT_MAX));
   // Ściana ma wymiary i obrazki dopiero, gdy Start jest widoczny (chwilę po zalogowaniu): klatka zwłoki
@@ -333,9 +358,11 @@ export function playStartIntro() {
   let prev = 0;
   let revealed = false;
   let faded = false;
+  // Zwykła ściana zostaje schowana pod canvasem aż do końca przybliżania: canvas pojawia się
+  // płynnie, a gdyby ściana była już widoczna, prześwitywałyby przez niego inne (duże) okładki
   const start = now => {
-    bg.classList.remove('intro-waiting');
     scene = introScene(bg);
+    if (!scene) bg.classList.remove('intro-waiting');  // bez canvasa od razu zwykła ściana
     step(now);
   };
   const step = now => {
@@ -355,7 +382,8 @@ export function playStartIntro() {
     if (t >= INTRO_ZOOM && !faded) {
       faded = true;
       scene?.release();
-      scene?.canvas.classList.add('gone');  // znika nad zwykłą ścianą
+      bg.classList.remove('intro-waiting');
+      scene?.canvas.classList.add('gone');  // znika nad zwykłą ścianą (te same okładki w tym samym miejscu)
     }
     if (t < INTRO_ZOOM + INTRO_FADE) {
       requestAnimationFrame(step);
@@ -366,7 +394,7 @@ export function playStartIntro() {
     cards().forEach(card => card.style.removeProperty('--intro-delay'));
     const { pending } = intro;
     intro = null;
-    if (pending) renderStartWall();
+    if (pending) renderStartWall({ keepWall: true });
   };
 }
 
