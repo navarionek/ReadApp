@@ -3,12 +3,11 @@ import { loadPrize, viewerId } from './admin.js';
 import { renderBadgesCard } from './badges.js';
 import { renderStartWall } from './coverwall.js';
 import { avatar, renderRankingViz } from './ranking.js';
-import { openBookEditor } from './bookeditor.js';
 import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFinishing, startFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { ratingControl, renderBookRanking } from './ratings.js';
 import { renderWrapped } from './wrapped.js';
-import { coverEl, openReadingModal, readingCoverOf } from './shelf.js';
+import { coverEl, openBookModal, openReadingModal, readingCoverOf } from './shelf.js';
 import { state } from './state.js';
 import { formatDay, renderStats, seriesColors } from './stats.js';
 import { supabaseClient } from './supabase.js';
@@ -280,51 +279,51 @@ export function actionButton(iconName, label, onClick) {
 }
 
 // Książki jednej osoby, rozwijane z jej wiersza w rankingu: najpierw czytane teraz, potem
-// przeczytane od najnowszej. Książka: tytuł, data, strony i mnożnik po lewej, wynik (i ołówek
-// przy własnych) po prawej.
-export function personBooks(reader, colors) {
-  const isMine = state.currentUser && reader.key === state.currentUser.id;
-  const color = colors.get(reader.key);
+// przeczytane od najnowszej. Wiersz: mała okładka, tytuł, pod nim szary opis, wynik po prawej.
+// Stuknięcie otwiera okno książki (jak na Półce): tam ocena i edycja.
+function personBookRow(cover, title, meta, side, onOpen) {
+  const row = el('button', { type: 'button', class: 'rb-book' }, [
+    el('span', { class: 'rb-cover' }, [cover]),
+    el('span', { class: 'rb-main' }, [
+      el('span', { class: 'rb-title', text: title || '—' }),
+      el('span', { class: 'rb-meta' }, meta),
+    ]),
+    el('span', { class: 'rb-side' }, side),
+  ]);
+  row.addEventListener('click', () => onOpen(row.querySelector('.book-cover')));
+  return el('li', {}, [row]);
+}
+
+export function personBooks(reader) {
   const year = currentYear();
 
   const books = [...reader.books].reverse().map(book => {
     const when = new Date(book.created_at);
+    const mult = Number(book.multiplier);
     const meta = [
-      el('span', { text: `${formatDay(when)}${when.getFullYear() !== year ? ` ${when.getFullYear()}` : ''}` }),
-      el('span', { text: `${book.pages} str.` }),
-      ...(Number(book.multiplier) !== 1 ? [el('span', { class: 'pp-mult', text: `×${formatMultiplier(book.multiplier).replace('.', ',')}` })] : []),
-      ...(book.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
+      el('span', { text: `${formatDay(when)}${when.getFullYear() !== year ? ` ${when.getFullYear()}` : ''} · ${book.pages} str.` }),
+      ...(mult !== 1 ? [el('span', { class: 'rb-mult', text: `×${formatMultiplier(mult).replace('.', ',')}` })] : []),
+      ...(book.unfinished ? [el('span', { text: 'niedokończona' })] : []),
     ];
     const side = [
-      // Ocenia się na Półce (w oknie książki), tu tylko widać ocenę
       ...[ratingControl(book, false)].filter(Boolean),
-      el('span', { class: 'pp-score' }, [document.createTextNode(String(bookPoints(book))), el('small', { text: ' pkt' })]),
-      ...(isMine
-        ? [el('span', { class: 'pp-actions' }, [
-            actionButton('pencil', 'Edytuj książkę', () => openBookEditor('reads', book)),
-          ])]
-        : []),
+      el('span', { class: 'rb-score' }, [document.createTextNode(String(bookPoints(book))), el('small', { text: ' pkt' })]),
     ];
-    const row = el('li', { class: 'pp-book' }, [
-      el('div', { class: 'pp-book-main' }, [
-        el('span', { class: 'pp-title', text: book.title || '—' }),
-        el('span', { class: 'pp-meta' }, meta),
-      ]),
-      el('div', { class: 'pp-book-side' }, side),
-    ]);
-    row.style.setProperty('--accent', color);
-    return row;
+    return personBookRow(coverEl(book), book.title, meta, side, cover => openBookModal(book, cover));
   });
 
-  const current = state.readingNow.filter(item => item.user_id === reader.key);
+  const current = state.readingNow.filter(item => item.user_id === reader.key).map(item => {
+    const info = readingCoverOf(item);
+    return personBookRow(
+      coverEl({ title: item.title, cover_url: info?.cover_url }),
+      item.title,
+      [el('span', { text: readingNowLabel(item) })],
+      [el('span', { class: 'rb-now', text: 'czyta' })],
+      cover => openReadingModal(item, cover),
+    );
+  });
   return [
-    ...(current.length
-      ? [el('div', { class: 'pp-reading' }, current.map(item => el('span', { class: 'pp-reading-chip' }, [
-          icon('book-open'),
-          el('span', { class: 'pp-reading-title', text: item.title }),
-          el('span', { class: 'pp-reading-meta', text: readingNowLabel(item) }),
-        ])))]
-      : []),
-    el('ul', { class: 'pp-books' }, books),
+    ...(current.length ? [el('ul', { class: 'rb-list' }, current)] : []),
+    el('ul', { class: 'rb-list' }, books),
   ];
 }

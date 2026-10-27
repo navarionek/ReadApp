@@ -100,26 +100,18 @@ window.addEventListener('resize', closeBadgePop);
 const openRows = new Set();
 
 // Pasek jednej osoby: długość = punkty względem lidera, a w środku kolejne książki jako segmenty.
-// Stuknięcie w wiersz rozwija pod nim wszystkie książki tej osoby (booksOf buduje listę).
+// W zwiniętym wierszu nic nie przechwytuje stuknięć, więc stuknięcie gdziekolwiek rozwija
+// listę: odznaki (z dymkami) i wszystkie książki tej osoby (booksOf buduje listę).
 function renderBar(reader, rank, leaderPoints, colors, ranked, booksOf) {
   const pages = reader.books.reduce((sum, b) => sum + b.pages, 0);
   const n = reader.books.length;
   const gap = leaderPoints - reader.points;
 
-  const track = el('div', { class: 'rank-track' });
+  const track = el('div', { class: 'rank-track', 'aria-hidden': 'true' });
   const fill = el('div', { class: 'rank-fill' }, reader.books.map((book, i) => {
-    const pts = bookPoints(book);
-    const seg = el('button', {
-      type: 'button',
-      class: `rank-seg${i % 2 ? ' alt' : ''}`,
-      'aria-label': `${book.title || 'bez tytułu'}, ${pts} punktów`,
-    });
-    seg.style.flexGrow = String(Math.max(pts, 1));
+    const seg = el('span', { class: `rank-seg${i % 2 ? ' alt' : ''}` });
+    seg.style.flexGrow = String(Math.max(bookPoints(book), 1));
     seg.style.background = colors.get(reader.key);
-    seg.addEventListener('click', e => {
-      e.stopPropagation();  // globalny klik zamykałby dymek od razu
-      toggleBubble(seg, book.title || 'bez tytułu', `${pts} pkt`);
-    });
     return seg;
   }));
   fill.dataset.width = String(leaderPoints ? Math.max(4, (reader.points / leaderPoints) * 100) : 0);
@@ -128,43 +120,50 @@ function renderBar(reader, rank, leaderPoints, colors, ranked, booksOf) {
 
   const earned = earnedBadges(reader, rank, ranked);
   const isMe = reader.key === viewerId();
+  const badges = earned.length
+    ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
+        earned.map(b => {
+          const chip = el('button', { type: 'button', class: 'badge-mini', 'aria-label': `${b.name}: ${b.desc}` }, [icon(b.icon)]);
+          chip.addEventListener('click', e => {
+            e.stopPropagation();  // globalny klik zamykałby dymek od razu
+            toggleBadgePop(chip, b);
+          });
+          return chip;
+        }))]
+    : [];
   const inner = el('div', { class: 'rank-books-inner' });
   const panel = el('div', { class: 'rank-books' }, [inner]);
   const head = el('div', { class: 'rank-head', role: 'button', tabindex: '0', 'aria-expanded': 'false', 'aria-label': `${firstName(reader.name)}: pokaż książki` }, [
-      el('span', { class: 'rank-pos', text: `#${rank}` }),
+      el('span', { class: 'rank-pos', text: String(rank) }),
       avatar(reader, colors),
-      el('span', { class: 'rank-name', text: firstName(reader.name) + (isMe ? ' (ty)' : '') }),
-      ...(reader.inMoneyPrize
-        ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
-        : []),
-      el('span', { class: 'rank-total', 'data-count': String(reader.points), text: `${reader.points} pkt` }),
+      el('span', { class: 'rank-who' }, [
+        el('span', { class: 'rank-name' }, [
+          el('span', { text: firstName(reader.name) + (isMe ? ' (ty)' : '') }),
+          ...(reader.inMoneyPrize
+            ? [el('span', { class: 'money-badge', title: 'Bierze udział w nagrodzie pieniężnej', 'aria-label': 'Nagroda pieniężna' }, [icon('coins')])]
+            : []),
+        ]),
+        el('span', { class: 'rank-meta' }, [
+          el('span', { text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} str.` }),
+          ...(earned.length ? [el('span', { class: 'rank-badge-count' }, [icon('award'), el('span', { text: String(earned.length) })])] : []),
+        ]),
+      ]),
+      el('span', { class: 'rank-score' }, [
+        el('span', { class: 'rank-total', 'data-count': String(reader.points), text: `${reader.points} pkt` }),
+        ...(rank > 1 ? [el('span', { class: 'rank-gap', text: `−${gap}` })] : []),
+      ]),
+      el('span', { class: 'rank-more' }, [icon('chevron-down')]),
     ]);
   const row = el('div', { class: `rank-row${isMe ? ' me' : ''}${rank === 1 ? ' leader' : ''}` }, [
     head,
-    ...(earned.length
-      ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
-          earned.map(b => {
-            const chip = el('button', { type: 'button', class: 'badge-mini', 'aria-label': `${b.name}: ${b.desc}` }, [icon(b.icon)]);
-            chip.addEventListener('click', e => {
-              e.stopPropagation();  // globalny klik zamykałby dymek od razu
-              toggleBadgePop(chip, b);
-            });
-            return chip;
-          }))]
-      : []),
     track,
-    el('div', { class: 'rank-meta' }, [
-      el('span', { text: `${n} ${n === 1 ? 'książka' : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 'książki' : 'książek'} · ${pages} stron` }),
-      ...(rank > 1 ? [el('span', { class: 'rank-gap', text: `−${gap} do lidera` })] : []),
-      el('span', { class: 'rank-more' }, [icon('chevron-down')]),
-    ]),
     panel,
   ]);
   row.style.setProperty('--row', String(rank - 1));
 
   const setOpen = open => {
     if (open && !inner.childElementCount) {
-      inner.replaceChildren(...booksOf(reader, colors));
+      inner.replaceChildren(...badges, ...booksOf(reader, colors));
       refreshIcons();
     }
     row.classList.toggle('open', open);

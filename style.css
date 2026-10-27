@@ -2909,51 +2909,144 @@ header {
 
 .rank-bars {
   display: grid;
-  gap: 1rem;
+  gap: 0.625rem;
 }
 
+/* Wiersz osoby: miejsce, awatar, imię z krótkim opisem pod spodem, punkty; pod spodem cienki pasek.
+   Całość jest jednym dużym polem do stuknięcia, które rozwija listę książek. */
 .rank-row {
-  padding: 0.75rem;
+  padding: 0.75rem 0.875rem 0.875rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   background: var(--bg-card);
+  cursor: pointer;
+  transition: box-shadow 0.25s ease;
 }
 
 .rank-row.me {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary) inset;
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-card));
+}
+
+.rank-row.open {
+  box-shadow: var(--shadow);
 }
 
 .rank-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.625rem;
+}
+
+.rank-head:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .rank-pos {
-  min-width: 1.75rem;
+  min-width: 1rem;
+  text-align: center;
   font-weight: 800;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
-.rank-name {
+.rank-head .rank-avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.9375rem;
+}
+
+.rank-who {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.0625rem;
   min-width: 0;
+}
+
+.rank-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.rank-name > span:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+}
+
+.rank-name .money-badge svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.rank-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.rank-badge-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.rank-badge-count svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.rank-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .rank-total {
+  font-size: 1.0625rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rank-gap {
+  font-size: 0.75rem;
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
+.rank-more {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.3s ease;
+}
+
+.rank-more svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.rank-row.open .rank-more {
+  transform: rotate(180deg);
+}
+
+/* Cienki pasek: długość = punkty względem lidera, segmenty = książki */
 .rank-track {
-  height: 1.5rem;
+  height: 0.375rem;
+  margin-top: 0.75rem;
   border-radius: 999px;
   background: var(--bg-body);
   overflow: hidden;
@@ -2961,80 +3054,17 @@ header {
 
 .rank-fill {
   display: flex;
-  gap: 2px;
+  gap: 1px;
   height: 100%;
   transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .rank-seg {
-  min-width: 3px;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  opacity: 1;
+  min-width: 2px;
 }
 
 .rank-seg.alt {
   opacity: 0.65;
-}
-
-.rank-seg:first-child { border-radius: 999px 0 0 999px; }
-.rank-seg:last-child { border-radius: 0 999px 999px 0; }
-.rank-seg:only-child { border-radius: 999px; }
-
-.rank-seg:hover,
-.rank-seg:focus-visible {
-  opacity: 1;
-  outline: none;
-  filter: brightness(1.15);
-}
-
-.rank-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.375rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.rank-gap {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Wiersz osoby rozwija się w jej listę książek (dawne „Szczegółowe postępy”) */
-.rank-row {
-  cursor: pointer;
-  transition: box-shadow 0.25s ease;
-}
-
-.rank-row.open {
-  box-shadow: var(--shadow);
-}
-
-.rank-head:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-.rank-more {
-  display: flex;
-  margin-left: auto;
-  transition: transform 0.3s ease;
-}
-
-.rank-gap + .rank-more {
-  margin-left: 0;
-}
-
-.rank-more svg {
-  width: 1rem;
-  height: 1rem;
-}
-
-.rank-row.open .rank-more {
-  transform: rotate(180deg);
 }
 
 /* Wysuwanie bez znajomości wysokości: wiersz siatki rośnie od 0fr do 1fr */
@@ -3055,19 +3085,150 @@ header {
 }
 
 .rank-books-inner > :first-child {
-  margin-top: 0.75rem;
+  margin-top: 0.875rem;
 }
 
-.rank-books .pp-reading {
-  padding: 0 0 0.5rem;
+/* Odznaki: dopiero po rozwinięciu, małe kółka (nazwa w dymku po stuknięciu) */
+.rank-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
 }
 
-.rank-books .pp-books {
+.rank-badges .badge-mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.rank-badges .badge-mini svg {
+  width: 0.9375rem;
+  height: 0.9375rem;
+}
+
+/* Lista książek: jedna karta z cienkimi kreskami zamiast osobnego pudełka na każdą książkę */
+.rb-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-radius: var(--radius-sm);
+  background: var(--bg-body);
+  overflow: hidden;
+}
+
+.rb-list + .rb-list {
+  margin-top: 0.5rem;
+}
+
+.rb-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.rb-book {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 0.5rem;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rb-book:active {
+  background: color-mix(in srgb, var(--text-main) 6%, transparent);
+}
+
+.rb-cover .book-cover {
+  width: 2rem;
+  height: 3rem;
+  border-radius: 2px 4px 4px 2px;
+  box-shadow: 0 2px 6px -2px rgb(0 0 0 / 0.5);
+}
+
+.rb-cover .book-cover.placeholder {
   padding: 0;
 }
 
-.rank-books .pp-book {
-  background: var(--bg-body);
+.rb-cover .placeholder > * {
+  display: none;
+}
+
+.rb-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.rb-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.rb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.rb-meta > span + span::before {
+  content: '·';
+  margin-right: 0.375rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.rb-mult {
+  color: #f59e0b;
+  font-weight: 700;
+}
+
+.rb-side {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rb-score {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rb-score small {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.rb-now {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3451,31 +3612,6 @@ label .hint {
 
 img.rank-avatar {
   object-fit: cover;
-}
-
-/* Odznaki w wierszu rankingu */
-.rank-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin: -0.125rem 0 0.5rem;
-}
-
-.rank-badges .badge-mini {
-  align-items: center;
-  justify-content: center;
-  width: 1.625rem;
-  height: 1.625rem;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: var(--primary-light);
-  cursor: pointer;
-}
-
-.rank-badges .badge-mini svg {
-  width: 0.875rem;
-  height: 0.875rem;
 }
 
 /* ----------------- Do przeczytania (kolejka) ----------------- */
