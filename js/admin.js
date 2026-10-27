@@ -22,7 +22,6 @@ function showMyColor(color) {
   const swatch = document.getElementById('color-swatch');
   swatch.style.background = color || '';
   swatch.dataset.color = color || '';  // od tego koloru startuje wybierak
-  document.getElementById('color-reset').hidden = !color;
 }
 
 // color = null wraca do koloru automatycznego z palety

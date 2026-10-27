@@ -35,10 +35,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const color = await openColorPicker(document.getElementById('color-swatch').dataset.color);
     if (color) saveMyColor(color);
   });
-  document.getElementById('color-reset').addEventListener('click', () => {
-    closeSettings();
-    saveMyColor(null);
-  });
   document.getElementById('tv-link-btn').addEventListener('click', openTvLinkDialog);
   document.getElementById('settings-admin').addEventListener('click', () => {
     closeSettings();
