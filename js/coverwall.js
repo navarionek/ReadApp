@@ -128,8 +128,8 @@ function mountStartWall(books, keepWall = false) {
     bg = el('div', { id: 'cover-bg', class: 'cover-bg', 'aria-hidden': 'true' });
     document.body.prepend(bg);
   }
-  // Drobne okładki, dużo kolumn: bardziej faktura niż pojedyncze książki
-  const tile = Math.max(58, Math.min(100, Math.min(width, height) * 0.17));
+  // Okładki na tyle duże, żeby było widać pojedyncze książki (na telefonie ok. 1/4 szerokości)
+  const tile = Math.max(80, Math.min(140, Math.min(width, height) * 0.25));
   bg.replaceChildren(buildCoverWall(books, {
     width,
     height,
