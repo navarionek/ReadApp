@@ -17,6 +17,17 @@
       if (dark) document.documentElement.classList.add('dark-mode');
       // Pasek statusu telefonu w kolorze tła apki (zamiast fioletowego paska)
       document.querySelector('meta[name="theme-color"]').content = dark ? '#0f172a' : '#f8fafc';
+      // Intro ze ścianą okładek ruszy dopiero po wczytaniu logowania: do tego czasu apka schowana,
+      // żeby nagłówek „Czytanko” nie mignął przed animacją (zdejmuje to main.js)
+      try {
+        const screen = location.hash.replace('#', '');
+        const loggedIn = Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        if (loggedIn && (!screen || screen === 'start') && localStorage.getItem('coverBg') !== 'off'
+          && localStorage.getItem('coverBgBooks') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          document.documentElement.classList.add('intro-pending');
+          setTimeout(function () { document.documentElement.classList.remove('intro-pending'); }, 4000);
+        }
+      } catch (e) {}
     })();
   </script>
   <link rel="stylesheet" href="style.css">

@@ -5112,7 +5112,8 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   animation: intro-fade-in 0.3s ease backwards;
 }
 
-.wall-intro main.container {
+.wall-intro main.container,
+.intro-pending main.container {
   visibility: hidden;
 }
 

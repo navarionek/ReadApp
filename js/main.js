@@ -113,6 +113,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const userChanged = (user?.id || null) !== (state.currentUser?.id || null);
     // Po włączeniu apki na Starcie: intro ze ścianą okładek (karty chowa, zanim się pokażą)
     if (user && userChanged && currentScreen() === 'start') playStartIntro();
+    document.documentElement.classList.remove('intro-pending');  // intro już schowało apkę albo nie rusza
     updateUI(user);
     // setTimeout: nie wołamy Supabase wewnątrz callbacka auth (zalecenie supabase-js, unika deadlocka)
     if (user && userChanged) {
