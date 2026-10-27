@@ -120,17 +120,26 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     el('span', { class: 'be-row-label' }, [el('span', { text: label }), ...(hint ? [el('small', { text: hint })] : [])]),
     control,
   ]);
-  // Pole daty z własną ikonką kalendarza: systemowy szewron na Androidzie przyklejał się do
-  // krawędzi i nie dawał się odsunąć. Na telefonie wybór daty otwiera stuknięcie w pole,
-  // na komputerze (bez systemowej strzałki) otwieramy go sami.
+  // Pole daty: systemowe pole na Androidzie ma własny szewron i format daty zależny od języka
+  // telefonu (ucinał się), więc widać nasz napis („4 paź 2026”) z ikonką kalendarza, a prawdziwe
+  // pole leży na nim przezroczyste: stuknięcie otwiera systemowy wybór daty. Na komputerze
+  // otwieramy go sami (kliknięcie w pole tego nie robi).
   const dateField = input => {
+    const text = el('span', { class: 'be-date-text' });
+    const show = () => {
+      const [y, m, d] = input.value.split('-').map(Number);
+      text.textContent = input.value ? new Date(y, m - 1, d).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    };
+    input.addEventListener('input', show);
+    input.addEventListener('change', show);
     input.addEventListener('click', () => {
       if (!window.matchMedia('(pointer: fine)').matches) return;
       try {
         input.showPicker();
       } catch {}
     });
-    return el('span', { class: 'be-date-wrap' }, [input, icon('calendar')]);
+    show();
+    return el('span', { class: 'be-num be-date-wrap' }, [text, icon('calendar'), input]);
   };
 
   const pointsValue = el('strong', { class: 'be-points-value' });
