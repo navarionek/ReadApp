@@ -534,9 +534,18 @@ let sheetClosing = null;  // trwające zamykanie (obietnica)
 // reveal: prawdziwa okładka w miejscu lądowania. Odsłaniamy ją jeszcze pod kopią, kopia w tej
 // samej chwili gubi cień (inaczej przez moment byłyby dwa), a znika dopiero po dwóch klatkach:
 // przeglądarka zdąży narysować okładkę, więc nic nie mignie.
+// Okładki mają transition: all, przez co chowanie i odsłanianie (visibility) oraz zdjęcie cienia
+// działały z opóźnieniem: przy lądowaniu przez klatkę nie było ani cienia kopii, ani prawdziwej
+// okładki. Dlatego przełączamy je zawsze bez przejścia.
+function setShown(node, shown) {
+  node.style.transition = 'none';
+  node.style.visibility = shown ? '' : 'hidden';
+}
+
 function flyCover(small, large, cover, way, reveal, smallEl) {
   const ghost = cover.cloneNode(true);
   ghost.classList.add('bs-ghost');
+  ghost.style.transition = 'none';
   ghost.style.visibility = 'visible';
   Object.assign(ghost.style, { left: `${large.left}px`, top: `${large.top}px`, width: `${large.width}px`, height: `${large.height}px` });
   document.body.appendChild(ghost);
@@ -562,10 +571,13 @@ function flyCover(small, large, cover, way, reveal, smallEl) {
         anim.cancel();
       } catch {}
       ghost.style.boxShadow = 'none';
-      if (reveal) reveal.style.visibility = '';
+      if (reveal) setShown(reveal, true);
       return twoFrames();
     })
-    .then(() => ghost.remove());
+    .then(() => {
+      ghost.remove();
+      if (reveal) reveal.style.transition = '';
+    });
 }
 
 function showSheet(children, source) {
@@ -578,14 +590,14 @@ function showSheet(children, source) {
   modal.classList.toggle('flying', flying);
   document.getElementById('book-modal-body').replaceChildren(...children);
   const target = modal.querySelector('.bs-cover .book-cover');
-  if (flying && target) target.style.visibility = 'hidden';
+  if (flying && target) setShown(target, false);
   showBookModal();
   refreshIcons();
   if (!flying || !target) return;
   sheetSource = source;
   flyCover(from, target.getBoundingClientRect(), target, 'in', target, source);
   // Okładkę na półce chowamy klatkę później, gdy kopia już jest narysowana (bez mrugnięcia na starcie)
-  requestAnimationFrame(() => { if (sheetSource === source) source.style.visibility = 'hidden'; });
+  requestAnimationFrame(() => { if (sheetSource === source) setShown(source, false); });
 }
 
 // Wyjście: okładka wraca na półkę (jeśli jej miejsce jest widoczne), okno gaśnie
@@ -598,7 +610,10 @@ function animateClose(animate) {
   const finish = () => {
     modal.hidden = true;
     modal.classList.remove('closing');
-    if (source) source.style.visibility = '';
+    if (source) {
+      setShown(source, true);
+      requestAnimationFrame(() => { source.style.transition = ''; });
+    }
   };
   if (!animate || calmMotion()) {
     finish();
@@ -608,7 +623,7 @@ function animateClose(animate) {
   const waits = [new Promise(resolve => setTimeout(resolve, 240))];
   if (back?.width && back.bottom > 0 && back.top < window.innerHeight) {
     const from = target.getBoundingClientRect();
-    target.style.visibility = 'hidden';
+    setShown(target, false);
     waits.push(flyCover(back, from, target, 'out', source, source));
   }
   return Promise.all(waits).then(finish);
