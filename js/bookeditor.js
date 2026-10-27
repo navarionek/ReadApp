@@ -120,6 +120,18 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     el('span', { class: 'be-row-label' }, [el('span', { text: label }), ...(hint ? [el('small', { text: hint })] : [])]),
     control,
   ]);
+  // Pole daty z własną ikonką kalendarza: systemowy szewron na Androidzie przyklejał się do
+  // krawędzi i nie dawał się odsunąć. Na telefonie wybór daty otwiera stuknięcie w pole,
+  // na komputerze (bez systemowej strzałki) otwieramy go sami.
+  const dateField = input => {
+    input.addEventListener('click', () => {
+      if (!window.matchMedia('(pointer: fine)').matches) return;
+      try {
+        input.showPicker();
+      } catch {}
+    });
+    return el('span', { class: 'be-date-wrap' }, [input, icon('calendar')]);
+  };
 
   const pointsValue = el('strong', { class: 'be-points-value' });
   let pages = null;
@@ -156,7 +168,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     finishedDate.value = dayInputValue(row.created_at);
     if (row.started_at) finishedDate.min = dayInputValue(row.started_at);
     const started = row.started_at ? new Date(row.started_at) : null;
-    rows.push(listRow('Skończona', finishedDate, started ? `Zaczęta ${formatDay(started)} ${started.getFullYear()}` : null));
+    rows.push(listRow('Skończona', dateField(finishedDate), started ? `Zaczęta ${formatDay(started)} ${started.getFullYear()}` : null));
 
     // Mnożniki jako przełączane „pigułki”
     const initial = initialLabels(row);
@@ -193,7 +205,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     if (kind === 'reading_now') {
       startedDate = el('input', { type: 'date', class: 'be-num be-date', max: todayInputValue(), 'aria-label': 'Data rozpoczęcia' });
       startedDate.value = dayInputValue(row.started_at);
-      rows.push(listRow('Zaczęta', startedDate));
+      rows.push(listRow('Zaczęta', dateField(startedDate)));
     }
     // Liczba stron wydania: podpowiedź przy kończeniu książki
     pageCount = el('input', { type: 'number', class: 'be-num', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', placeholder: '—', 'aria-label': 'Liczba stron wydania' });

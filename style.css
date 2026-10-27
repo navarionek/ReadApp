@@ -5366,15 +5366,36 @@ body.be-lock {
   border-color: var(--primary);
 }
 
-/* Data: szewron kalendarza odsunięty od prawej krawędzi pola */
+/* Data: systemowy szewron schowany, zamiast niego własna ikonka kalendarza z odstępem od krawędzi */
+.be-date-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.be-date-wrap svg {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 .book-editor .be-date {
-  padding: 0 1rem 0 0.85rem;
+  padding: 0 2.5rem 0 0.75rem;
   font-size: 0.95rem;
+  text-align: right;
 }
 
 .book-editor .be-date::-webkit-calendar-picker-indicator {
-  margin: 0 0 0 0.4rem;
-  padding: 0;
+  display: none;
+}
+
+.book-editor .be-date::-webkit-date-and-time-value {
+  text-align: right;
 }
 
 /* Przełącznik: prawdziwy checkbox pod spodem (klik w cały wiersz), widać tylko .switch */
