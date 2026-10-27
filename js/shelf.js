@@ -528,17 +528,25 @@ let sheetClosing = null;  // trwające zamykanie (obietnica)
 
 // Kopia okładki leci nad oknem między okładką na półce (small) a tą w oknie (large).
 // Kopia ma rozmiar dużej okładki i jest zmniejszana, więc w locie się nie rozmywa.
-// way: 'in' = z półki do okna, 'out' = z okna z powrotem na półkę
-// reveal: prawdziwa okładka w miejscu lądowania. Odsłaniamy ją jeszcze pod kopią, a kopię
-// zdejmujemy dopiero po dwóch klatkach: przeglądarka zdąży ją narysować, więc nic nie mignie.
-function flyCover(small, large, cover, way, reveal) {
+// way: 'in' = z półki do okna, 'out' = z okna z powrotem na półkę; smallEl: okładka na półce.
+// Cień kopii przechodzi w locie od cienia okładki na półce do cienia w oknie (przeliczony przez
+// skalę, bo kopia jest zmniejszana), więc przy lądowaniu nie zmienia się skokowo.
+// reveal: prawdziwa okładka w miejscu lądowania. Odsłaniamy ją jeszcze pod kopią, kopia w tej
+// samej chwili gubi cień (inaczej przez moment byłyby dwa), a znika dopiero po dwóch klatkach:
+// przeglądarka zdąży narysować okładkę, więc nic nie mignie.
+function flyCover(small, large, cover, way, reveal, smallEl) {
   const ghost = cover.cloneNode(true);
   ghost.classList.add('bs-ghost');
   ghost.style.visibility = 'visible';
   Object.assign(ghost.style, { left: `${large.left}px`, top: `${large.top}px`, width: `${large.width}px`, height: `${large.height}px` });
   document.body.appendChild(ghost);
-  const shrunk = { transform: `translate(${small.left - large.left}px, ${small.top - large.top}px) scale(${small.width / large.width}, ${small.height / large.height})` };
-  const frames = way === 'in' ? [shrunk, { transform: 'none' }] : [{ transform: 'none' }, shrunk];
+  const kx = small.width / large.width;
+  const ky = small.height / large.height;
+  const bigShadow = getComputedStyle(cover).boxShadow;
+  const smallShadow = smallEl ? getComputedStyle(smallEl).boxShadow.replace(/(-?\d*\.?\d+)px/g, (_, n) => `${(Number(n) / ((kx + ky) / 2)).toFixed(2)}px`) : bigShadow;
+  const shrunk = { transform: `translate(${small.left - large.left}px, ${small.top - large.top}px) scale(${kx}, ${ky})`, boxShadow: smallShadow };
+  const grown = { transform: 'none', boxShadow: bigShadow };
+  const frames = way === 'in' ? [shrunk, grown] : [grown, shrunk];
   const anim = ghost.animate(frames, { duration: way === 'in' ? 420 : 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' });
   // Bezpiecznik: gdyby animacja stanęła (np. karta w tle), okładka i tak wraca na miejsce
   const timeout = new Promise(resolve => setTimeout(resolve, way === 'in' ? 700 : 550));
@@ -548,6 +556,12 @@ function flyCover(small, large, cover, way, reveal) {
   });
   return Promise.race([anim.finished.catch(() => {}), timeout])
     .then(() => {
+      // Kopia zostaje w miejscu lądowania (styl z ostatniej klatki), ale już bez cienia
+      try {
+        anim.commitStyles();
+        anim.cancel();
+      } catch {}
+      ghost.style.boxShadow = 'none';
       if (reveal) reveal.style.visibility = '';
       return twoFrames();
     })
@@ -569,7 +583,7 @@ function showSheet(children, source) {
   refreshIcons();
   if (!flying || !target) return;
   sheetSource = source;
-  flyCover(from, target.getBoundingClientRect(), target, 'in', target);
+  flyCover(from, target.getBoundingClientRect(), target, 'in', target, source);
   // Okładkę na półce chowamy klatkę później, gdy kopia już jest narysowana (bez mrugnięcia na starcie)
   requestAnimationFrame(() => { if (sheetSource === source) source.style.visibility = 'hidden'; });
 }
@@ -595,7 +609,7 @@ function animateClose(animate) {
   if (back?.width && back.bottom > 0 && back.top < window.innerHeight) {
     const from = target.getBoundingClientRect();
     target.style.visibility = 'hidden';
-    waits.push(flyCover(back, from, target, 'out', source));
+    waits.push(flyCover(back, from, target, 'out', source, source));
   }
   return Promise.all(waits).then(finish);
 }
