@@ -5312,13 +5312,17 @@ body.be-lock {
 }
 
 /* Lista wierszy: etykieta z lewej, pole z prawej, kreska między wierszami */
+/* margin: 0 i font-size: wiersz to <label>, a ogólny styl label dawał margines pod spodem
+   (treść siedziała wyżej niż środek wiersza) */
 .be-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   min-height: 3.6rem;
+  margin: 0;
   padding: 0.5rem 0.75rem 0.5rem 1rem;
+  font-size: 1rem;
   cursor: pointer;
 }
 
@@ -5362,8 +5366,15 @@ body.be-lock {
   border-color: var(--primary);
 }
 
+/* Data: szewron kalendarza odsunięty od prawej krawędzi pola */
 .book-editor .be-date {
+  padding: 0 1rem 0 0.85rem;
   font-size: 0.95rem;
+}
+
+.book-editor .be-date::-webkit-calendar-picker-indicator {
+  margin: 0 0 0 0.4rem;
+  padding: 0;
 }
 
 /* Przełącznik: prawdziwy checkbox pod spodem (klik w cały wiersz), widać tylko .switch */
