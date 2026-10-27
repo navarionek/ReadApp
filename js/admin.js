@@ -21,7 +21,7 @@ async function syncAvatar(saved) {
 function showMyColor(color) {
   const swatch = document.getElementById('color-swatch');
   swatch.style.background = color || '';
-  if (color) document.getElementById('color-input').value = color;
+  swatch.dataset.color = color || '';  // od tego koloru startuje wybierak
   document.getElementById('color-reset').hidden = !color;
 }
 

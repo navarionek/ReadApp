@@ -1,5 +1,6 @@
 import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loadPrizeIntoForm, loadProfile, saveMyColor, setViewAs } from './admin.js';
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
+import { openColorPicker } from './colorpicker.js';
 import { playStartIntro, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
 import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
@@ -28,11 +29,12 @@ window.addEventListener('DOMContentLoaded', () => {
     closeSettings();
     handleRename();
   });
-  const colorInput = document.getElementById('color-input');
-  document.getElementById('color-btn').addEventListener('click', e => {
-    if (e.target !== colorInput) colorInput.showPicker();
+  // Własny wybierak koloru (systemowy na iPhonie się nie otwierał, na Androidzie dawał gotowe kolory)
+  document.getElementById('color-btn').addEventListener('click', async () => {
+    closeSettings();
+    const color = await openColorPicker(document.getElementById('color-swatch').dataset.color);
+    if (color) saveMyColor(color);
   });
-  colorInput.addEventListener('change', () => saveMyColor(colorInput.value));
   document.getElementById('color-reset').addEventListener('click', () => {
     closeSettings();
     saveMyColor(null);
