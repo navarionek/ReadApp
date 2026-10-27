@@ -5,10 +5,11 @@ import { state } from './state.js';
 import { supabaseClient } from './supabase.js';
 import { el, friendlyError, icon, refreshIcons } from './ui.js';
 
-/* ----------------- Oceny książek: kciuk w górę / w dół oraz ranking książek roku ----------------- */
+/* ----------------- Oceny książek: fajna / takie se / słaba oraz ranking książek roku ----------------- */
 const RATINGS = [
-  { value: 1, icon: 'thumbs-up', label: 'Fajna' },
-  { value: -1, icon: 'thumbs-down', label: 'Słaba' },
+  { value: 1, icon: 'thumbs-up', label: 'Fajna', tone: 'up' },
+  { value: 0, icon: 'meh', label: 'Takie se', tone: 'mid' },
+  { value: -1, icon: 'thumbs-down', label: 'Słaba', tone: 'down' },
 ];
 
 // Ocena zapisuje się od razu; kliknięcie w już wybrany kciuk zdejmuje ocenę.
@@ -31,7 +32,7 @@ export function ratingControl(book, editable, after, { big = false } = {}) {
   if (!editable) {
     const known = RATINGS.find(r => r.value === book.rating);
     if (!known) return null;
-    return el('span', { class: `rating-badge rating-${known.value > 0 ? 'up' : 'down'}${big ? ' rating-badge-big' : ''}`, title: known.label }, [
+    return el('span', { class: `rating-badge rating-${known.tone}${big ? ' rating-badge-big' : ''}`, title: known.label }, [
       icon(known.icon),
       ...(big ? [el('span', { text: known.label })] : []),
     ]);
@@ -39,7 +40,7 @@ export function ratingControl(book, editable, after, { big = false } = {}) {
   if (big) {
     return el('div', { class: 'rating-big', role: 'group', 'aria-label': 'Ocena książki' }, RATINGS.map(r => {
       const on = book.rating === r.value;
-      const btn = el('button', { type: 'button', class: `rating-big-btn rating-${r.value > 0 ? 'up' : 'down'}${on ? ' active' : ''}`, 'aria-pressed': String(on) }, [
+      const btn = el('button', { type: 'button', class: `rating-big-btn rating-${r.tone}${on ? ' active' : ''}`, 'aria-pressed': String(on) }, [
         icon(r.icon),
         el('span', { text: r.label }),
       ]);
@@ -50,7 +51,7 @@ export function ratingControl(book, editable, after, { big = false } = {}) {
   const group = el('span', { class: 'rating-buttons', role: 'group', 'aria-label': 'Ocena książki' }, RATINGS.map(r => {
     const btn = el('button', {
       type: 'button',
-      class: `btn btn-outline btn-icon rating-btn rating-${r.value > 0 ? 'up' : 'down'}${book.rating === r.value ? ' active' : ''}`,
+      class: `btn btn-outline btn-icon rating-btn rating-${r.tone}${book.rating === r.value ? ' active' : ''}`,
       'aria-label': r.label,
       'aria-pressed': String(book.rating === r.value),
       title: r.label,
@@ -61,9 +62,10 @@ export function ratingControl(book, editable, after, { big = false } = {}) {
   return group;
 }
 
-// Od najfajniejszych do najmniej: kciuk w górę, bez oceny, kciuk w dół; w grupie wygrywa więcej punktów
+// Od najfajniejszych do najmniej: fajna, takie se, bez oceny, słaba; w grupie wygrywa więcej punktów
+const ratingRank = book => (book.rating === null || book.rating === undefined ? -0.5 : book.rating);
 export function sortByRating(books) {
-  return [...books].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || bookPoints(b) - bookPoints(a));
+  return [...books].sort((a, b) => ratingRank(b) - ratingRank(a) || bookPoints(b) - bookPoints(a));
 }
 
 // Karta na ekranie Ranking: książki roku wybranej osoby ułożone według ocen

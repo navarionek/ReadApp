@@ -37,6 +37,7 @@ export function renderWrapped() {
   const longest = mine.reduce((best, b) => (b.pages > best.pages ? b : best));
   const shortest = mine.reduce((best, b) => (b.pages < best.pages ? b : best));
   const ups = mine.filter(b => b.rating === 1).length;
+  const mids = mine.filter(b => b.rating === 0).length;
   const downs = mine.filter(b => b.rating === -1).length;
   const favourite = sortByRating(mine)[0];
 
@@ -51,8 +52,8 @@ export function renderWrapped() {
     slide('calendar-days', 'Najlepszy miesiąc', MONTHS[busiest], `${perMonth[busiest]} ${perMonth[busiest] === 1 ? 'książka' : 'książek'}`),
     slide('mountain', 'Najdłuższa książka', bookLabel(longest)),
     slide('feather', 'Najkrótsza książka', bookLabel(shortest)),
-    ...(ups || downs
-      ? [slide('thumbs-up', 'Oceny', `${ups} 👍 · ${downs} 👎`, favourite?.rating === 1 ? `Hit roku: ${favourite.title || 'bez tytułu'}` : undefined)]
+    ...(ups || mids || downs
+      ? [slide('thumbs-up', 'Oceny', `${ups} 👍 · ${mids} 😐 · ${downs} 👎`, favourite?.rating === 1 ? `Hit roku: ${favourite.title || 'bez tytułu'}` : undefined)]
       : []),
   ];
 
