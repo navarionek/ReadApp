@@ -5880,7 +5880,8 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 
 /* Przed intro (zanim wiadomo, czy ruszy) strona jest ukryta. W trakcie intro tylko przezroczysta: przeglądarka
    rozkłada i rysuje ją wcześniej, więc gdy w połowie przybliżania wjeżdżają karty, nie musi tego robić w jednej
-   klatce (to dawało przycięcie). Wjeżdżające elementy mają z góry własne warstwy. */
+   klatce. Wjeżdżające elementy mają własne warstwy przez całe intro (gdyby powstawały dopiero przy wjeździe,
+   ekran mrugał), a ruch to tylko przezroczystość i przesunięcie (bez malowania w każdej klatce). */
 .intro-pending main.container {
   visibility: hidden;
 }
@@ -5890,8 +5891,8 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   pointer-events: none;
 }
 
-.wall-intro :is(main.container > header, .app-nav),
-.wall-intro .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
+:is(.wall-intro, .wall-intro-reveal) :is(main.container > header, .app-nav),
+:is(.wall-intro, .wall-intro-reveal) .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
   will-change: transform, opacity;
 }
 
@@ -5900,13 +5901,16 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 /* W czasie intro karty są bez matowego szkła (rozmycie tła liczyłoby się w każdej klatce nad pędzącymi
-   okładkami i to przycinało), za to z mocniejszym tłem. Szkło włącza się na końcu, a tło karty płynnie
-   wraca do zwykłej przezroczystości, więc włączenie rozmycia prawie nie rzuca się w oczy. */
-.wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
+   okładkami i to przycinało), za to z mocniejszym tłem; dzięki temu mogą wjeżdżać samą przezroczystością.
+   Szkło włącza się na końcu, a tło karty płynnie wraca do zwykłej przezroczystości. */
+:is(.wall-intro, .wall-intro-reveal) .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
   background-color: color-mix(in srgb, var(--bg-card) 90%, transparent) !important;
-  animation: intro-glass-in 0.35s ease-out both;
+}
+
+.wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
+  animation: intro-card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: var(--intro-delay, 0s);
 }
 
@@ -5914,22 +5918,8 @@ body:has(.cover-bg) .screen[data-screen="start"] :is(.stat-card, .card, .goal-ca
   transition: background-color 0.6s ease;
 }
 
-.wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
-  animation: intro-content-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: var(--intro-delay, 0s);
-}
-
-/* Tylko „from”: kończy się na zwykłym wyglądzie karty (szkło albo baner nagrody) */
-@keyframes intro-glass-in {
-  from {
-    background-color: transparent;
-    border-color: transparent;
-    box-shadow: none;
-  }
-}
-
-@keyframes intro-content-in {
-  from { opacity: 0; transform: translateY(12px); }
+@keyframes intro-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
 }
 
 @keyframes intro-fade-in {
