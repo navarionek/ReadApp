@@ -366,6 +366,41 @@ function countTo(node, from, to) {
   node._count = requestAnimationFrame(step);
 }
 
+/* ----- Tło Półki z karty osoby ----- */
+// Gdy karta osoby chowa się u góry przy przewijaniu, jej gradient (warstwa #shelf-backdrop w tych samych
+// barwach) rośnie spod karty na cały ekran i zostaje tłem; przy powrocie kurczy się z powrotem pod kartę.
+// Warstwa ma rozmiar ekranu, tu tylko ją przesuwamy, skalujemy i rozjaśniamy (raz na klatkę).
+let backdropFrame = 0;
+
+function placeBackdrop() {
+  backdropFrame = 0;
+  const backdrop = document.getElementById('shelf-backdrop');
+  const hero = document.getElementById('shelf-hero');
+  if (!backdrop || !hero?.offsetHeight || currentScreen() !== 'polka') return;
+  for (const name of ['--aura-h', '--aura-s']) {
+    const value = hero.style.getPropertyValue(name);
+    if (value && backdrop.style.getPropertyValue(name) !== value) backdrop.style.setProperty(name, value);
+  }
+  const card = hero.getBoundingClientRect();
+  const W = backdrop.offsetWidth || window.innerWidth;
+  const H = backdrop.offsetHeight || window.innerHeight;
+  const hidden = Math.min(1, Math.max(0, -card.top / card.height));  // jaka część karty schowała się u góry
+  const e = hidden * hidden * (3 - 2 * hidden);
+  const x = card.left * (1 - e);
+  const y = card.top * (1 - e);
+  const w = card.width + (W - card.width) * e;
+  const h = card.height + (H - card.height) * e;
+  backdrop.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(w / W).toFixed(4)}, ${(h / H).toFixed(4)})`;
+  backdrop.style.opacity = Math.min(1, hidden * 2.2).toFixed(3);
+}
+
+function scheduleBackdrop() {
+  if (!backdropFrame) backdropFrame = requestAnimationFrame(placeBackdrop);
+}
+
+window.addEventListener('scroll', scheduleBackdrop, { passive: true });
+window.addEventListener('resize', scheduleBackdrop);
+
 function renderShelfHero() {
   const hero = document.getElementById('shelf-hero');
   const owner = shelfOwner();
@@ -389,6 +424,7 @@ function renderShelfHero() {
   }
   const changed = owner.key !== heroDrawn.owner;
   setAuraColor(hero, colors.get(owner.key), !fresh);
+  scheduleBackdrop();  // tło ekranu w barwach karty
 
   if (changed) {
     hero.querySelector('.shelf-hero-body').replaceChildren(

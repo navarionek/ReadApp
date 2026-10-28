@@ -252,8 +252,8 @@ class Orbit {
     if (this.shadow) {
       // Poświata dopiero przy mocniejszym rozkręceniu: najpierw widać sam dociśnięty cień karty (style.css)
       const q = Math.max(0, (p - 0.3) / 0.7);
-      this.shadow.style.opacity = q.toFixed(3);
-      this.shadow.style.transform = `translateY(${(8 + 22 * p).toFixed(1)}px) scale(${(0.92 + 0.14 * p).toFixed(3)}, ${(0.9 + 0.5 * p).toFixed(3)})`;
+      this.shadow.style.opacity = (0.6 * q).toFixed(3);
+      this.shadow.style.transform = `translateY(${(6 + 12 * p).toFixed(1)}px) scale(${(0.95 + 0.07 * p).toFixed(3)}, ${(0.92 + 0.25 * p).toFixed(3)})`;
     }
     let g;
     if (this.launch) {
