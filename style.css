@@ -5660,3 +5660,341 @@ body.be-lock {
   border-radius: var(--radius);
   font-weight: 600;
 }
+
+/* ----------------- Tryb czytnika (e-ink) -----------------
+   Eksperyment włączany w ustawieniach (klasa .eink na <html>, js/eink.js). Ekrany e-ink mają
+   wolne odświeżanie i niski kontrast, więc: czarno na białym, grube ramki zamiast cieni i szarości,
+   brak animacji, rozmycia i okładek w tle, większy druk i duże pola do stuknięcia.
+   Start dostaje własny układ: wielkie liczby, jedna kolumna, pozycje oddzielone liniami. */
+:root.eink,
+:root.eink.dark-mode {
+  color-scheme: light;
+
+  --primary: #000;
+  --primary-hover: #000;
+  --primary-light: #fff;
+  --bg-body: #fff;
+  --bg-card: #fff;
+  --text-main: #000;
+  --text-muted: #262626;
+  --text-on-primary: #fff;
+  --border: #000;
+  --border-focus: #000;
+  --shadow-sm: none;
+  --shadow: none;
+  --radius-sm: 0.25rem;
+  --radius: 0.25rem;
+  --radius-lg: 0.25rem;
+  --transition: none;
+}
+
+:root.eink {
+  font-size: 18px;
+}
+
+:root.eink *,
+:root.eink *::before,
+:root.eink *::after {
+  animation: none !important;
+  transition: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+:root.eink body {
+  font-weight: 500;
+  line-height: 1.5;
+  -webkit-font-smoothing: auto;
+}
+
+:root.eink .cover-bg {
+  display: none !important;
+}
+
+:root.eink .app-title {
+  font-size: 2.25rem;
+  color: #000;
+}
+
+:root.eink .stat-icon,
+:root.eink .screen[data-screen="start"] .card-icon {
+  display: none;
+}
+
+/* Przyciski: pełny kontur, duże pole do stuknięcia, bez unoszenia przy najechaniu */
+:root.eink .btn {
+  min-height: 3rem;
+  padding: 0.5rem 1.25rem;
+  border: 2px solid #000;
+  font-size: 1rem;
+}
+
+:root.eink .btn-primary {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .btn-outline {
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .btn:hover,
+:root.eink .btn:active {
+  transform: none;
+}
+
+:root.eink .btn-icon {
+  min-width: 3rem;
+}
+
+:root.eink .btn:disabled {
+  opacity: 1;
+  border-style: dashed;
+}
+
+/* Okładki: odcienie szarości z mocniejszym kontrastem; zaślepki jako ramka z tytułem */
+:root.eink img.book-cover {
+  filter: grayscale(1) contrast(1.15);
+}
+
+:root.eink .book-cover.placeholder {
+  background: #fff !important;
+  border: 2px solid #000;
+}
+
+:root.eink .book-cover.placeholder * {
+  color: #000 !important;
+}
+
+/* Przełączniki: obrys i wypełnienie zamiast koloru */
+:root.eink .switch {
+  background: #fff;
+  border: 2px solid #000;
+}
+
+:root.eink .switch::after {
+  top: 0;
+  left: 0;
+  background: #000;
+}
+
+:root.eink .switch.on {
+  background: #000;
+}
+
+:root.eink .switch.on::after {
+  background: #fff;
+}
+
+:root.eink .settings-menu {
+  background: #fff;
+  border: 2px solid #000;
+}
+
+/* Dolne menu: aktywna zakładka odwrócona (biały na czarnym) */
+:root.eink .app-nav {
+  background: #fff;
+  border: 0;
+  border-top: 2px solid #000;
+  border-radius: 0;
+}
+
+:root.eink .nav-item {
+  min-height: 3.5rem;
+  border-radius: 0;
+  color: #000;
+  font-size: 0.9rem;
+}
+
+:root.eink .nav-item:hover {
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .nav-item.active,
+:root.eink .nav-item.active:hover {
+  background: #000;
+  color: #fff;
+}
+
+/* ----- Start ----- */
+:root.eink .screen[data-screen="start"] .stats-grid {
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 2px solid #000;
+}
+
+:root.eink .screen[data-screen="start"] .stat-card {
+  display: block;
+  padding: 1rem 1.25rem;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .screen[data-screen="start"] .stat-card + .stat-card {
+  border-left: 2px solid #000;
+}
+
+:root.eink .stat-link:hover {
+  border-color: #000;
+}
+
+:root.eink .stat-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #000;
+}
+
+:root.eink .screen[data-screen="start"] .stat-value {
+  display: block;
+  font-size: 3.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+:root.eink .screen[data-screen="start"] .prize-banner {
+  display: block;
+  padding: 0.75rem 1.25rem;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .prize-text {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #000;
+}
+
+:root.eink .screen[data-screen="start"] :is(.card, .goal-card) {
+  padding: 1.25rem;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .screen[data-screen="start"] .card-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #000;
+}
+
+:root.eink .screen[data-screen="start"] :is(.card, .goal-card) h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+/* Teraz czytasz: duży tytuł, przycisk „Skończone” pod ręką */
+:root.eink .reading-now-list {
+  gap: 0;
+}
+
+:root.eink .reading-now-item {
+  gap: 1rem;
+  padding: 1rem 0;
+  border: 0;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+}
+
+:root.eink .reading-now-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+:root.eink .reading-now-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+:root.eink .reading-now-meta {
+  font-size: 1rem;
+  color: #000;
+}
+
+:root.eink .book-cover.mini {
+  width: 3.5rem;
+  border: 2px solid #000;
+}
+
+/* Plan na 1. miejsce: wielka liczba stron dziennie */
+:root.eink .goal-number {
+  font-size: 4.5rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #000;
+}
+
+:root.eink .goal-unit {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #000;
+}
+
+:root.eink .goal-sub,
+:root.eink .goal-facts dt {
+  font-size: 1rem;
+  color: #000;
+}
+
+:root.eink .goal-facts dd {
+  font-size: 1.375rem;
+  font-weight: 800;
+  color: #000;
+}
+
+/* Odznaki: zdobyte pełne i czarne, niezdobyte obrysowane kreską (bez przezroczystości, która na e-ink znika) */
+:root.eink .badges-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+:root.eink .badge-item {
+  opacity: 1;
+  padding: 0.75rem;
+  border: 2px dashed #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .badge-item.earned {
+  border-style: solid;
+  background: #fff;
+}
+
+:root.eink .badge-icon {
+  background: #fff;
+  border: 2px solid #000;
+  color: #000;
+}
+
+:root.eink .badge-item.earned .badge-icon {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .badge-name {
+  font-size: 1rem;
+}
+
+:root.eink .badge-desc {
+  font-size: 0.875rem;
+  color: #000;
+}
+
+:root.eink .goal-card .card-header {
+  align-self: stretch;
+  width: 100%;
+}
+
+:root.eink .goal-facts {
+  align-self: stretch;
+  border-top-color: #000;
+}

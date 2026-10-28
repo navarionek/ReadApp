@@ -1,3 +1,4 @@
+import { einkEnabled } from './eink.js';
 import { coverEl, titleHue } from './shelf.js';
 import { state } from './state.js';
 import { el } from './ui.js';
@@ -60,6 +61,7 @@ let introPlayed = false;           // tylko raz po włączeniu apki
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 export function startWallEnabled() {
+  if (einkEnabled()) return false;  // czytnik: bez ruchomego tła
   try {
     return localStorage.getItem(STORAGE_KEY) !== 'off';
   } catch {

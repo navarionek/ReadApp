@@ -15,6 +15,10 @@
       try { saved = localStorage.getItem('theme'); } catch (e) {}
       const dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (dark) document.documentElement.classList.add('dark-mode');
+      // Tryb czytnika (e-ink): ten sam przełącznik co w ustawieniach, tu tylko klasa przed renderem
+      let eink = false;
+      try { eink = localStorage.getItem('eink') === 'on'; } catch (e) {}
+      if (eink) document.documentElement.classList.add('eink');
       // Pasek statusu telefonu w kolorze tła apki (zamiast fioletowego paska)
       document.querySelector('meta[name="theme-color"]').content = dark ? '#0f172a' : '#f8fafc';
       // Intro ze ścianą okładek ruszy dopiero po wczytaniu logowania: do tego czasu apka schowana,
@@ -22,7 +26,7 @@
       try {
         const screen = location.hash.replace('#', '');
         const loggedIn = Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-        if (loggedIn && (!screen || screen === 'start') && localStorage.getItem('coverBg') !== 'off'
+        if (loggedIn && !eink && (!screen || screen === 'start') && localStorage.getItem('coverBg') !== 'off'
           && localStorage.getItem('coverBgBooks') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           document.documentElement.classList.add('intro-pending');
           setTimeout(function () { document.documentElement.classList.remove('intro-pending'); }, 4000);
@@ -53,6 +57,31 @@
         var r = e.reason;
         show((r && r.message) || String(r));
       });
+    })();
+  </script>
+  <!-- Łatki dla starszych przeglądarek (np. czytniki Onyx Boox): replaceChildren od Chrome 86, Array.at od 92 -->
+  <script>
+    (function () {
+      function replaceChildren() {
+        while (this.firstChild) this.removeChild(this.firstChild);
+        var frag = document.createDocumentFragment();
+        for (var i = 0; i < arguments.length; i++) {
+          var node = arguments[i];
+          frag.appendChild(node instanceof Node ? node : document.createTextNode(String(node)));
+        }
+        this.appendChild(frag);
+      }
+      [Element, Document, DocumentFragment].forEach(function (type) {
+        if (!type.prototype.replaceChildren) {
+          Object.defineProperty(type.prototype, 'replaceChildren', { value: replaceChildren, configurable: true, writable: true });
+        }
+      });
+      if (!Array.prototype.at) {
+        Object.defineProperty(Array.prototype, 'at', {
+          value: function (n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; return this[n]; },
+          configurable: true, writable: true,
+        });
+      }
     })();
   </script>
   <link rel="stylesheet" href="style.css">
@@ -110,6 +139,14 @@
                 <small class="settings-hint">Efekty na próbę, np. okładki w tle Startu</small>
               </span>
               <span id="cover-bg-switch" class="switch on" aria-hidden="true"></span>
+            </button>
+            <button type="button" id="eink-toggle" class="settings-item" role="menuitemcheckbox" aria-checked="false">
+              <i data-lucide="book-open-text"></i>
+              <span class="settings-text">
+                <span>Tryb czytnika</span>
+                <small class="settings-hint">Nowy Start na ekrany e-ink: czarno na białym, duży druk</small>
+              </span>
+              <span id="eink-switch" class="switch" aria-hidden="true"></span>
             </button>
             <button type="button" id="tv-link-btn" class="settings-item" role="menuitem">
               <i data-lucide="tv"></i>
