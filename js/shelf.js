@@ -382,6 +382,8 @@ export function replayShelfOrbit() {
 // Przewijanie wyznacza tylko cel: tło dochodzi do niego płynnie i z opóźnieniem (BACKDROP_LAG), więc
 // nawet po szybkim przewinięciu rozlewa się w swoim tempie, a nie skacze razem z palcem.
 const BACKDROP_LAG = 420;  // stała czasu dochodzenia do celu (ms); do celu ok. 1,2 s
+const BACKDROP_REACH = 0.6;    // jak nisko sięga tło po rozlaniu (część wysokości ekranu)
+const BACKDROP_OPACITY = 0.75; // tło ma być ledwo widoczne
 let backdropFrame = 0;
 let backdropAt = 0;        // bieżący stan 0 (pod kartą) .. 1 (cały ekran)
 let backdropLast = 0;
@@ -411,9 +413,9 @@ function placeBackdrop(now) {
   const x = card.left * (1 - e);
   const y = card.top * (1 - e);
   const w = card.width + (W - card.width) * e;
-  const h = card.height + (H - card.height) * e;
+  const h = card.height + (H * BACKDROP_REACH - card.height) * e;  // w dół tylko do części ekranu
   backdrop.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(w / W).toFixed(4)}, ${(h / H).toFixed(4)})`;
-  backdrop.style.opacity = Math.min(1, e * 2.2).toFixed(3);
+  backdrop.style.opacity = (BACKDROP_OPACITY * Math.min(1, e * 2.2)).toFixed(3);
   // Jeszcze nie u celu: następna klatka (także gdy przewijanie już stanęło)
   if (backdropAt !== target) backdropFrame = requestAnimationFrame(placeBackdrop);
   else backdropLast = 0;

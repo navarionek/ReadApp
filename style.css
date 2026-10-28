@@ -8059,20 +8059,18 @@ body.be-lock {
   transform-origin: 0 0;
   will-change: transform, opacity;
   background:
-    radial-gradient(90% 55% at 18% 0%, hsl(var(--h) var(--s) 48% / 0.55), transparent 70%),
-    radial-gradient(70% 50% at 100% 18%, hsl(calc(var(--h) + 32) var(--s) 48% / 0.35), transparent 70%),
-    radial-gradient(80% 45% at 60% 45%, hsl(calc(var(--h) - 36) var(--s) 40% / 0.22), transparent 70%),
-    linear-gradient(180deg, hsl(var(--h) var(--s-deep) 13%) 0%, hsl(var(--h) var(--s-deep) 9%) 45%, var(--bg-body) 92%);
+    radial-gradient(90% 55% at 18% 0%, hsl(var(--h) var(--s) 48% / 0.26), transparent 70%),
+    radial-gradient(70% 50% at 100% 12%, hsl(calc(var(--h) + 32) var(--s) 48% / 0.16), transparent 70%),
+    linear-gradient(180deg, hsl(var(--h) var(--s-deep) 12%) 0%, var(--bg-body) 70%);
   -webkit-mask-image: radial-gradient(130% 120% at 50% 30%, #000 62%, transparent 100%);
   mask-image: radial-gradient(130% 120% at 50% 30%, #000 62%, transparent 100%);
 }
 
 :root:not(.dark-mode) .shelf-backdrop {
   background:
-    radial-gradient(90% 55% at 18% 0%, hsl(var(--h) var(--s) 72% / 0.45), transparent 70%),
-    radial-gradient(70% 50% at 100% 18%, hsl(calc(var(--h) + 32) var(--s) 74% / 0.32), transparent 70%),
-    radial-gradient(80% 45% at 60% 45%, hsl(calc(var(--h) - 36) var(--s) 76% / 0.22), transparent 70%),
-    linear-gradient(180deg, hsl(var(--h) var(--s) 95%) 0%, hsl(var(--h) var(--s) 97%) 45%, var(--bg-body) 92%);
+    radial-gradient(90% 55% at 18% 0%, hsl(var(--h) var(--s) 72% / 0.22), transparent 70%),
+    radial-gradient(70% 50% at 100% 12%, hsl(calc(var(--h) + 32) var(--s) 74% / 0.14), transparent 70%),
+    linear-gradient(180deg, hsl(var(--h) var(--s) 96%) 0%, var(--bg-body) 70%);
 }
 
 body:has(#app-screens:not([hidden]) > .screen[data-screen="polka"]:not([hidden])) .shelf-backdrop {
