@@ -5847,7 +5847,7 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 
 /* Intro po włączeniu apki (js/coverwall.js): ściana na pierwszym planie, potem odjeżdża w tło.
    Karty ani ich przodkowie nie dostają opacity < 1 (pojawia się tło karty, a treść wjeżdża osobno).
-   Strona do tego czasu jest tylko visibility: hidden. */
+   Strona do tego czasu jest tylko przezroczysta (niżej). */
 .cover-bg::after {
   transition: opacity 0.6s ease;
 }
@@ -5878,9 +5878,21 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   animation: intro-fade-in 0.3s ease backwards;
 }
 
-.wall-intro main.container,
+/* Przed intro (zanim wiadomo, czy ruszy) strona jest ukryta. W trakcie intro tylko przezroczysta: przeglądarka
+   rozkłada i rysuje ją wcześniej, więc gdy w połowie przybliżania wjeżdżają karty, nie musi tego robić w jednej
+   klatce (to dawało przycięcie). Wjeżdżające elementy mają z góry własne warstwy. */
 .intro-pending main.container {
   visibility: hidden;
+}
+
+.wall-intro main.container {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wall-intro :is(main.container > header, .app-nav),
+.wall-intro .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
+  will-change: transform, opacity;
 }
 
 .wall-intro-reveal :is(main.container > header, .app-nav) {
