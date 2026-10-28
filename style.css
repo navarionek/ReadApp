@@ -2128,6 +2128,20 @@ select.plain-input {
   animation: orb-sun-in 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both;
 }
 
+/* Poświata przed wybuchem (przytrzymanie karty, js/aura.js ustawia przezroczystość i skalę): jasny środek,
+   a na zewnątrz rozżarzony pierścień wokół okręgów */
+.orb-glow {
+  position: absolute;
+  inset: -6%;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+  background:
+    radial-gradient(closest-side, hsl(calc(var(--h) + 20) 100% 92% / 0.75), hsl(calc(var(--h) + 10) var(--s) 62% / 0.35) 40%, transparent 62%),
+    radial-gradient(closest-side, transparent 58%, hsl(calc(var(--h) - 28) 100% 78% / 0.55) 74%, hsl(var(--h) var(--s) 60% / 0.25) 84%, transparent 96%);
+}
+
 /* Wystrzał okręgu (przytrzymanie karty, js/aura.js): słońce za każdym razem błyska */
 .orb-core-svg.pop > circle {
   transform-box: fill-box;

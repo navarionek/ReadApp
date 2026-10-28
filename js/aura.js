@@ -130,6 +130,7 @@ const SPIN_RAMP = 8000; // tyle trzeba trzymać palec, żeby okręgi wystrzelił
 const SPIN_JUMP = 25;   // zryw na starcie: tyle razy szybciej już po ułamku sekundy
 const SPIN_JUMP_MS = 180; // jak szybko przychodzi zryw (stała czasu, ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
+const GLOW_FROM = 110;  // od tej prędkości (razy zwykła) wokół okręgów narasta poświata przed wybuchem
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
 const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 520;     // lot jednego okręgu
@@ -156,7 +157,10 @@ class Orbit {
   constructor(slot) {
     const uid = `orb${++orbitCount}`;
     this.layers = Array.from({ length: LAYERS }, (_, i) => svg(`orb-layer l${i}`, []));
+    // Poświata przed wystrzałem (narasta z prędkością, rozbłyskuje przy wystrzale), pod słońcem i okręgami
+    this.glow = el('div', { class: 'orb-glow' });
     this.root = el('div', { class: 'orb' }, [
+      this.glow,
       svg('orb-core-svg', [
         node('defs', {}, [
           node('radialGradient', { id: `${uid}-core` }, [
@@ -216,6 +220,7 @@ class Orbit {
       }
       const done = !this.holding && this.spinRate < 1.02;
       if (done) this.spinRate = 1;
+      this.charge(now);
       this.layers.flatMap(layer => layer.getAnimations())
         .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(this.spinRate) : (anim.playbackRate = this.spinRate)));
       this.spinRaf = done ? 0 : requestAnimationFrame(step);
@@ -223,10 +228,28 @@ class Orbit {
     this.spinRaf = requestAnimationFrame(step);
   }
 
+  // Naładowanie przed wybuchem: od GLOW_FROM razy zwykłej prędkości wokół okręgów narasta poświata, a orbita
+  // drży coraz mocniej. Przy wystrzale poświata rozbłyskuje i gaśnie. Sama przezroczystość i przesunięcia.
+  charge(now) {
+    let g;
+    if (this.launch) {
+      g = this.burstAt ? Math.exp(-(now - this.burstAt) / 420) : 0;
+    } else {
+      g = Math.min(1, Math.max(0, (this.spinRate - GLOW_FROM) / (SPIN_MAX - GLOW_FROM))) ** 1.3;
+    }
+    this.glow.style.opacity = g.toFixed(3);
+    this.glow.style.transform = `scale(${(0.8 + 0.45 * g).toFixed(3)})`;
+    const shake = !this.launch && this.holding ? 4 * g : 0;
+    this.root.style.transform = shake > 0.2
+      ? `translate(${((Math.random() - 0.5) * shake).toFixed(2)}px, ${((Math.random() - 0.5) * shake).toFixed(2)}px)`
+      : '';
+  }
+
   // Wystrzał: od zewnętrznego okręgu, co FLY_GAP ms jeden okrąg odlatuje na zewnątrz i gaśnie, słońce
   // przy każdym błyska, a telefon (Android) lekko pyka
   fire() {
     this.launch = 'flying';
+    this.burstAt = performance.now();
     const order = this.rings.filter(ring => ring.now.op > 0.05).reverse();
     const t0 = performance.now();
     order.forEach((ring, k) => { ring.fly = { at: t0 + k * FLY_GAP, r: ring.now.r, op: ring.now.op, width: ring.now.width }; });
