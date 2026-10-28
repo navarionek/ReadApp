@@ -1,4 +1,4 @@
-import { onScreenShown } from './ambient.js';
+import { onScreenShown } from './wallpause.js';
 import { moveNavIndicator } from './navbar.js';
 import { playRankingIntro } from './ranking.js';
 import { resetForm } from './form.js';
@@ -39,7 +39,7 @@ export function showScreen(name) {
     if (shown && name !== shownScreen) screen.classList.toggle('screen-enter', !intro);
     screen.hidden = !shown;
   });
-  onScreenShown(name, shownScreen);
+  onScreenShown(name);
   shownScreen = name;
   document.querySelectorAll('.nav-item').forEach(item => {
     const active = item.dataset.screen === name;

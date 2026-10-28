@@ -5742,8 +5742,8 @@ input[type="date"].plain-input {
   font-variant-numeric: tabular-nums;
 }
 
-/* Tło ekranu Start: przygaszona ściana okładek (js/coverwall.js). Poza Startem płynnie gaśnie (a gdy zgaśnie,
-   przestaje się ruszać, js/ambient.js), po powrocie się wyłania. */
+/* Tło ekranu Start: przygaszona ściana okładek (js/coverwall.js). Poza Startem płynnie gaśnie w zwykłe tło
+   (a gdy zgaśnie, przestaje się ruszać, js/wallpause.js), po powrocie się wyłania. */
 .cover-bg {
   position: fixed;
   inset: 0;
@@ -5759,34 +5759,6 @@ body:has(#app-screens:not([hidden]) > .screen[data-screen="start"]:not([hidden])
   opacity: 1;
   visibility: visible;
   transition: opacity 0.75s ease;
-}
-
-/* Poza Startem: miękka poświata w kolorze jednej z okładek ze ściany (--ambient, js/ambient.js),
-   pojawia się, gdy ściana gaśnie */
-.ambient-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.9s ease;
-  background:
-    radial-gradient(130% 75% at 50% -12%, color-mix(in srgb, var(--ambient, transparent) 30%, transparent), transparent 72%),
-    radial-gradient(90% 55% at 100% 108%, color-mix(in srgb, var(--ambient, transparent) 14%, transparent), transparent 70%);
-}
-
-:root:not(.dark-mode) .ambient-bg {
-  background:
-    radial-gradient(130% 75% at 50% -12%, color-mix(in srgb, var(--ambient, transparent) 18%, transparent), transparent 72%),
-    radial-gradient(90% 55% at 100% 108%, color-mix(in srgb, var(--ambient, transparent) 9%, transparent), transparent 70%);
-}
-
-body:has(.cover-bg):has(#app-screens:not([hidden]) > .screen:not([data-screen="start"]):not([hidden])) .ambient-bg {
-  opacity: 1;
-}
-
-:root.eink .ambient-bg {
-  display: none;
 }
 
 .cover-bg::after {
