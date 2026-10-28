@@ -3609,6 +3609,118 @@ label .hint {
   100% { transform: scale(1) rotate(0); }
 }
 
+/* ----------------- Nowa odznaka (pełny ekran) ----------------- */
+.badge-award-overlay {
+  z-index: 2900;  /* nad podsumowaniem i edytorem, pod toastem */
+  background: radial-gradient(circle at 50% 38%, rgba(245, 197, 66, 0.28), rgba(15, 23, 42, 0.88) 62%);
+  backdrop-filter: blur(6px);
+}
+
+.badge-award-card {
+  position: relative;
+  width: 100%;
+  max-width: 24rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 2rem 1.25rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--shadow), 0 0 60px rgba(245, 197, 66, 0.35);
+  text-align: center;
+  animation: summary-pop 0.6s cubic-bezier(0.2, 1.4, 0.35, 1) both;
+}
+
+.badge-award-card.multi {
+  padding-top: 1.5rem;
+}
+
+.badge-award-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 7rem;
+  height: 7rem;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(160deg, #f5c542, #d9a21b);
+  box-shadow: 0 0 0 6px rgba(245, 197, 66, 0.3), 0 0 44px rgba(245, 197, 66, 0.65);
+  animation: summary-icon-pop 0.9s cubic-bezier(0.2, 1.8, 0.4, 1) 0.2s both;
+}
+
+.badge-award-icon svg {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.badge-award-kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #b8860b;
+}
+
+.badge-award-name {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+
+.badge-award-desc {
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+}
+
+.badge-award-list {
+  list-style: none;
+  margin: 1rem 0 1.5rem;
+  padding: 0;
+  display: grid;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.badge-award-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: summary-pop 0.5s cubic-bezier(0.2, 1.4, 0.35, 1) calc(0.25s + var(--i, 0) * 0.07s) both;
+}
+
+.badge-award-mini {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(160deg, #f5c542, #d9a21b);
+}
+
+.badge-award-mini svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.badge-award-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.badge-award-item-name {
+  font-weight: 700;
+}
+
+.badge-award-item-desc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
 @keyframes rank-bump {
   0% { transform: scale(0.4); opacity: 0; }
   60% { transform: scale(1.35); opacity: 1; }
@@ -6918,4 +7030,32 @@ body.be-lock {
 /* Okładki już przerobione na odcienie szarości z rozpraszaniem (js/dither.js): bez dodatkowego filtru */
 :root.eink img.book-cover[data-dithered] {
   filter: none;
+}
+
+/* Nowa odznaka na czytniku: białe tło, czarne ramki, bez poświat i animacji */
+:root.eink .badge-award-overlay {
+  background: #fff;
+  backdrop-filter: none;
+}
+
+:root.eink .badge-award-card {
+  border: 2px solid #000;
+  box-shadow: none;
+}
+
+:root.eink .badge-award-icon,
+:root.eink .badge-award-mini {
+  color: #000;
+  background: #fff;
+  border: 2px solid #000;
+  box-shadow: none;
+}
+
+:root.eink .badge-award-kicker {
+  color: #000;
+}
+
+:root.eink .badge-award-desc,
+:root.eink .badge-award-item-desc {
+  color: #000;
 }

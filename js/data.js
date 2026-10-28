@@ -1,6 +1,6 @@
 import { goalJokeThisOpen, isKrystian } from './discourage.js';
 import { loadPrize, viewerId } from './admin.js';
-import { renderBadgesCard } from './badges.js';
+import { loadStoredBadges, renderBadgesCard, syncMyBadges } from './badges.js';
 import { renderStartWall } from './coverwall.js';
 import { avatar, renderRankingViz } from './ranking.js';
 import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFinishing, startFinishing, updateFormUI } from './form.js';
@@ -85,6 +85,7 @@ export async function loadReads() {
       .eq('user_id', state.currentUser.id)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),
+    loadStoredBadges(),  // wynik trafia do state.badges, błąd nie blokuje reszty
   ]);
   const { data: rows, error } = readsResult;
   if (seq !== readsSeq) return;
@@ -263,6 +264,7 @@ export function renderLeaderboard(readers) {
   state.lastRanked = ranked.map(r => ({ key: r.key, name: r.name, points: r.points }));
   renderRankingViz(ranked, personBooks);
   renderBadgesCard(ranked);
+  syncMyBadges(ranked);
 
   if (state.currentUser) {
     const rankIndex = ranked.findIndex(r => r.key === viewerId());

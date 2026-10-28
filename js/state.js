@@ -11,6 +11,7 @@ export const state = {
   finishing: null,         // { id, title, startedAt } gdy kończymy książkę z „Teraz czytam”
   finishPickedNew: false,  // ktoś świadomie wybrał „Inna książka” zamiast zaczętej
 
+  badges: new Map(),       // zapisane odznaki bieżącego roku: userId → Set(badge_id)
   readingNow: [],          // zaczęte książki wszystkich: [{ id, user_id, title, started_at, profiles }]
   myQueue: [],             // moja lista „Do przeczytania”: [{ id, title, author }]
   startingFromQueue: null, // { id, title, author } gdy zaczynamy książkę z listy „Do przeczytania”

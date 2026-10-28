@@ -1,39 +1,47 @@
+import { BADGE_INFO } from '../supabase/functions/_shared/badges.js';
 import { bookPoints, normalizeTitle } from '../supabase/functions/_shared/logic.js';
 import { state } from './state.js';
 import { viewerId } from './admin.js';
-import { DAY_MS, el, icon } from './ui.js';
+import { supabaseClient } from './supabase.js';
+import { currentYear, DAY_MS, el, icon } from './ui.js';
+import { showBadgeAward } from './badgeaward.js';
 
 /* ----------------- Odznaki ----------------- */
-// Liczone z wpisów bieżącego roku, więc resetują się razem z rywalizacją
-export const BADGES = [
-  { id: 'first', icon: 'book-open', name: 'Pierwsza książka', desc: 'Pierwszy wpis w tym roku', test: s => s.books >= 1 },
-  { id: 'five', icon: 'library', name: 'Piątka', desc: '5 książek', test: s => s.books >= 5 },
-  { id: 'ten', icon: 'library-big', name: 'Dycha', desc: '10 książek', test: s => s.books >= 10 },
-  { id: 'twenty', icon: 'landmark', name: 'Dwudziestka', desc: '20 książek', test: s => s.books >= 20 },
-  { id: 'pages1k', icon: 'flame', name: 'Tysiąc stron', desc: '1000 przeczytanych stron', test: s => s.pages >= 1000 },
-  { id: 'pages5k', icon: 'rocket', name: 'Pięć tysięcy stron', desc: '5000 przeczytanych stron', test: s => s.pages >= 5000 },
-  { id: 'brick', icon: 'brick-wall', name: 'Cegła', desc: 'Książka mająca co najmniej 500 stron', test: s => s.longest >= 500 },
-  { id: 'gigabrick', icon: 'castle', name: 'GIGA cegła', desc: 'Książka mająca co najmniej 800 stron', test: s => s.longest >= 800 },
-  { id: 'bonus', icon: 'sparkles', name: 'Bonusmaxxxing', desc: '3 książki z mnożnikiem powyżej 1x', test: s => s.bonus >= 3 },
-  { id: 'double', icon: 'badge-percent', name: 'Podwójny bonus', desc: 'Książka z mnożnikiem 2,25x (dwa mnożniki naraz)', test: s => s.doubleBonus >= 1 },
-  { id: 'streak', icon: 'calendar-check', name: 'Regularność', desc: 'Wpisy w 3 kolejnych miesiącach', test: s => s.monthStreak >= 3 },
-  { id: 'leader', icon: 'crown', name: 'Korona', desc: 'Aktualnie 1. miejsce w rankingu', test: s => s.rank === 1 },
-  { id: 'dominator', icon: 'swords', name: 'Dominator', desc: '1. miejsce z przewagą co najmniej 500 punktów', test: s => s.rank === 1 && s.lead >= 500 },
-  { id: 'deadline', icon: 'timer', name: 'Rzutem na taśmę', desc: 'Książka dodana w ostatnim tygodniu roku (25–31 grudnia)', test: s => s.lastWeek >= 1 },
-  { id: 'thin', icon: 'feather', name: 'Ulotka', desc: 'Skończona książka do 150 stron', test: s => s.thin >= 1 },
-  { id: 'jackpot', icon: 'gem', name: 'Jackpot', desc: 'Jedna książka warta 1000 punktów', test: s => s.bestBook >= 1000 },
-  { id: 'hamster', icon: 'squirrel', name: 'Chomik', desc: '3 zaczęte książki naraz w „Teraz czytam”', test: s => s.reading >= 3 },
-  { id: 'lightning', icon: 'zap', name: 'Błyskawica', desc: 'Książka przeczytana w mniej niż tydzień', test: s => s.fast >= 1 },
-  { id: 'turtle', icon: 'turtle', name: 'Żółw', desc: 'Książka czytana ponad 60 dni', test: s => s.slow >= 1 },
-  { id: 'english', icon: 'languages', name: 'Anglofil', desc: '5 książek z mnożnikiem „Angielski”', test: s => s.english >= 5 },
-  { id: 'scientist', icon: 'flask-conical', name: 'Naukowiec', desc: '5 książek z mnożnikiem „Naukowa”', test: s => s.science >= 5 },
-  { id: 'loyal', icon: 'pen-line', name: 'Wierny fan', desc: '2 książki tego samego autora', test: s => s.sameAuthor >= 2 },
-  { id: 'classic', icon: 'scroll-text', name: 'Klasyka', desc: 'Książka wydana przed 1950 rokiem', test: s => s.classic >= 1 },
-  { id: 'nonstop', icon: 'calendar-range', name: 'Bez przerw', desc: 'Wpis w każdym miesiącu od stycznia (co najmniej 4 pełne miesiące)', test: s => s.fromJanuary },
-  { id: 'giant', icon: 'mountain', name: 'Gigant', desc: 'Najdłuższa skończona książka w całej grupie w tym roku', test: s => s.giant },
+// Liczone z wpisów bieżącego roku, więc resetują się razem z rywalizacją. Zdobytą odznakę aplikacja
+// zapisuje na stałe w tabeli user_badges (osobno dla każdego roku) i już jej nie odbiera, nawet gdy wpis
+// zostanie potem usunięty. Przy wyświetlaniu liczy się to, co zapisane, plus to, co właśnie wychodzi z wpisów.
+const DEFINITIONS = [
+  { id: 'first', icon: 'book-open', test: s => s.books >= 1 },
+  { id: 'five', icon: 'library', test: s => s.books >= 5 },
+  { id: 'ten', icon: 'library-big', test: s => s.books >= 10 },
+  { id: 'twenty', icon: 'landmark', test: s => s.books >= 20 },
+  { id: 'pages1k', icon: 'flame', test: s => s.pages >= 1000 },
+  { id: 'pages5k', icon: 'rocket', test: s => s.pages >= 5000 },
+  { id: 'brick', icon: 'brick-wall', test: s => s.longest >= 500 },
+  { id: 'gigabrick', icon: 'castle', test: s => s.longest >= 800 },
+  { id: 'bonus', icon: 'sparkles', test: s => s.bonus >= 3 },
+  { id: 'double', icon: 'badge-percent', test: s => s.doubleBonus >= 1 },
+  { id: 'streak', icon: 'calendar-check', test: s => s.monthStreak >= 3 },
+  { id: 'leader', icon: 'crown', test: s => s.rank === 1 },
+  { id: 'dominator', icon: 'swords', test: s => s.rank === 1 && s.lead >= 500 },
+  { id: 'deadline', icon: 'timer', test: s => s.lastWeek >= 1 },
+  { id: 'thin', icon: 'feather', test: s => s.thin >= 1 },
+  { id: 'jackpot', icon: 'gem', test: s => s.bestBook >= 1000 },
+  { id: 'hamster', icon: 'squirrel', test: s => s.reading >= 3 },
+  { id: 'lightning', icon: 'zap', test: s => s.fast >= 1 },
+  { id: 'turtle', icon: 'turtle', test: s => s.slow >= 1 },
+  { id: 'english', icon: 'languages', test: s => s.english >= 5 },
+  { id: 'scientist', icon: 'flask-conical', test: s => s.science >= 5 },
+  { id: 'loyal', icon: 'pen-line', test: s => s.sameAuthor >= 2 },
+  { id: 'classic', icon: 'scroll-text', test: s => s.classic >= 1 },
+  { id: 'nonstop', icon: 'calendar-range', test: s => s.fromJanuary },
+  { id: 'giant', icon: 'mountain', test: s => s.giant },
 ];
 
-const hasLabel = (book, label) => (book.multiplier_labels || []).some(l => l.toLowerCase() === label);
+const INFO = new Map(BADGE_INFO.map(b => [b.id, b]));
+export const BADGES = DEFINITIONS.map(d => ({ ...INFO.get(d.id), ...d }));
+
+const hasLabel =(book, label) => (book.multiplier_labels || []).some(l => l.toLowerCase() === label);
 
 export function badgeStats(reader, rank, ranked = []) {
   const books = reader.books;
@@ -94,11 +102,77 @@ export function earnedBadges(reader, rank, ranked = []) {
   return BADGES.filter(b => b.test(stats));
 }
 
+const storedBadges = userId => state.badges.get(userId) || new Set();
+
+// Odznaki do pokazania: zapisane (nikt ich nie odbiera) plus te, które wychodzą z wpisów, a jeszcze
+// nie trafiły do bazy (u innych osób zapisują się, gdy otworzą aplikację)
+export function shownBadges(reader, rank, ranked = []) {
+  const stored = storedBadges(reader.key);
+  const computed = new Set(earnedBadges(reader, rank, ranked).map(b => b.id));
+  return BADGES.filter(b => stored.has(b.id) || computed.has(b.id));
+}
+
+export async function loadStoredBadges() {
+  const { data, error } = await supabaseClient.from('user_badges').select('user_id, badge_id').eq('year', currentYear());
+  if (error) {
+    console.error('Error loading badges:', error);
+    return;
+  }
+  const byUser = new Map();
+  (data || []).forEach(row => {
+    if (!byUser.has(row.user_id)) byUser.set(row.user_id, new Set());
+    byUser.get(row.user_id).add(row.badge_id);
+  });
+  state.badges = byUser;
+}
+
+// Wpisy sprzed wprowadzenia zapisywania odznak: osoba, która je ma, dostaje swoje obecne odznaki bez powiadomień
+// dla reszty (odznaki nie są „nowe” dla innych). Dla wpisów dodanych później powiadomienia idą normalnie.
+const BADGES_LAUNCH = new Date('2026-10-28T18:00:00+01:00');
+let syncing = false;
+
+// Zapisuje świeżo zdobyte odznaki zalogowanej osoby i pokazuje je na pełnym ekranie
+export async function syncMyBadges(ranked) {
+  const me = state.currentUser;
+  if (!me || viewerId() !== me.id || syncing) return;
+  const index = ranked.findIndex(r => r.key === me.id);
+  if (index < 0) return;
+  const reader = ranked[index];
+  const stored = storedBadges(me.id);
+  const fresh = earnedBadges(reader, index + 1, ranked).filter(b => !stored.has(b.id));
+  if (!fresh.length) return;
+
+  syncing = true;
+  try {
+    const silent = stored.size === 0 && reader.books.some(b => new Date(b.created_at) < BADGES_LAUNCH);
+    const year = currentYear();
+    const notifiedAt = new Date().toISOString();
+    const { data, error } = await supabaseClient
+      .from('user_badges')
+      .upsert(
+        fresh.map(b => ({ year, badge_id: b.id, ...(silent ? { notified_at: notifiedAt } : {}) })),
+        { onConflict: 'user_id,year,badge_id', ignoreDuplicates: true },
+      )
+      .select('badge_id');
+    if (error) throw error;
+    const all = new Set([...stored, ...fresh.map(b => b.id)]);  // także te, które inne urządzenie zapisało przed chwilą
+    state.badges.set(me.id, all);
+    // Pokazujemy tylko to, co naprawdę trafiło do bazy teraz (drugie urządzenie nie pokaże tego samego)
+    const added = new Set((data || []).map(row => row.badge_id));
+    const shown = fresh.filter(b => added.has(b.id));
+    if (shown.length) showBadgeAward(shown);
+  } catch (err) {
+    console.error('Error saving badges:', err);
+  } finally {
+    syncing = false;
+  }
+}
+
 export function renderBadgesCard(ranked) {
   const grid = document.getElementById('badges-grid');
   const index = ranked.findIndex(r => r.key === viewerId());
-  const me = ranked[index] || { books: [] };
-  const earned = new Set(earnedBadges(me, index + 1, ranked).map(b => b.id));
+  const me = ranked[index] || { key: viewerId(), books: [] };
+  const earned = new Set(shownBadges(me, index + 1, ranked).map(b => b.id));
 
   document.getElementById('badges-count').textContent = `${earned.size}/${BADGES.length}`;
   grid.replaceChildren(...BADGES.map(b => el('div', { class: `badge-item${earned.has(b.id) ? ' earned' : ''}` }, [

@@ -1,5 +1,5 @@
 import { viewerId } from './admin.js';
-import { earnedBadges } from './badges.js';
+import { shownBadges } from './badges.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { confettiBurst, confettiFountain } from './confetti.js';
 import { currentScreen } from './shell.js';
@@ -118,7 +118,7 @@ function renderBar(reader, rank, leaderPoints, colors, ranked, booksOf) {
   fill.style.width = `${fill.dataset.width}%`;
   track.appendChild(fill);
 
-  const earned = earnedBadges(reader, rank, ranked);
+  const earned = shownBadges(reader, rank, ranked);
   const isMe = reader.key === viewerId();
   const badges = earned.length
     ? [el('div', { class: 'rank-badges', 'aria-label': `Odznaki: ${earned.map(b => b.name).join(', ')}` },
