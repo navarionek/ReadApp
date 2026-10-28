@@ -374,7 +374,8 @@ export function playStartIntro() {
     prev = now;
     const z = Math.min(1, t / INTRO_ZOOM);
     // Kolumny pędzą od pierwszej klatki i hamują do zwykłego tempa
-    if (!faded) scene?.draw(INTRO_FROM + (INTRO_TO - INTRO_FROM) * easeInOut(z), 1 + (INTRO_PEAK - 1) * (1 - z) ** 1.6, dt);
+    // Także w trakcie gaśnięcia canvasa: zastygły obraz rozjeżdżał się z jadącą już pod nim ścianą (przeskok okładek)
+    scene?.draw(INTRO_FROM + (INTRO_TO - INTRO_FROM) * easeInOut(z), 1 + (INTRO_PEAK - 1) * (1 - z) ** 1.6, dt);
     if (t >= INTRO_CARDS && !revealed) {
       revealed = true;
       // Karty wjeżdżają po kolei, od góry, na tle jeszcze przybliżającej się ściany
