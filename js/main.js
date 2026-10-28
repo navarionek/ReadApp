@@ -5,6 +5,7 @@ import { playStartIntro, renderStartWall, syncStartWallToggle, toggleStartWall }
 import { loadReads } from './data.js';
 import { syncCoverDither } from './dither.js';
 import { syncEinkToggle, toggleEink } from './eink.js';
+import { initNavIndicator } from './navbar.js';
 import { initPageKeys } from './pagekeys.js';
 import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
@@ -70,6 +71,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.querySelector('.nav-item[data-screen="dodaj"]').addEventListener('click', () => {
     if (state.finishing) resetForm();
   });
+  initNavIndicator();
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);

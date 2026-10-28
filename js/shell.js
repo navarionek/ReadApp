@@ -1,3 +1,4 @@
+import { moveNavIndicator } from './navbar.js';
 import { playRankingIntro } from './ranking.js';
 import { resetForm } from './form.js';
 import { hideRaceCard, showRaceCard } from './flight.js';
@@ -35,6 +36,7 @@ export function showScreen(name) {
     if (active) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
   });
+  moveNavIndicator();
   window.scrollTo(0, 0);
   if (toProgress) requestAnimationFrame(() => document.getElementById('ranking-viz')?.scrollIntoView({ block: 'start' }));
 

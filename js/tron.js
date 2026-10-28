@@ -234,7 +234,8 @@ export function createTron(container, { maxScale = 1 } = {}) {
 
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(50, now - last);
+    // Pierwsza klatka potrafi mieć znacznik czasu sprzed startu: ujemny krok cofałby licznik czasu poniżej zera
+    const dt = clamp(now - last, 0, 50);
     adapt(now - last);
     last = now;
     time += dt / 1000;
@@ -322,10 +323,17 @@ export function createTron(container, { maxScale = 1 } = {}) {
     return out.sort((a, b) => b.z - a.z);
   }
 
+  // Kolor akcentu wędruje po kolorach osób (co 9 s następna)
+  function accentColor() {
+    if (!racers.length) return neon('#33e0ff');
+    const i = Math.floor(Math.max(0, time) / 9) % racers.length;
+    return racers[i].color;
+  }
+
   // Poświata w punkcie zbiegu; kolor wędruje po kolorach osób
   function drawGlow() {
     if (!project(pathX(camZ + FAR), pathY(camZ + FAR), camZ + FAR)) return;
-    const c = racers.length ? racers[Math.floor(time / 9) % racers.length].color : neon('#33e0ff');
+    const c = accentColor();
     const R = H * 0.75;
     const g = ctx.createRadialGradient(px, py, 0, px, py, R);
     g.addColorStop(0, c.css(0.015));
@@ -358,7 +366,7 @@ export function createTron(container, { maxScale = 1 } = {}) {
       p.moveTo(x1, y1);
       p.lineTo(px, py);
     }
-    const accent = racers.length ? racers[Math.floor(time / 9) % racers.length].color : neon('#33e0ff');
+    const accent = accentColor();
     ctx.lineCap = 'round';
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(200, 225, 255, 0.35)';

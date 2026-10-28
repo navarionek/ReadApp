@@ -107,10 +107,24 @@ function ringTargets(books, seed) {
   });
 }
 
-const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+// Krzywa ruchu jak cubic-bezier(0.4, 0, 0.1, 1): łagodny start i długie, miękkie wyhamowanie na końcu
+function bezier(x1, y1, x2, y2) {
+  const at = (a, b, t) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  return x => {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (at(x1, x2, mid) < x) lo = mid;
+      else hi = mid;
+    }
+    return at(y1, y2, (lo + hi) / 2);
+  };
+}
+const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
-const MORPH_MS = 950;
+const MORPH_MS = 1600;
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
