@@ -276,10 +276,11 @@ function colorVars(target, h, s) {
   target.style.setProperty('--aura-s', String(s));
 }
 
-// Warstwa koloru: gradient (przenika przezroczystością) i plamy w osobnym „wirze” (obraca się przy wejściu)
+// Warstwa koloru: gradient i plamy. Plamy siedzą w dwóch opakowaniach: „wir” rusza całą grupą, a każde
+// opakowanie plamy osobno (np. wyrasta przy rozkwicie); sama plama w tym czasie dalej dryfuje.
 function paintLayer(h, s) {
   const paint = el('div', { class: 'aura-paint' }, [
-    el('div', { class: 'aura-swirl' }, [1, 2, 3, 4].map(i => el('span', { class: `mesh-blob m${i}` }))),
+    el('div', { class: 'aura-swirl' }, [1, 2, 3, 4].map(i => el('span', { class: `blob-wrap w${i}` }, [el('span', { class: `mesh-blob m${i}` })]))),
   ]);
   colorVars(paint, h, s);
   return paint;
@@ -296,8 +297,19 @@ export function createAura() {
   ]);
 }
 
-// animate: kolor przechodzi przez odcień pośredni (warstwa-pomost w połowie drogi po kole barw), a plamy
-// nowej warstwy wirują i osiadają. Każda warstwa jest malowana raz, potem tylko się obraca i przenika.
+// Przejścia warstwy koloru (opis w style.css); losowane, nigdy dwa razy to samo pod rząd
+const EFFECTS = ['bloom', 'flood', 'sweep', 'swirl'];
+let lastEffect = null;
+
+function pickEffect() {
+  const options = EFFECTS.filter(fx => fx !== lastEffect);
+  lastEffect = options[Math.floor(Math.random() * options.length)];
+  return lastEffect;
+}
+
+// animate: nowa warstwa wchodzi nad starą jednym z przejść; przy wietrze i wirze kolor płynie przez odcień
+// pośredni (warstwa-pomost w połowie drogi po kole barw). Każda warstwa jest malowana raz, potem tylko
+// się przesuwa, obraca i przenika.
 export function setAuraColor(hero, color, animate) {
   const [h, s] = colorToHsl(color);
   // Szarości zostają szare (wychodzi srebro), reszta dostaje żywe nasycenie
@@ -317,11 +329,13 @@ export function setAuraColor(hero, color, animate) {
     paints.appendChild(fresh);
     return;
   }
+  const fx = pickEffect();
+  paints.dataset.fx = fx;
   old.forEach(o => o.classList.add('leaving'));
   const added = [];
   // Krótsza droga po kole barw; przy bliskich kolorach pomost nie jest potrzebny
   const delta = ((((h - prevH) % 360) + 540) % 360) - 180;
-  if (Number.isFinite(prevH) && Math.abs(delta) > 40 && sat >= 10 && prevS >= 10) {
+  if ((fx === 'sweep' || fx === 'swirl') && Number.isFinite(prevH) && Math.abs(delta) > 40 && sat >= 10 && prevS >= 10) {
     const bridge = paintLayer(Math.round((prevH + delta / 2 + 360) % 360), Math.round((prevS + sat) / 2));
     bridge.classList.add('bridge');
     added.push(bridge);
@@ -329,13 +343,11 @@ export function setAuraColor(hero, color, animate) {
   fresh.classList.add('entering');
   added.push(fresh);
   paints.append(...added);
-  // Gdy nowa warstwa całkiem przykryje resztę, stare i pomost znikają
-  const cleanup = () => {
+  // Gdy nowa warstwa całkiem przykryje resztę (wszystkie przejścia trwają do 1,3 s), stare i pomost znikają
+  setTimeout(() => {
     [...old, ...added.filter(a => a !== fresh)].forEach(o => o.remove());
     fresh.classList.remove('entering');
-  };
-  fresh.addEventListener('animationend', e => { if (e.target === fresh) cleanup(); });
-  setTimeout(cleanup, 1800);  // gdyby animacji nie było (karta w tle, ograniczony ruch)
+  }, 1450);
 }
 
 const orbitOf = hero => hero.querySelector('.aura-orbit')._orbit;
