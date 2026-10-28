@@ -2194,28 +2194,46 @@ select.plain-input {
   overflow: visible;
 }
 
+/* Warstwy okręgów obracają się i powoli „oddychają” (przygasają i rozjaśniają się), każda w swoim rytmie,
+   więc orbita lekko się mieni. Przytrzymanie karty przyspiesza tylko obrót (js/aura.js). */
 .orb-layer {
-  will-change: transform;
-  animation: orb-spin 150s linear infinite;
+  will-change: transform, opacity;
+  animation: orb-spin 150s linear infinite, orb-breathe 9s ease-in-out infinite alternate;
 }
 
 .orb-layer.l1 {
-  animation-duration: 200s;
-  animation-direction: reverse;
+  animation-duration: 200s, 11s;
+  animation-direction: reverse, alternate;
+  animation-delay: 0s, -4s;
 }
 
 .orb-layer.l2 {
-  animation-duration: 260s;
+  animation-duration: 260s, 13s;
+  animation-delay: 0s, -7s;
+}
+
+@keyframes orb-breathe {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
+
+/* Zewnętrzne okręgi rozpływają się w tle zamiast kończyć się ostro */
+.orb {
+  -webkit-mask-image: radial-gradient(closest-side, #000 52%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 52%, transparent 100%);
 }
 
 @keyframes orb-spin {
   to { transform: rotate(360deg); }
 }
 
+/* Orbita pod łukiem jak mgiełka: ledwo widoczne, drobne kropki */
 .orb-track {
   fill: none;
-  stroke: rgb(255 255 255 / 0.07);
-  stroke-width: 1;
+  stroke: rgb(255 255 255 / 0.09);
+  stroke-width: 0.8;
+  stroke-dasharray: 0.4 4.6;
+  stroke-linecap: round;
 }
 
 .orb-track.empty {

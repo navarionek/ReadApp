@@ -125,6 +125,8 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
+const COMET_BODY = 0.5;  // jaka część łuku to jaśniejszy środek komety
+const COMET_HEAD = 0.2;  // jaka część łuku to jasna głowa
 const SPIN_MAX = 900;   // prędkość okręgów w chwili wystrzału (razy zwykła)
 const SPIN_RAMP = 8000; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
 const SPIN_JUMP = 25;   // zryw na starcie: tyle razy szybciej już po ułamku sekundy
@@ -184,14 +186,17 @@ class Orbit {
   addRing(i, target) {
     const g = node('g');
     const track = node('circle', { cx: C, cy: C, class: 'orb-track' });
+    // Łuk jak kometa: długi, słaby ogon (arc), jaśniejszy środek (body) i krótka, jasna głowa (head) przy „planecie”
     const arc = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
+    const body = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
+    const head = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
     const halo = node('circle', { r: 5.5, class: 'orb-halo mid' });
     const dot = node('circle', { class: 'orb-dot mid' });
-    g.append(track, arc, halo, dot);
+    g.append(track, arc, body, head, halo, dot);
     this.layers[i % LAYERS].appendChild(g);
     // Nowy okrąg wyrasta: zaczyna mniejszy, bez łuku i niewidoczny
     const now = { r: target.r * 0.7, len: 0, width: target.width, tilt: target.tilt - 60, op: 0, arc: 0 };
-    const ring = { g, track, arc, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
+    const ring = { g, track, arc, body, head, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
     this.rings.push(ring);
     return ring;
   }
@@ -224,7 +229,8 @@ class Orbit {
       const done = !this.holding && this.spinRate < 1.02;
       if (done) this.spinRate = 1;
       this.charge(now);
-      this.layers.flatMap(layer => layer.getAnimations())
+      // Tylko obrót (warstwy jeszcze „oddychają”, tego nie przyspieszamy, bo przy rozkręceniu migałoby)
+      this.layers.flatMap(layer => layer.getAnimations().filter(anim => anim.animationName === 'orb-spin'))
         .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(this.spinRate) : (anim.playbackRate = this.spinRate)));
       this.spinRaf = done ? 0 : requestAnimationFrame(step);
     };
@@ -398,7 +404,7 @@ class Orbit {
     const kind = late ? to.kind : ring.kind ?? to.kind;
     if (kind && kind !== ring.kind) {
       ring.kind = kind;
-      for (const part of [ring.arc, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
+      for (const part of [ring.arc, ring.body, ring.head, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
     }
     const empty = late ? !!to.empty : ring.empty ?? !!to.empty;
     if (empty !== ring.empty) {
@@ -415,15 +421,26 @@ class Orbit {
     ring.g.setAttribute('transform', `rotate(${now.tilt.toFixed(2)} ${C} ${C})`);
     ring.g.setAttribute('opacity', now.op.toFixed(3));
     ring.track.setAttribute('r', r);
-    ring.arc.setAttribute('r', r);
-    ring.arc.setAttribute('stroke-dasharray', `${now.len.toFixed(2)} 360`);
-    ring.arc.setAttribute('stroke-width', now.width.toFixed(2));
+    // Kometa: każdy kawałek to ten sam okrąg, przycięty kreskowaniem do końcówki łuku (przesunięcie
+    // zamiast kreski zerowej długości, która z zaokrąglonym końcem rysowała kropkę na starcie)
+    const segment = (part, share, width) => {
+      const seg = now.len * share;
+      part.setAttribute('r', r);
+      part.setAttribute('stroke-dasharray', `${seg.toFixed(2)} 360`);
+      part.setAttribute('stroke-dashoffset', (-(now.len - seg)).toFixed(2));
+      part.setAttribute('stroke-width', (now.width * width).toFixed(2));
+    };
+    segment(ring.arc, 1, 0.45);
+    segment(ring.body, COMET_BODY, 0.75);
+    segment(ring.head, COMET_HEAD, 1);
     // „Planeta” na końcu łuku (łuk zaczyna się na godzinie 3 i idzie zgodnie z zegarem)
     const a = (now.len * Math.PI) / 180;
     const px = (C + now.r * Math.cos(a)).toFixed(2);
     const py = (C + now.r * Math.sin(a)).toFixed(2);
     const arcOp = now.arc.toFixed(3);
-    ring.arc.setAttribute('opacity', arcOp);
+    ring.arc.setAttribute('opacity', (now.arc * 0.22).toFixed(3));
+    ring.body.setAttribute('opacity', (now.arc * 0.5).toFixed(3));
+    ring.head.setAttribute('opacity', arcOp);
     for (const part of [ring.halo, ring.dot]) {
       part.setAttribute('cx', px);
       part.setAttribute('cy', py);
