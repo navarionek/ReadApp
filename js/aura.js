@@ -204,6 +204,7 @@ class Orbit {
     if (reducedMotion()) return;
     if (on && !this.holding) this.holdStart = performance.now() - holdTime(this.spinRate || 1);  // dokładamy od bieżącej prędkości
     this.holding = on;
+    this.press(on);
     if (!on && this.launch === 'out') this.regrow();
     if (this.spinRaf) return;
     this.spinRate = this.spinRate || 1;
@@ -232,7 +233,26 @@ class Orbit {
 
   // Naładowanie przed wybuchem: od GLOW_FROM razy zwykłej prędkości wokół okręgów narasta poświata, a orbita
   // drży coraz mocniej. Przy wystrzale poświata rozbłyskuje i gaśnie. Sama przezroczystość i przesunięcia.
+  // Wciśnięcie karty: karta lekko się wciska, a kolorowy cień pod nią (osobny element, żeby nie malować
+  // cienia karty w każdej klatce) ustawiamy pod kartą w jej kolorze
+  press(on) {
+    const hero = this.root.closest('.shelf-hero');
+    hero?.classList.toggle('pressed', on);
+    const shadow = document.getElementById('shelf-hero-shadow');
+    if (!on || !hero || !shadow) return;
+    this.shadow = shadow;
+    shadow.style.top = `${hero.offsetTop + hero.offsetHeight * 0.45}px`;
+    shadow.style.height = `${hero.offsetHeight * 0.6}px`;
+    colorVars(shadow, hero.style.getPropertyValue('--aura-h'), hero.style.getPropertyValue('--aura-s'));
+  }
+
   charge(now) {
+    // Postęp ładowania 0..1 z prędkości: od razu widać zryw, rośnie z trzymaniem, opada razem z hamowaniem
+    const p = Math.min(1, Math.max(0, (this.spinRate - 1) / (SPIN_MAX - 1))) ** (1 / SPIN_CURVE);
+    if (this.shadow) {
+      this.shadow.style.opacity = p > 0.005 ? (0.35 + 0.65 * p).toFixed(3) : '0';
+      this.shadow.style.transform = `translateY(${(8 + 22 * p).toFixed(1)}px) scale(${(0.92 + 0.14 * p).toFixed(3)}, ${(0.9 + 0.5 * p).toFixed(3)})`;
+    }
     let g;
     if (this.launch) {
       g = this.burstAt ? Math.exp(-(now - this.burstAt) / 420) : 0;
