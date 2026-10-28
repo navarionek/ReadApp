@@ -160,7 +160,8 @@ const INTRO_FROM = 0.6;    // skala na starcie (ile razy mniejsze okładki niż 
 const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
 const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
 const INTRO_WAIT_MAX = 2500;  // najdłużej tyle czekamy na dane i okładki przed animacją
-const INTRO_RES = 0.75;    // rozdzielczość canvasa względem ekranu (okładki są małe i pędzą, ostrość nie ma znaczenia)
+const INTRO_RES = 1;       // rozdzielczość canvasa względem ekranu (przy 0.75 okładki wyglądały na spikselowane)
+const INTRO_SHARE = 0.5;   // test: w intro tylko połowa książek (mniej okładek do zdekodowania i narysowania na start)
 
 // Okładki zdekodowane z wyprzedzeniem (createImageBitmap dekoduje poza głównym wątkiem): pierwsze rysowanie
 // pasków nie musi wtedy dekodować obrazków w jednej klatce, co szarpało na samym starcie intro
@@ -335,7 +336,7 @@ export function playStartIntro() {
     cached = JSON.parse(localStorage.getItem(CACHE_KEY)) || [];
   } catch {}
   if (!cached.length) return;  // pierwsze uruchomienie: jeszcze nie znamy okładek
-  mountStartWall(cached);
+  mountStartWall(cached.slice(-Math.max(6, Math.round(cached.length * INTRO_SHARE))));
   const bg = document.getElementById('cover-bg');
   if (!bg) return;
   intro = { pending: false, dataDone: null };
