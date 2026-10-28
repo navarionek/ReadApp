@@ -125,8 +125,8 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
-const SPIN_MAX = 220;   // prędkość okręgów w chwili wystrzału (razy zwykła)
-const SPIN_RAMP = 2400; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
+const SPIN_MAX = 450;   // prędkość okręgów w chwili wystrzału (razy zwykła)
+const SPIN_RAMP = 5000; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
 const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
