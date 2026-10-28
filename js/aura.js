@@ -125,13 +125,27 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
-const SPIN_MAX = 450;   // prędkość okręgów w chwili wystrzału (razy zwykła)
-const SPIN_RAMP = 5000; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
+const SPIN_MAX = 900;   // prędkość okręgów w chwili wystrzału (razy zwykła)
+const SPIN_RAMP = 8000; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
+const SPIN_JUMP = 25;   // zryw na starcie: tyle razy szybciej już po ułamku sekundy
+const SPIN_JUMP_MS = 180; // jak szybko przychodzi zryw (stała czasu, ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
 const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 520;     // lot jednego okręgu
-const holdTime = rate => SPIN_RAMP * Math.max(0, (rate - 1) / (SPIN_MAX - 1)) ** (1 / SPIN_CURVE);
+// Prędkość po t ms trzymania: szybki zryw na starcie, potem coraz ostrzejsze przyspieszanie do SPIN_MAX
+const holdRate = t => 1 + SPIN_JUMP * (1 - Math.exp(-t / SPIN_JUMP_MS)) + (SPIN_MAX - 1 - SPIN_JUMP) * Math.min(1, t / SPIN_RAMP) ** SPIN_CURVE;
+// Odwrotnie: po ilu ms trzymania jest dana prędkość (żeby ponowne przytrzymanie dokładało od bieżącej)
+function holdTime(rate) {
+  let lo = 0;
+  let hi = SPIN_RAMP;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (holdRate(mid) < rate) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
@@ -178,8 +192,8 @@ class Orbit {
     return ring;
   }
 
-  // Przytrzymanie karty: dopóki palec jest na karcie, okręgi kręcą się coraz szybciej, i to coraz ostrzej
-  // (prędkość rośnie z potęgą czasu trzymania). Po SPIN_RAMP okręgi wystrzeliwują jeden po drugim
+  // Przytrzymanie karty: od razu zryw, a potem okręgi kręcą się coraz szybciej, i to coraz ostrzej
+  // (prędkość rośnie z potęgą czasu trzymania, holdRate). Po SPIN_RAMP okręgi wystrzeliwują jeden po drugim
   // („piu, piu”), a po puszczeniu palca wyrastają z powrotem ze środka. Puszczenie wcześniej = okręgi
   // płynnie wyhamowują. Prędkość zmieniamy przez playbackRate animacji CSS warstw.
   hold(on) {
@@ -194,9 +208,9 @@ class Orbit {
       const dt = Math.min(64, now - last);
       last = now;
       if (this.holding) {
-        const t = Math.min(1, (now - this.holdStart) / SPIN_RAMP);
-        this.spinRate = 1 + (SPIN_MAX - 1) * t ** SPIN_CURVE;
-        if (t >= 1 && !this.launch) this.fire();
+        const held = now - this.holdStart;
+        this.spinRate = holdRate(held);
+        if (held >= SPIN_RAMP && !this.launch) this.fire();
       } else {
         this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
       }
