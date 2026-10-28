@@ -398,6 +398,22 @@ export function playStartIntro() {
   };
 }
 
+// Animacje CSS liczą czas także wtedy, gdy apka jest w tle, więc po powrocie ściana
+// przeskakiwała. Na czas schowania apki zatrzymujemy kolumny i puszczamy je z tego samego miejsca.
+let frozen = [];
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (intro) return;  // intro samo steruje animacjami kolumn
+    frozen = [...document.querySelectorAll('#cover-bg .tv-wall-strip')]
+      .flatMap(strip => strip.getAnimations())
+      .filter(anim => anim.playState === 'running');
+    frozen.forEach(anim => anim.pause());
+  } else {
+    frozen.forEach(anim => anim.play());
+    frozen = [];
+  }
+});
+
 let resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
