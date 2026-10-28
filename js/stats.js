@@ -1,4 +1,3 @@
-import { einkEnabled } from './eink.js';
 import { renderInsights } from './insights.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { showRaceCard } from './flight.js';
@@ -418,41 +417,15 @@ export function setRaceProgress(p, dt = null) {
   });
 }
 
-// Animacja krokowa: kilkanaście wyraźnych klatek co pół sekundy zamiast płynnego ruchu
-// (e-ink odświeża ekran za wolno na płynną animację, a przy „ogranicz ruch” płynnej nie wolno)
-const EINK_RACE_STEPS = 16;
-const EINK_RACE_STEP_MS = 500;
-
-function playRaceInSteps() {
-  let i = 0;
-  const tick = () => {
-    i += 1;
-    setRaceProgress(Math.min(1, i / EINK_RACE_STEPS));
-    state.raceTimer = i < EINK_RACE_STEPS ? setTimeout(tick, EINK_RACE_STEP_MS) : null;
-    if (i >= EINK_RACE_STEPS) state.raceFrame = null;
-  };
-  state.raceFrame = -1;  // w trakcie animacji (jak requestAnimationFrame): bez dymka i bez przerysowań w tle
-  setRaceProgress(0);
-  state.raceTimer = setTimeout(tick, EINK_RACE_STEP_MS);
-}
-
 export function playRace() {
   cancelAnimationFrame(state.raceFrame);
-  clearTimeout(state.raceTimer);
-  state.raceTimer = null;
   state.raceFrame = null;
   drawRace();
   hideRaceTooltip();
   if (!state.race) return;
 
-  // Czytniki mają animacje wyłączone w systemie (przeglądarka zgłasza to jako „ogranicz ruch”), więc
-  // wyścig od razu pokazywał wynik końcowy. Przy ograniczonym ruchu też idzie w krokach: bez płynnego ruchu,
-  // ale widać, jak punkty rosną.
-  if (einkEnabled() || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    playRaceInSteps();
-    return;
-  }
-
+  // Bez sprawdzania „ogranicz ruch”: czytniki mają animacje wyłączone w systemie i przeglądarka zgłasza to
+  // jako ograniczony ruch, a wyścig ma tam iść płynnie (to krótki wykres, nie ruch po całym ekranie)
   const start = performance.now();
   let last = start;
   const step = now => {

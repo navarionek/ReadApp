@@ -26,8 +26,7 @@ export const state = {
   statsRows: [],
   lastRanked: [],          // ostatni ranking: [{ key, name, points }] (do podsumowania po dodaniu książki)
   race: null,              // narysowany wykres: skale, elementy, serie
-  raceFrame: null,         // id requestAnimationFrame (-1 = animacja krokowa na czytniku)
-  raceTimer: null,         // id setTimeout animacji krokowej (tryb czytnika)
+  raceFrame: null,         // id requestAnimationFrame
   raceProgress: 1,         // 0..1, jak daleko w roku jest animacja
   racePending: false,      // wejście na Statystyki przed wczytaniem danych
 };
