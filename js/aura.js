@@ -352,7 +352,8 @@ class Orbit {
   }
 
   start(animate) {
-    this.rings.forEach(ring => { ring.from = { ...ring.now }; });
+    // Kolor okręgu zaczyna od tego, co było widać (rodzaj łuku), i płynnie dochodzi do nowego
+    this.rings.forEach(ring => { ring.from = { ...ring.now, look: ring.look || KIND_LOOK[ring.to.kind] || KIND_LOOK.mid }; });
     this.colorFrom = { ...this.color };
     this.t0 = performance.now();
     this.last = this.t0;
@@ -368,8 +369,12 @@ class Orbit {
     const t = this.duration ? Math.min(1, (time - this.t0) / this.duration) : 1;
     const e = ease(t);
     if (this.colorTo) {
-      const h = this.colorFrom.h + turn(this.colorFrom.h, this.colorTo.h) * e;
-      this.color = { h: (h + 360) % 360, s: lerp(this.colorFrom.s, this.colorTo.s, e) };
+      // Przy zmianie osoby kolor robi pełne koło przez wszystkie barwy i dopiero ląduje na nowej
+      // (a nie przechodzi wprost między dwoma kolorami); przy tej samej barwie bez koła
+      const step = turn(this.colorFrom.h, this.colorTo.h);
+      const travel = Math.abs(step) > 1 ? step + (step >= 0 ? 360 : -360) : step;
+      const h = this.colorFrom.h + travel * e;
+      this.color = { h: ((h % 360) + 360) % 360, s: lerp(this.colorFrom.s, this.colorTo.s, e) };
       colorVars(this.root, this.color.h.toFixed(1), this.color.s.toFixed(1));
     }
     this.rings.forEach(ring => this.draw(ring, e));
@@ -393,13 +398,11 @@ class Orbit {
     now.tilt = from.tilt + turn(from.tilt, to.tilt) * e;
     now.op = lerp(from.op, to.op, e);
     now.arc = lerp(from.arc, to.arc, e);
-    // Rodzaj łuku (kolor) i kropkowanie zmieniają się w połowie przejścia, gdy okrąg jest w ruchu
+    // Kolor łuku, poświaty i kropki płynnie między rodzajem sprzed przejścia a nowym (bez skoku w połowie)
+    const toLook = KIND_LOOK[to.kind] || KIND_LOOK.mid;
+    ring.look = Object.fromEntries(Object.keys(toLook).map(key => [key, lerp(from.look[key], toLook[key], e)]));
+    // Kropkowanie pustej orbity zmienia się w połowie przejścia, gdy okrąg jest w ruchu
     const late = e >= 0.5 || from.op === 0;
-    const kind = late ? to.kind : ring.kind ?? to.kind;
-    if (kind && kind !== ring.kind) {
-      ring.kind = kind;
-      for (const part of [ring.arc, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
-    }
     const empty = late ? !!to.empty : ring.empty ?? !!to.empty;
     if (empty !== ring.empty) {
       ring.empty = empty;
@@ -430,8 +433,23 @@ class Orbit {
       part.setAttribute('opacity', arcOp);
     }
     ring.dot.setAttribute('r', (now.width / 2 + 0.9).toFixed(2));
+    // Barwy liczone tu (styl ma pierwszeństwo przed CSS): odcień orbity + przesunięcie rodzaju łuku
+    const look = ring.look || KIND_LOOK.mid;
+    const h = ((this.color?.h ?? 250) + look.dh).toFixed(1);
+    const sat = (look.s < 0 ? this.color?.s ?? 70 : look.s).toFixed(1);
+    ring.arc.style.stroke = `hsl(${h} ${sat}% ${look.l.toFixed(1)}% / ${look.a.toFixed(3)})`;
+    ring.halo.style.fill = `hsl(${h} 100% ${(look.l + 2).toFixed(1)}% / ${look.halo.toFixed(3)})`;
+    ring.dot.style.fill = `rgb(255 255 255 / ${look.dot.toFixed(3)})`;
   }
 }
+
+// Wygląd łuku według rodzaju książki: przesunięcie odcienia od barwy osoby, nasycenie (-1 = jak osoby),
+// jasność, przezroczystość łuku, poświata „planety” i jasność kropki
+const KIND_LOOK = {
+  mid: { dh: 18, s: -1, l: 74, a: 0.92, halo: 0.3, dot: 1 },
+  hot: { dh: -28, s: 100, l: 80, a: 1, halo: 0.45, dot: 1 },
+  dim: { dh: 0, s: 0, l: 100, a: 0.26, halo: 0, dot: 0.45 },
+};
 
 let orbitCount = 0;
 
