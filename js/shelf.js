@@ -1,5 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
-import { createAura, inkFor, setAuraColor, setOrbit, swirlAura } from './aura.js';
+import { createAura, inkFor, setAuraColor, setOrbit } from './aura.js';
 import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
@@ -359,7 +359,7 @@ function countTo(node, from, to) {
   }
   const start = performance.now();
   const step = now => {
-    const t = Math.min(1, (now - start) / 800);
+    const t = Math.min(1, (now - start) / 600);
     show(from + (to - from) * (1 - (1 - t) ** 3));
     if (t < 1) node._count = requestAnimationFrame(step);
   };
@@ -382,13 +382,9 @@ function renderShelfHero() {
       el('div', { class: 'shelf-stats' }, [0, 1, 2].map(() => el('div', { class: 'shelf-stat' }, [el('strong', { text: '0' }), el('span')]))),
     );
     heroDrawn = { owner: null, orbit: null, stats: [0, 0, 0] };
-    // Pierwsze rysowanie bez przepływu kolorów (inaczej karta przechodziłaby z domyślnego fioletu)
-    hero.classList.add('instant');
-    requestAnimationFrame(() => requestAnimationFrame(() => hero.classList.remove('instant')));
   }
-  const aura = hero.querySelector('.shelf-aura');
   const changed = owner.key !== heroDrawn.owner;
-  setAuraColor(hero, colors.get(owner.key));
+  setAuraColor(hero, colors.get(owner.key), !fresh);
 
   if (changed) {
     hero.querySelector('.shelf-hero-body').replaceChildren(
@@ -399,10 +395,7 @@ function renderShelfHero() {
         el('p', { class: 'shelf-hero-sub', text: '\u00a0' }),  // twarda spacja trzyma wysokość, zanim dojdą książki
       ]),
     );
-    if (!fresh) {
-      swirlAura(aura);
-      setOrbit(aura, null, '', true);  // stara orbita odlatuje
-    }
+    if (!fresh) setOrbit(hero, null, '', true);  // stara orbita odchodzi
     heroDrawn.orbit = null;
   }
   hero.querySelector('.shelf-hero-kicker').textContent = isOwn ? 'Twoja półka' : 'Półka';
@@ -423,10 +416,10 @@ function renderShelfHero() {
     });
     heroDrawn.stats = values;
 
-    // Orbita: nowa osoba albo pierwsze rysowanie = wlatuje i łuki się rysują; zmiana w książkach = po cichu
+    // Orbita: nowa osoba albo pierwsze rysowanie = wchodzi; zmiana w książkach (np. ocena) = po cichu
     const orbitSig = JSON.stringify(rows.map(r => [r.id, r.pages, r.rating, r.multiplier, r.unfinished]));
     if (orbitSig !== heroDrawn.orbit) {
-      setOrbit(aura, rows, String(owner.key), heroDrawn.orbit === null);
+      setOrbit(hero, rows, String(owner.key), heroDrawn.orbit === null);
       heroDrawn.orbit = orbitSig;
     }
   }
