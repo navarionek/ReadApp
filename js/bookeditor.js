@@ -243,7 +243,8 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   });
 
   /* --- Zapis --- */
-  const saveBtn = el('button', { type: 'button', class: 'btn btn-primary btn-block btn-lg be-save' }, [icon('check'), el('span', { text: 'Zapisz' })]);
+  const saveLabel = el('span', { text: 'Zapisz' });
+  const saveBtn = el('button', { type: 'button', class: 'btn btn-primary btn-block btn-lg be-save' }, [icon('check'), saveLabel]);
   const fail = (text, field) => {
     showToast(text);
     field?.focus();
@@ -291,15 +292,24 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     }
 
     saveBtn.disabled = true;
-    if (coverChanged) {
-      Object.assign(values, cover, { info_checked_at: new Date().toISOString() });
-    } else {
-      // Serwer uzupełnia dane tylko nowym wpisom i nadpisałby wtedy autora i rok: niech zrobi to najpierw
-      Object.assign(values, await settleBookInfo(kind, row));
+    saveLabel.textContent = 'Zapisuję…';
+    let data = null;
+    let error = null;
+    try {
+      if (coverChanged) {
+        Object.assign(values, cover, { info_checked_at: new Date().toISOString() });
+      } else {
+        // Serwer uzupełnia dane tylko nowym wpisom i nadpisałby wtedy autora i rok: niech zrobi to najpierw
+        Object.assign(values, await settleBookInfo(kind, row));
+      }
+      ({ data, error } = await supabaseClient.from(kind).update(values).eq('id', row.id).select('id'));
+    } catch (err) {
+      error = err;
     }
-    const { data, error } = await supabaseClient.from(kind).update(values).eq('id', row.id).select('id');
     saveBtn.disabled = false;
+    saveLabel.textContent = 'Zapisz';
     if (error || !data?.length) {
+      console.error('Book save failed:', error, values);
       showToast('Nie udało się zapisać: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
       return;
     }

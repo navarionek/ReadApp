@@ -756,7 +756,7 @@ a.btn {
   left: 50%;
   bottom: 1.5rem;
   transform: translateX(-50%);
-  z-index: 1100;
+  z-index: 3000;  /* nad edytorem książki (2500), inaczej błędy zapisu były niewidoczne */
   max-width: calc(100% - 2rem);
   padding: 0.75rem 1.25rem;
   border-radius: var(--radius);
