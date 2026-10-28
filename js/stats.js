@@ -418,8 +418,8 @@ export function setRaceProgress(p, dt = null) {
   });
 }
 
-// Czytnik e-ink odświeża ekran za wolno na płynną animację (widać było tylko wynik końcowy),
-// więc wyścig idzie tu w wyraźnych krokach co chwilę, które ekran zdąży narysować
+// Animacja krokowa: kilkanaście wyraźnych klatek co pół sekundy zamiast płynnego ruchu
+// (e-ink odświeża ekran za wolno na płynną animację, a przy „ogranicz ruch” płynnej nie wolno)
 const EINK_RACE_STEPS = 16;
 const EINK_RACE_STEP_MS = 500;
 
@@ -445,13 +445,11 @@ export function playRace() {
   hideRaceTooltip();
   if (!state.race) return;
 
-  if (einkEnabled()) {
+  // Czytniki mają animacje wyłączone w systemie (przeglądarka zgłasza to jako „ogranicz ruch”), więc
+  // wyścig od razu pokazywał wynik końcowy. Przy ograniczonym ruchu też idzie w krokach: bez płynnego ruchu,
+  // ale widać, jak punkty rosną.
+  if (einkEnabled() || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     playRaceInSteps();
-    return;
-  }
-
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    setRaceProgress(1);
     return;
   }
 
