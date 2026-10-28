@@ -30,6 +30,31 @@
       } catch (e) {}
     })();
   </script>
+  <!-- Błąd w kodzie pokazuje się na dole ekranu (czytniki i starsze przeglądarki nie mają konsoli) -->
+  <script>
+    (function () {
+      var shown = false;
+      function show(text) {
+        if (shown) return;
+        shown = true;
+        function put() {
+          var box = document.createElement('div');
+          box.setAttribute('style', 'position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:10px 14px;background:#b91c1c;color:#fff;font:13px/1.4 sans-serif;word-break:break-word');
+          box.textContent = 'Błąd: ' + text;
+          box.addEventListener('click', function () { box.remove(); });
+          document.body.appendChild(box);
+        }
+        if (document.body) put(); else document.addEventListener('DOMContentLoaded', put);
+      }
+      window.addEventListener('error', function (e) {
+        show((e.message || 'nieznany') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        show((r && r.message) || String(r));
+      });
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
   <!-- Three.js dla wyścigu 3D (ładowany dopiero na Statystykach); musi być przed skryptami-modułami -->
   <script type="importmap">
