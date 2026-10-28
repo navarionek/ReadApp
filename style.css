@@ -2122,6 +2122,24 @@ select.plain-input {
   fill: #fff;
 }
 
+/* Słońce w środku orbity przy wejściu na Półkę: rośnie od zera, lekko przeskakuje i osiada
+   (.screen-enter dodaje js/shell.js przy każdym wejściu na ekran) */
+.screen-enter .orb-core-svg {
+  animation: orb-sun-in 1.3s cubic-bezier(0.2, 0.8, 0.2, 1) 0.25s both;
+}
+
+@keyframes orb-sun-in {
+  0% { opacity: 0; transform: scale(0); }
+  55% { opacity: 1; transform: scale(1.18); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter .orb-core-svg {
+    animation: none;
+  }
+}
+
 .aura-grain {
   position: absolute;
   inset: 0;
