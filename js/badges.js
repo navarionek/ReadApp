@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { viewerId } from './admin.js';
 import { supabaseClient } from './supabase.js';
 import { currentYear, DAY_MS, el, icon } from './ui.js';
-import { showBadgeAward } from './badgeaward.js';
+import { pendingBadgeIds, showBadgeAward } from './badgeaward.js';
 
 /* ----------------- Odznaki ----------------- */
 // Liczone z wpisów bieżącego roku, więc resetują się razem z rywalizacją. Zdobytą odznakę aplikacja
@@ -131,6 +131,16 @@ export async function loadStoredBadges() {
 const BADGES_LAUNCH = new Date('2026-10-28T18:00:00+01:00');
 let syncing = false;
 
+// Odznaki zapisane przy poprzednim wejściu, których okno nie zdążyło się pokazać (raz na wczytanie strony)
+let resumed = false;
+function resumePendingAward(stored) {
+  if (resumed) return;
+  resumed = true;
+  const ids = new Set(pendingBadgeIds());
+  const badges = BADGES.filter(b => ids.has(b.id) && stored.has(b.id));
+  if (badges.length) showBadgeAward(badges);
+}
+
 // Zapisuje świeżo zdobyte odznaki zalogowanej osoby i pokazuje je na pełnym ekranie
 export async function syncMyBadges(ranked) {
   const me = state.currentUser;
@@ -139,6 +149,7 @@ export async function syncMyBadges(ranked) {
   if (index < 0) return;
   const reader = ranked[index];
   const stored = storedBadges(me.id);
+  resumePendingAward(stored);
   const fresh = earnedBadges(reader, index + 1, ranked).filter(b => !stored.has(b.id));
   if (!fresh.length) return;
 

@@ -6,6 +6,26 @@ import { el, icon, refreshIcons } from './ui.js';
 let queue = [];
 let open = false;
 
+// Odznaki zapisane w bazie, ale jeszcze nie pokazane (np. strona przeładowała się zaraz po zapisie, bo wyszła
+// nowa wersja apki): zostają w pamięci przeglądarki, aż ktoś zamknie okno
+const PENDING_KEY = 'badge-award-pending';
+
+export function pendingBadgeIds() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+    return Array.isArray(ids) ? ids : [];
+  } catch {
+    return [];
+  }
+}
+
+function setPending(ids) {
+  try {
+    if (ids.length) localStorage.setItem(PENDING_KEY, JSON.stringify(ids));
+    else localStorage.removeItem(PENDING_KEY);
+  } catch { /* bez pamięci przeglądarki okno po prostu pokaże się raz */ }
+}
+
 // Nie przykrywamy podsumowania po dodaniu książki ani nie wchodzimy w ekran powitalny
 function whenFree(fn, tries = 0) {
   const busy = document.querySelector('.summary-overlay, .badge-award-overlay, body.wall-intro, body.wall-intro-reveal')
@@ -16,6 +36,8 @@ function whenFree(fn, tries = 0) {
 
 export function showBadgeAward(badges) {
   if (!badges.length) return;
+  if (queue.some(batch => batch[0].id === badges[0].id) || document.querySelector('.badge-award-overlay')) return;
+  setPending([...new Set([...pendingBadgeIds(), ...badges.map(b => b.id)])]);
   queue.push(badges);
   if (!open) setTimeout(() => whenFree(next), 600);
 }
@@ -58,6 +80,8 @@ function next() {
     document.removeEventListener('keydown', onKey);
     overlay.remove();
     open = false;
+    const shownIds = new Set(badges.map(b => b.id));
+    setPending(pendingBadgeIds().filter(id => !shownIds.has(id)));
     if (queue.length) setTimeout(next, 250);
   };
   const onKey = e => { if (e.key === 'Escape') close(); };
