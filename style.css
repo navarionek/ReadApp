@@ -7187,7 +7187,7 @@ body.be-lock {
 
 /* ----------------- Własny kolor w apce -----------------
    --me ustawia js/admin.js z koloru wybranego w ustawieniach (bez wyboru zmiennej nie ma i nic się nie zmienia).
-   Celowo oszczędnie: napis „Czytanko”, własny wiersz w Rankingu i własna Półka. Karty i ekran startowy zostają neutralne. */
+   Celowo oszczędnie: napis „Czytanko” i własny wiersz w Rankingu. Karty, ekran startowy i nagłówek Półki zostają neutralne. */
 :root:not(.eink) {
   accent-color: var(--me, auto);
 }
@@ -7209,15 +7209,18 @@ body.be-lock {
   box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--me, transparent);
 }
 
-/* Własna półka: obwódka nagłówka, kółko wokół awatara i liczby w kafelkach */
-:root:not(.eink) .shelf-hero.own {
-  border-color: color-mix(in srgb, var(--me, var(--border)) 55%, var(--border));
+
+/* Półka: przełącznik osób w kolorach osób (--person ustawia js/shelf.js) */
+:root:not(.eink) .shelf-person {
+  border-color: color-mix(in srgb, var(--person, var(--border)) 50%, var(--border));
 }
 
-:root:not(.eink) .shelf-hero.own .shelf-hero-avatar {
-  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 6px var(--me, transparent);
+:root:not(.eink) .shelf-person.active {
+  border-color: var(--person, var(--primary));
+  background: var(--person, var(--primary));
+  box-shadow: 0 6px 14px -6px var(--person, var(--primary));
 }
 
-:root:not(.eink) .shelf-hero.own .shelf-stat strong {
-  color: color-mix(in srgb, var(--me, var(--text-main)) 80%, var(--text-main));
+:root:not(.eink) .shelf-person.active .rank-avatar {
+  box-shadow: 0 0 0 2px #fff;
 }

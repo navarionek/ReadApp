@@ -323,6 +323,7 @@ function renderShelfPeople() {
       avatar(p, colors),
       el('span', { text: p.key === viewerId() ? 'Ty' : firstName(p.name) }),
     ]);
+    chip.style.setProperty('--person', colors.get(p.key));
     chip.addEventListener('click', () => {
       if (active) return;
       state.shelfUserId = p.key === viewerId() ? null : p.key;
@@ -337,7 +338,6 @@ function renderShelfHero() {
   const hero = document.getElementById('shelf-hero');
   const owner = shelfOwner();
   const isOwn = owner.key === viewerId();
-  hero.classList.toggle('own', isOwn);
   const rows = state.shelfRows.filter(r => r.user_id === owner.key);
   const pages = rows.reduce((sum, r) => sum + (r.pages || 0), 0);
   const loved = rows.filter(r => r.rating === 1).length;
