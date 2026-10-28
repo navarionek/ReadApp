@@ -2015,6 +2015,108 @@ select.plain-input {
   to { transform: translate3d(-16%, -20%, 0) scale(1.12); }
 }
 
+/* Gwiazdy w tle karty (js/aura.js): niebo na canvasie, które bardzo wolno dryfuje, migoczące gwiazdy
+   z czteroramiennym błyskiem i co jakiś czas spadająca gwiazda. Tylko przezroczystość i przesunięcia. */
+.aura-stars {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stars-drift {
+  position: absolute;
+  inset: -4%;
+  animation: stars-drift 140s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.stars-sky {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes stars-drift {
+  from { transform: translate(-2%, 1%); }
+  to { transform: translate(2%, -1%); }
+}
+
+.star-twinkle {
+  position: absolute;
+  width: var(--size, 10px);
+  height: var(--size, 10px);
+  margin: calc(var(--size, 10px) / -2) 0 0 calc(var(--size, 10px) / -2);
+  opacity: 0.15;
+  background: radial-gradient(closest-side, #fff 0 12%, rgb(220 230 255 / 0.55) 25%, transparent 70%);
+  animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+/* Cztery ramiona błysku */
+.star-twinkle::before,
+.star-twinkle::after {
+  content: "";
+  position: absolute;
+  left: -40%;
+  right: -40%;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.9), transparent);
+}
+
+.star-twinkle::after {
+  transform: rotate(90deg);
+}
+
+@keyframes star-twinkle {
+  0%, 100% { opacity: 0.12; transform: scale(0.45) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(25deg); }
+}
+
+/* Spadająca gwiazda: przez większość cyklu jej nie ma, potem krótki przelot po skosie */
+.star-shoot {
+  position: absolute;
+  top: 12%;
+  left: 30%;
+  width: 110px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.25) 40%, #fff);
+  opacity: 0;
+  transform-origin: right center;
+  animation: star-shoot 13s ease-in 4s infinite;
+  will-change: transform, opacity;
+}
+
+.star-shoot.s1 {
+  top: 34%;
+  left: 55%;
+  width: 80px;
+  animation-duration: 19s;
+  animation-delay: 11s;
+}
+
+@keyframes star-shoot {
+  0%, 88% { opacity: 0; transform: rotate(-22deg) translateX(-40px) scaleX(0.3); }
+  90% { opacity: 1; }
+  95% { opacity: 0; transform: rotate(-22deg) translateX(260px) scaleX(1); }
+  100% { opacity: 0; transform: rotate(-22deg) translateX(260px) scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stars-drift,
+  .star-twinkle,
+  .star-shoot {
+    animation: none;
+  }
+
+  .star-shoot {
+    display: none;
+  }
+}
+
 /* Orbita: każdy okrąg to książka; trzy warstwy okręgów obracają się w różnym tempie. Przy zmianie osoby
    okręgi przechodzą w okręgi nowej osoby (promień, łuk, obrót, kolor liczy js/aura.js w każdej klatce). */
 .aura-orbit {

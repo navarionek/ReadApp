@@ -428,9 +428,87 @@ export function createAura() {
   slot._orbit = new Orbit(slot);
   return el('div', { class: 'shelf-aura', 'aria-hidden': 'true' }, [
     el('div', { class: 'aura-paints' }),
+    starField(),
     slot,
     el('span', { class: 'aura-grain' }),
   ]);
+}
+
+/* ----- Gwiazdy w tle karty ----- */
+// Niebo rysowane raz na canvasie (na nowo tylko przy zmianie rozmiaru karty): mnóstwo drobnych gwiazd
+// w odcieniach bieli, błękitu i ciepłej bieli, jaśniejsze z poświatą, do tego delikatne pasmo jak Droga
+// Mleczna. Nad nim kilka migoczących gwiazd z czteroramiennym błyskiem i co jakiś czas spadająca gwiazda.
+// Ruch to tylko przezroczystość i przesunięcia (style.css), niebo powoli dryfuje.
+const STAR_TINTS = [[255, 255, 255], [255, 255, 255], [255, 255, 255], [200, 220, 255], [210, 228, 255], [255, 232, 205]];
+
+function drawSky(canvas) {
+  const W = canvas.clientWidth;
+  const H = canvas.clientHeight;
+  if (!W || !H) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const rand = seeded('czytanko-niebo');
+  const star = (x, y, r, alpha) => {
+    const [cr, cg, cb] = STAR_TINTS[Math.floor(rand() * STAR_TINTS.length)];
+    if (r > 0.9) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 4.5);
+      glow.addColorStop(0, `rgb(${cr} ${cg} ${cb} / ${alpha * 0.35})`);
+      glow.addColorStop(1, `rgb(${cr} ${cg} ${cb} / 0)`);
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - r * 4.5, y - r * 4.5, r * 9, r * 9);
+    }
+    ctx.fillStyle = `rgb(${cr} ${cg} ${cb} / ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  // Pasmo jak Droga Mleczna: ukośna, ledwo widoczna poświata i zagęszczenie drobnych gwiazd wzdłuż niej
+  const band = (x, y) => Math.abs((x / W) * 0.55 + (1 - y / H) * 0.45 - 0.62);
+  const haze = ctx.createLinearGradient(0, H, W, 0);
+  haze.addColorStop(0.3, 'rgb(255 255 255 / 0)');
+  haze.addColorStop(0.62, 'rgb(220 225 255 / 0.05)');
+  haze.addColorStop(0.9, 'rgb(255 255 255 / 0)');
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 0, W, H);
+  const count = Math.round((W * H) / 650);
+  for (let i = 0; i < count; i++) {
+    const x = rand() * W;
+    const y = rand() * H;
+    const near = Math.max(0, 1 - band(x, y) * 6);  // 1 na środku pasma, 0 z dala
+    if (rand() > 0.35 + 0.65 * near && rand() < 0.5) continue;  // poza pasmem rzadziej
+    const r = 0.35 + rand() ** 3 * 1.6;
+    star(x, y, r, 0.45 + rand() * 0.55);
+  }
+}
+
+function starField() {
+  const rand = seeded('czytanko-iskry');
+  const canvas = el('canvas', { class: 'stars-sky' });
+  // Migoczące gwiazdy: więcej po prawej (tam orbita), każda w swoim rytmie
+  const twinkles = Array.from({ length: 8 }, () => {
+    const s = el('span', { class: 'star-twinkle' });
+    s.style.left = `${(25 + rand() * 72).toFixed(1)}%`;
+    s.style.top = `${(6 + rand() * 80).toFixed(1)}%`;
+    s.style.setProperty('--size', `${Math.round(7 + rand() * 9)}px`);
+    s.style.setProperty('--dur', `${(2.6 + rand() * 3.4).toFixed(2)}s`);
+    s.style.setProperty('--delay', `${(-rand() * 6).toFixed(2)}s`);
+    return s;
+  });
+  const shooting = [0, 1].map(i => el('span', { class: `star-shoot s${i}` }));
+  const field = el('div', { class: 'aura-stars' }, [el('div', { class: 'stars-drift' }, [canvas]), ...twinkles, ...shooting]);
+  // Niebo rysujemy, gdy karta ma wymiary, i od nowa przy zmianie rozmiaru (obrót telefonu)
+  let size = '';
+  new ResizeObserver(() => {
+    const next = `${canvas.clientWidth}x${canvas.clientHeight}`;
+    if (next === size) return;
+    size = next;
+    drawSky(canvas);
+  }).observe(canvas);
+  return field;
 }
 
 // Przejścia warstwy koloru (opis w style.css); losowane, nigdy dwa razy to samo pod rząd
