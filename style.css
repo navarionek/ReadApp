@@ -7166,16 +7166,12 @@ body.be-lock {
   color: #000;
 }
 
-/* Logo „Czytanko”: napis odręczny jako SVG (kolor z motywu, zamach pod napisem w bursztynie) */
+/* Logo „Czytanko”: napis odręczny jako SVG (kolor z motywu albo własny) */
 .app-title .app-logo {
   display: block;
   height: 3.25rem;
   width: auto;
   overflow: visible;
-}
-
-.app-logo-swoosh {
-  stroke: #f5a524;
 }
 
 @media (max-width: 640px) {
@@ -7188,14 +7184,10 @@ body.be-lock {
   height: 3.5rem;
 }
 
-:root.eink .app-logo-swoosh {
-  stroke: currentColor;
-}
 
 /* ----------------- Własny kolor w apce -----------------
    --me ustawia js/admin.js z koloru wybranego w ustawieniach (bez wyboru zmiennej nie ma i nic się nie zmienia).
-   Kolor trafia w kilka miejsc, delikatnie: obwódka i awatar własnego wiersza w rankingu, aktywna zakładka,
-   ikony statystyk, górna kreska kart, zamach pod logo, zaznaczenie tekstu i pola formularzy. */
+   Celowo oszczędnie: napis „Czytanko”, własny wiersz w Rankingu i własna Półka. Karty i ekran startowy zostają neutralne. */
 :root:not(.eink) {
   accent-color: var(--me, auto);
 }
@@ -7204,23 +7196,8 @@ body.be-lock {
   background: color-mix(in srgb, var(--me, var(--primary)) 30%, transparent);
 }
 
-:root:not(.eink) .app-logo-swoosh {
-  stroke: var(--me, #f5a524);
-}
-
-:root:not(.eink) .nav-item.active,
-:root:not(.eink) .nav-item.active:hover {
-  color: color-mix(in srgb, var(--me, var(--primary)) 75%, var(--text-main));
-  background: color-mix(in srgb, var(--me, var(--primary)) 14%, var(--bg-card));
-}
-
-:root:not(.eink) .stat-icon {
-  color: color-mix(in srgb, var(--me, var(--primary)) 75%, var(--text-main));
-  background: color-mix(in srgb, var(--me, var(--primary)) 14%, var(--bg-card));
-}
-
-:root:not(.eink) .card {
-  box-shadow: inset 0 3px 0 color-mix(in srgb, var(--me, transparent) 45%, transparent), var(--shadow);
+:root:not(.eink) .app-title {
+  color: color-mix(in srgb, var(--me, var(--primary)) 85%, var(--text-main));
 }
 
 :root:not(.eink) .rank-row.me {
@@ -7232,15 +7209,15 @@ body.be-lock {
   box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--me, transparent);
 }
 
-:root:not(.eink) .rank-row.me .rank-pos {
-  color: color-mix(in srgb, var(--me, var(--text-muted)) 75%, var(--text-main));
+/* Własna półka: obwódka nagłówka, kółko wokół awatara i liczby w kafelkach */
+:root:not(.eink) .shelf-hero.own {
+  border-color: color-mix(in srgb, var(--me, var(--border)) 55%, var(--border));
 }
 
-:root:not(.eink) .badge-item.earned {
-  border-color: var(--me, var(--primary));
-  background: color-mix(in srgb, var(--me, var(--primary)) 10%, var(--bg-card));
+:root:not(.eink) .shelf-hero.own .shelf-hero-avatar {
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 6px var(--me, transparent);
 }
 
-:root:not(.eink) .badge-item.earned .badge-icon {
-  background: var(--me, var(--primary));
+:root:not(.eink) .shelf-hero.own .shelf-stat strong {
+  color: color-mix(in srgb, var(--me, var(--text-main)) 80%, var(--text-main));
 }
