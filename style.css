@@ -906,7 +906,8 @@ a.btn {
     border-radius: 1.5rem;
     border: 1px solid color-mix(in srgb, var(--text-main) 10%, transparent);
     background: color-mix(in srgb, var(--bg-card) 78%, transparent);
-    box-shadow: 0 16px 36px -10px rgb(0 0 0 / 0.45), inset 0 1px 0 rgb(255 255 255 / 0.06);
+    /* Krótki cień, prawie bez przesunięcia w dół: dłuższy wchodził na pas systemu pod paskiem i się ucinał */
+    box-shadow: 0 2px 10px -2px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.06);
     -webkit-backdrop-filter: blur(18px) saturate(1.6);
     backdrop-filter: blur(18px) saturate(1.6);
   }
