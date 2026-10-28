@@ -2312,6 +2312,91 @@ select.plain-input {
 }
 
 /* Wystrzał okręgu (przytrzymanie karty, js/aura.js): słońce za każdym razem błyska */
+/* Eksplozja przy wystrzale okręgów (js/aura.js, explode): błysk ze słońca, dwie fale uderzeniowe, iskry we
+   wszystkie strony i wstrząs karty. Same przezroczystości i transformacje, elementy znikają po chwili. */
+.orb-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.orb-flash {
+  position: absolute;
+  inset: -25%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, #fff, hsl(calc(var(--h) + 20) 100% 85% / 0.75) 28%, hsl(var(--h) var(--s) 60% / 0.25) 55%, transparent 72%);
+  opacity: 0;
+  animation: orb-flash 0.7s ease-out forwards;
+}
+
+@keyframes orb-flash {
+  0% { opacity: 0; transform: scale(0.3); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+.orb-shock {
+  position: absolute;
+  left: 30%;
+  top: 30%;
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  border: 2px solid hsl(calc(var(--h) + 20) 100% 86% / 0.95);
+  box-shadow: 0 0 14px hsl(calc(var(--h) + 20) 100% 70% / 0.8), inset 0 0 10px hsl(calc(var(--h) + 20) 100% 80% / 0.6);
+  opacity: 0;
+  animation: orb-shock 0.75s cubic-bezier(0.1, 0.75, 0.3, 1) forwards;
+}
+
+.orb-shock.s2 {
+  border-color: rgb(255 255 255 / 0.85);
+  animation-duration: 0.95s;
+  animation-delay: 0.1s;
+}
+
+@keyframes orb-shock {
+  0% { opacity: 1; transform: scale(0.1); }
+  100% { opacity: 0; transform: scale(2.8); }
+}
+
+.orb-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--len, 18px);
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff);
+  transform-origin: 0 50%;
+  opacity: 0;
+  animation: orb-spark var(--dur, 0.7s) cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+
+.orb-spark.hot {
+  background: linear-gradient(90deg, transparent, hsl(calc(var(--h) - 28) 100% 78%));
+}
+
+@keyframes orb-spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(4px) scaleX(0.3); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--dist)) scaleX(1); }
+}
+
+/* Wstrząs karty */
+.shelf-hero.boom {
+  animation: card-boom 0.5s cubic-bezier(0.3, 0.6, 0.4, 1);
+}
+
+@keyframes card-boom {
+  0% { transform: translate(0, 0); }
+  12% { transform: translate(-5px, 3px); }
+  26% { transform: translate(5px, -3px); }
+  40% { transform: translate(-3px, -2px); }
+  56% { transform: translate(3px, 2px); }
+  72% { transform: translate(-1px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+
 .orb-core-svg.pop > circle {
   transform-box: fill-box;
   transform-origin: center;

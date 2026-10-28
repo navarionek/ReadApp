@@ -135,8 +135,10 @@ const SPIN_JUMP_MS = 180; // jak szybko przychodzi zryw (stała czasu, ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
 const GLOW_FROM = 37;  // od tej prędkości (razy zwykła) wokół okręgów narasta poświata przed wybuchem
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
-const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
-const FLY_MS = 520;     // lot jednego okręgu
+const FLY_GAP = 32;     // odstęp między kolejnymi wystrzałami okręgów (ms)
+const FLY_MS = 380;     // lot jednego okręgu
+const FLY_DIST = 300;   // jak daleko odlatuje okrąg (jednostki rysunku orbity)
+const SPARKS = 30;      // iskry przy eksplozji
 // Prędkość po t ms trzymania: szybki zryw na starcie, potem coraz ostrzejsze przyspieszanie do SPIN_MAX
 const holdRate = t => (t = Math.max(0, t), 1 + SPIN_JUMP * (1 - Math.exp(-t / SPIN_JUMP_MS)) + (SPIN_MAX - 1 - SPIN_JUMP) * Math.min(1, t / SPIN_RAMP) ** SPIN_CURVE);
 // Odwrotnie: po ilu ms trzymania jest dana prędkość (żeby ponowne przytrzymanie dokładało od bieżącej)
@@ -285,6 +287,7 @@ class Orbit {
   fire() {
     this.launch = 'flying';
     this.burstAt = performance.now();
+    this.explode();
     const order = this.rings.filter(ring => ring.now.op > 0.05).reverse();
     const t0 = performance.now();
     order.forEach((ring, k) => { ring.fly = { at: t0 + k * FLY_GAP, r: ring.now.r, op: ring.now.op, width: ring.now.width }; });
@@ -304,12 +307,14 @@ class Orbit {
           core.classList.remove('pop');
           void core.getBoundingClientRect();  // błysk od nowa przy każdym wystrzale
           core.classList.add('pop');
-          if (fired % 2 === 1) navigator.vibrate?.(6);
+          // Pyknięcia dopiero po wibracji wybuchu (nowa wibracja przerywa poprzednią), co trzeci okrąg
+          if (fired % 3 === 0 && now - t0 > 160) navigator.vibrate?.(5);
         }
         const q = Math.min(1, p);
-        ring.now.r = ring.fly.r + 190 * q * q;
-        ring.now.op = ring.fly.op * (1 - q) ** 1.5;
-        ring.now.width = ring.fly.width * (1 + 1.5 * q);
+        // Gwałtownie na starcie, z wytracaniem prędkości (jak odrzucone wybuchem), gasną pod koniec lotu
+        ring.now.r = ring.fly.r + FLY_DIST * (1 - (1 - q) ** 3);
+        ring.now.op = ring.fly.op * (1 - q) ** 1.2;
+        ring.now.width = ring.fly.width * (1 + 2 * q);
         this.paint(ring);
         if (q < 1) flying = true;
       });
@@ -321,6 +326,36 @@ class Orbit {
       if (!this.holding) this.regrow();
     };
     requestAnimationFrame(step);
+  }
+
+  // Eksplozja: błysk ze słońca, dwie fale uderzeniowe, iskry we wszystkie strony i wstrząs karty.
+  // Wszystko to elementy z animacjami CSS (przezroczystość i transformacje), usuwane po chwili.
+  explode() {
+    const slot = this.root.parentElement;
+    const sparks = Array.from({ length: SPARKS }, () => {
+      const spark = el('span', { class: `orb-spark${Math.random() < 0.45 ? ' hot' : ''}` });
+      spark.style.setProperty('--a', `${Math.round(Math.random() * 360)}deg`);
+      spark.style.setProperty('--dist', `${Math.round(90 + Math.random() * 120)}px`);
+      spark.style.setProperty('--len', `${Math.round(10 + Math.random() * 22)}px`);
+      spark.style.setProperty('--dur', `${(0.45 + Math.random() * 0.45).toFixed(2)}s`);
+      return spark;
+    });
+    const fx = el('div', { class: 'orb-fx' }, [
+      el('span', { class: 'orb-flash' }),
+      el('span', { class: 'orb-shock' }),
+      el('span', { class: 'orb-shock s2' }),
+      ...sparks,
+    ]);
+    slot.appendChild(fx);
+    setTimeout(() => fx.remove(), 1300);
+    const hero = this.root.closest('.shelf-hero');
+    if (hero) {
+      hero.classList.remove('boom');
+      void hero.offsetWidth;  // wstrząs od nowa przy kolejnej eksplozji
+      hero.classList.add('boom');
+      setTimeout(() => hero.classList.remove('boom'), 600);
+    }
+    navigator.vibrate?.([35, 40, 70]);
   }
 
   // Po wystrzale okręgi wyrastają z powrotem ze środka (zwykłe przejście do docelowego kształtu)
