@@ -125,14 +125,15 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
-const COMET_BODY = 0.5;  // jaka część łuku to jaśniejszy środek komety
-const COMET_HEAD = 0.2;  // jaka część łuku to jasna głowa
-const SPIN_MAX = 900;   // prędkość okręgów w chwili wystrzału (razy zwykła)
+const COMET_PARTS = 8;    // z ilu nakładających się kawałków jest kometa (więcej = płynniejszy ogon)
+const COMET_HEAD = 0.14;  // jaka część łuku to sama głowa (najkrótszy kawałek)
+const COMET_ALPHA = 0.17; // jasność jednego kawałka; przy głowie nakłada się wszystkie, więc jest najjaśniej
+const SPIN_MAX = 300;   // prędkość okręgów w chwili wystrzału (razy zwykła)
 const SPIN_RAMP = 8000; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
-const SPIN_JUMP = 25;   // zryw na starcie: tyle razy szybciej już po ułamku sekundy
+const SPIN_JUMP = 8;   // zryw na starcie: tyle razy szybciej już po ułamku sekundy
 const SPIN_JUMP_MS = 180; // jak szybko przychodzi zryw (stała czasu, ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
-const GLOW_FROM = 110;  // od tej prędkości (razy zwykła) wokół okręgów narasta poświata przed wybuchem
+const GLOW_FROM = 37;  // od tej prędkości (razy zwykła) wokół okręgów narasta poświata przed wybuchem
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
 const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 520;     // lot jednego okręgu
@@ -186,17 +187,21 @@ class Orbit {
   addRing(i, target) {
     const g = node('g');
     const track = node('circle', { cx: C, cy: C, class: 'orb-track' });
-    // Łuk jak kometa: długi, słaby ogon (arc), jaśniejszy środek (body) i krótka, jasna głowa (head) przy „planecie”
-    const arc = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
-    const body = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
-    const head = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
+    // Łuk jak kometa: COMET_PARTS nakładających się kawałków, każdy krótszy (bliżej „planety”), odrobinę
+    // grubszy i dokładający trochę jasności, więc ogon płynnie gaśnie bez widocznych schodków. Wewnętrzne
+    // kawałki mają proste końce (zaokrąglone robiły jaśniejsze kropki na granicach), zaokrąglona jest tylko głowa.
+    const parts = Array.from({ length: COMET_PARTS }, (_, k) => {
+      const part = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
+      if (k < COMET_PARTS - 1) part.style.strokeLinecap = 'butt';
+      return part;
+    });
     const halo = node('circle', { r: 5.5, class: 'orb-halo mid' });
     const dot = node('circle', { class: 'orb-dot mid' });
-    g.append(track, arc, body, head, halo, dot);
+    g.append(track, ...parts, halo, dot);
     this.layers[i % LAYERS].appendChild(g);
     // Nowy okrąg wyrasta: zaczyna mniejszy, bez łuku i niewidoczny
     const now = { r: target.r * 0.7, len: 0, width: target.width, tilt: target.tilt - 60, op: 0, arc: 0 };
-    const ring = { g, track, arc, body, head, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
+    const ring = { g, track, parts, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
     this.rings.push(ring);
     return ring;
   }
@@ -404,7 +409,7 @@ class Orbit {
     const kind = late ? to.kind : ring.kind ?? to.kind;
     if (kind && kind !== ring.kind) {
       ring.kind = kind;
-      for (const part of [ring.arc, ring.body, ring.head, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
+      for (const part of [...ring.parts, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
     }
     const empty = late ? !!to.empty : ring.empty ?? !!to.empty;
     if (empty !== ring.empty) {
@@ -423,24 +428,21 @@ class Orbit {
     ring.track.setAttribute('r', r);
     // Kometa: każdy kawałek to ten sam okrąg, przycięty kreskowaniem do końcówki łuku (przesunięcie
     // zamiast kreski zerowej długości, która z zaokrąglonym końcem rysowała kropkę na starcie)
-    const segment = (part, share, width) => {
-      const seg = now.len * share;
+    const partOp = (now.arc * COMET_ALPHA).toFixed(3);
+    ring.parts.forEach((part, k) => {
+      const t = k / (COMET_PARTS - 1);                  // 0 = cały ogon, 1 = sama głowa
+      const seg = now.len * (1 - t * (1 - COMET_HEAD));
       part.setAttribute('r', r);
       part.setAttribute('stroke-dasharray', `${seg.toFixed(2)} 360`);
       part.setAttribute('stroke-dashoffset', (-(now.len - seg)).toFixed(2));
-      part.setAttribute('stroke-width', (now.width * width).toFixed(2));
-    };
-    segment(ring.arc, 1, 0.45);
-    segment(ring.body, COMET_BODY, 0.75);
-    segment(ring.head, COMET_HEAD, 1);
+      part.setAttribute('stroke-width', (now.width * (0.35 + 0.65 * t)).toFixed(2));
+      part.setAttribute('opacity', partOp);
+    });
     // „Planeta” na końcu łuku (łuk zaczyna się na godzinie 3 i idzie zgodnie z zegarem)
     const a = (now.len * Math.PI) / 180;
     const px = (C + now.r * Math.cos(a)).toFixed(2);
     const py = (C + now.r * Math.sin(a)).toFixed(2);
     const arcOp = now.arc.toFixed(3);
-    ring.arc.setAttribute('opacity', (now.arc * 0.22).toFixed(3));
-    ring.body.setAttribute('opacity', (now.arc * 0.5).toFixed(3));
-    ring.head.setAttribute('opacity', arcOp);
     for (const part of [ring.halo, ring.dot]) {
       part.setAttribute('cx', px);
       part.setAttribute('cy', py);
@@ -492,7 +494,8 @@ function drawSky(canvas) {
   const W = canvas.clientWidth;
   const H = canvas.clientHeight;
   if (!W || !H) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  // Niebo jest większe od karty (krąży wokół słońca), więc na dużych ekranach mniej pikseli na punkt
+  const dpr = Math.min(2, window.devicePixelRatio || 1, 1600 / Math.max(W, H));
   canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   const ctx = canvas.getContext('2d');
@@ -547,17 +550,28 @@ function starField() {
     return s;
   });
   const shooting = [0, 1].map(i => el('span', { class: `star-shoot s${i}` }));
-  const field = el('div', { class: 'aura-stars' }, [el('div', { class: 'stars-drift' }, [canvas]), ...twinkles, ...shooting]);
-  // Niebo rysujemy, gdy karta ma wymiary, i od nowa przy zmianie rozmiaru (obrót telefonu)
+  const drift = el('div', { class: 'stars-drift' }, [canvas]);
+  const field = el('div', { class: 'aura-stars' }, [drift, ...twinkles, ...shooting]);
+  // Niebo krąży wokół słońca orbity (prawa strona karty): to kwadratowa warstwa ze środkiem w słońcu,
+  // na tyle duża, żeby przy każdym kącie obrotu zakrywała całą kartę. Rysujemy je, gdy karta ma wymiary,
+  // i od nowa przy zmianie rozmiaru (obrót telefonu).
   let size = '';
   new ResizeObserver(() => {
-    const next = `${canvas.clientWidth}x${canvas.clientHeight}`;
-    if (next === size) return;
+    const W = field.clientWidth;
+    const H = field.clientHeight;
+    const next = `${W}x${H}`;
+    if (!W || !H || next === size) return;
     size = next;
+    const sunX = W * SKY_PIVOT[0];
+    const sunY = H * SKY_PIVOT[1];
+    const reach = Math.ceil(Math.max(Math.hypot(sunX, sunY), Math.hypot(W - sunX, sunY), Math.hypot(sunX, H - sunY), Math.hypot(W - sunX, H - sunY)) + 8);
+    Object.assign(drift.style, { left: `${sunX - reach}px`, top: `${sunY - reach}px`, width: `${reach * 2}px`, height: `${reach * 2}px` });
     drawSky(canvas);
-  }).observe(canvas);
+  }).observe(field);
   return field;
 }
+
+const SKY_PIVOT = [0.84, 0.43];  // gdzie na karcie jest słońce orbity (środek krążenia nieba), części szer. i wys.
 
 // Przejścia warstwy koloru (opis w style.css); losowane, nigdy dwa razy to samo pod rząd
 const EFFECTS = ['bloom', 'sweep', 'swirl'];

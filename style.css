@@ -2068,22 +2068,21 @@ select.plain-input {
   pointer-events: none;
 }
 
+/* Niebo krąży wokół słońca orbity (położenie i rozmiar ustawia js/aura.js): pełny obrót co 2 minuty */
 .stars-drift {
   position: absolute;
-  inset: -4%;
-  animation: stars-drift 140s ease-in-out infinite alternate;
+  animation: stars-orbit 120s linear infinite;
   will-change: transform;
+}
+
+@keyframes stars-orbit {
+  to { transform: rotate(360deg); }
 }
 
 .stars-sky {
   display: block;
   width: 100%;
   height: 100%;
-}
-
-@keyframes stars-drift {
-  from { transform: translate(-2%, 1%); }
-  to { transform: translate(2%, -1%); }
 }
 
 .star-twinkle {
@@ -2093,7 +2092,8 @@ select.plain-input {
   margin: calc(var(--size, 10px) / -2) 0 0 calc(var(--size, 10px) / -2);
   opacity: 0.15;
   background: radial-gradient(closest-side, #fff 0 14%, rgb(220 230 255 / 0.4) 30%, transparent 72%);
-  animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite;
+  /* Migotanie (transform) i powolne przepływanie (osobna właściwość translate, żeby się nie gryzły) */
+  animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite, star-float 14s ease-in-out var(--delay, 0s) infinite alternate;
   will-change: transform, opacity;
 }
 
@@ -2112,6 +2112,11 @@ select.plain-input {
 
 .star-twinkle::after {
   transform: rotate(90deg);
+}
+
+@keyframes star-float {
+  from { translate: -10px 4px; }
+  to { translate: 10px -4px; }
 }
 
 @keyframes star-twinkle {
@@ -2198,17 +2203,17 @@ select.plain-input {
    więc orbita lekko się mieni. Przytrzymanie karty przyspiesza tylko obrót (js/aura.js). */
 .orb-layer {
   will-change: transform, opacity;
-  animation: orb-spin 150s linear infinite, orb-breathe 9s ease-in-out infinite alternate;
+  animation: orb-spin 50s linear infinite, orb-breathe 9s ease-in-out infinite alternate;
 }
 
 .orb-layer.l1 {
-  animation-duration: 200s, 11s;
+  animation-duration: 65s, 11s;
   animation-direction: reverse, alternate;
   animation-delay: 0s, -4s;
 }
 
 .orb-layer.l2 {
-  animation-duration: 260s, 13s;
+  animation-duration: 85s, 13s;
   animation-delay: 0s, -7s;
 }
 
