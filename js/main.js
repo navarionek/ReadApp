@@ -4,7 +4,7 @@ import { openColorPicker } from './colorpicker.js';
 import { playStartIntro, renderStartWall, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
 import { syncCoverDither } from './dither.js';
-import { syncEinkToggle, toggleEink } from './eink.js';
+import { syncEinkToggle, toggleEink, toggleGazeta } from './eink.js';
 import { flickerLogoSoon } from './logo.js';
 import { initNavIndicator } from './navbar.js';
 import { initPageKeys } from './pagekeys.js';
@@ -82,10 +82,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('notify-toggle').addEventListener('click', handleNotifyToggle);  // menu zostaje otwarte, widać przełącznik
   document.getElementById('cover-bg-toggle').addEventListener('click', toggleStartWall);  // jw.
   syncStartWallToggle();
-  document.getElementById('eink-toggle').addEventListener('click', () => toggleEink(() => {  // jw.
+  const afterEinkChange = () => {
     renderStartWall();
     syncCoverDither();
-  }));
+  };
+  document.getElementById('eink-toggle').addEventListener('click', () => toggleEink(afterEinkChange));  // jw.
+  document.getElementById('gazeta-toggle').addEventListener('click', () => toggleGazeta(afterEinkChange));  // jw.
   syncEinkToggle();
   syncCoverDither();
   initPageKeys();

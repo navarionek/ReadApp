@@ -233,8 +233,8 @@ class Orbit {
 
   // Naładowanie przed wybuchem: od GLOW_FROM razy zwykłej prędkości wokół okręgów narasta poświata, a orbita
   // drży coraz mocniej. Przy wystrzale poświata rozbłyskuje i gaśnie. Sama przezroczystość i przesunięcia.
-  // Wciśnięcie karty: karta lekko się wciska, a kolorowy cień pod nią (osobny element, żeby nie malować
-  // cienia karty w każdej klatce) ustawiamy pod kartą w jej kolorze
+  // Wciśnięcie karty: cień karty się kurczy (klasa pressed, style.css), a poświatę pod kartą (osobny element,
+  // żeby nie malować cienia karty w każdej klatce) ustawiamy pod nią w jej kolorze
   press(on) {
     const hero = this.root.closest('.shelf-hero');
     hero?.classList.toggle('pressed', on);
@@ -250,7 +250,9 @@ class Orbit {
     // Postęp ładowania 0..1 z prędkości: od razu widać zryw, rośnie z trzymaniem, opada razem z hamowaniem
     const p = Math.min(1, Math.max(0, (this.spinRate - 1) / (SPIN_MAX - 1))) ** (1 / SPIN_CURVE);
     if (this.shadow) {
-      this.shadow.style.opacity = p > 0.005 ? (0.35 + 0.65 * p).toFixed(3) : '0';
+      // Poświata dopiero przy mocniejszym rozkręceniu: najpierw widać sam dociśnięty cień karty (style.css)
+      const q = Math.max(0, (p - 0.3) / 0.7);
+      this.shadow.style.opacity = q.toFixed(3);
       this.shadow.style.transform = `translateY(${(8 + 22 * p).toFixed(1)}px) scale(${(0.92 + 0.14 * p).toFixed(3)}, ${(0.9 + 0.5 * p).toFixed(3)})`;
     }
     let g;

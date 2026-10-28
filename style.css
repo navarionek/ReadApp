@@ -1809,8 +1809,9 @@ select.plain-input {
   isolation: isolate;
 }
 
-/* Przytrzymanie karty (js/aura.js): karta lekko się wciska, a kolorowy cień pod nią rozjarza się i rośnie
-   razem z rozkręcaniem okręgów. Cień to osobny, rozmyty element (tylko przezroczystość i skala). */
+/* Przytrzymanie karty (js/aura.js): kolorowy cień pod kartą od razu się kurczy i przylega (karta jakby
+   dociśnięta do strony), a gdy okręgi rozkręcają się coraz mocniej, pod kartą rozjarza się dodatkowa
+   poświata (osobny, rozmyty element: tylko przezroczystość i skala). */
 .screen[data-screen="polka"] {
   position: relative;
 }
@@ -1839,12 +1840,16 @@ select.plain-input {
 
 .shelf-hero {
   z-index: 1;
-  transition: transform 0.35s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 
-.shelf-hero.pressed {
-  transform: scale(0.985);
-  transition-duration: 0.15s;
+:root:not(.eink) .shelf-hero {
+  transition: box-shadow 0.4s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+:root:not(.eink) .shelf-hero.pressed {
+  box-shadow: 0 6px 14px -8px hsl(var(--h) var(--s) 45% / 0.9), inset 0 1px 0 rgb(255 255 255 / 0.14);
+  transition-duration: 0.14s;
+  transition-timing-function: ease-out;
 }
 
 .shelf-hero {
@@ -8044,4 +8049,200 @@ body.be-lock {
 :root.eink .nav-item.active svg,
 :root.eink .nav-item.active span {
   filter: none;
+}
+
+/* ----------------- Styl gazety (odmiana trybu czytnika, js/eink.js) -----------------
+   Czytanko jak dziennik: gotycka winieta z paskiem daty, nagłówki działów kapitalikami między liniami,
+   inicjały na początku tekstów, podwójne linie i ozdobniki (trzy kropki) między działami, liczby jak w notowaniach,
+   menu jak spis działów. Czarno na białym, bez animacji (jak cały tryb czytnika). */
+:root.eink.gazeta body {
+  font-family: var(--eink-serif);
+}
+
+/* Winieta */
+:root.eink.gazeta header {
+  margin-bottom: 1.5rem;
+  row-gap: 0.4rem;
+}
+
+:root.eink.gazeta .app-title .app-logo {
+  display: none;
+}
+
+:root.eink.gazeta .app-title::after {
+  content: "Czytanko";
+  display: block;
+  font-family: "UnifrakturMaguntia", "Old English Text MT", var(--eink-serif);
+  font-size: 3.4rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: #000;
+}
+
+.gazeta-dateline {
+  display: none;
+}
+
+:root.eink.gazeta .gazeta-dateline {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0.1rem;
+  border-top: 1px solid #000;
+  border-bottom: 4px double #000;
+  font-family: var(--eink-serif);
+  font-size: 0.78rem;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #000;
+}
+
+:root.eink.gazeta .gazeta-dateline span:nth-child(2) {
+  font-style: normal;
+  font-weight: 700;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  :root.eink.gazeta .gazeta-dateline span:first-child,
+  :root.eink.gazeta .gazeta-dateline span:last-child {
+    display: none;
+  }
+
+  :root.eink.gazeta .gazeta-dateline {
+    justify-content: center;
+  }
+}
+
+/* Działy: bez ramek, oddzielone liniami i ozdobnikiem */
+:root.eink.gazeta :is(.card, .goal-card, .shelf-hero) {
+  position: relative;
+  border: 0;
+  border-top: 1px solid #000;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+:root.eink.gazeta .screen > :is(.card, .goal-card) + :is(.card, .goal-card) {
+  margin-top: 2.6rem;
+}
+
+/* Ozdobnik między działami: trzy kropki (gradient w CSS, nie zależy od czcionki czytnika ani od cieni,
+   które tryb czytnika wyłącza) */
+:root.eink.gazeta .screen > :is(.card, .goal-card) + :is(.card, .goal-card)::before {
+  content: "";
+  position: absolute;
+  top: -1.6rem;
+  left: 50%;
+  width: 42px;
+  height: 7px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, #000 3px, transparent 3.5px) 0 0 / 17.5px 7px repeat-x;
+}
+
+/* Nagłówek działu: kapitaliki, wyśrodkowane, pod spodem podwójna linia */
+:root.eink.gazeta .card-header {
+  justify-content: center;
+  border-bottom: 4px double #000;
+  text-align: center;
+}
+
+:root.eink.gazeta :is(.card h2, .goal-card h2, .shelf-heading) {
+  font-variant: small-caps;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+}
+
+:root.eink.gazeta .shelf-heading {
+  border-bottom: 4px double #000;
+}
+
+/* Inicjał na początku tekstów */
+:root.eink.gazeta :is(.card-intro, .goal-sub, .shelf-hero-sub)::first-letter {
+  float: left;
+  margin: 0.06em 0.12em 0 0;
+  font-family: var(--eink-serif);
+  font-size: 3.1em;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 0.82;
+}
+
+/* Liczby jak w notowaniach: cyfry tabelaryczne, cienka linia pod spodem */
+:root.eink.gazeta :is(.stat-value, .goal-number, .shelf-stat strong, .rank-total) {
+  font-family: var(--eink-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Kafelki z liczbami jak ramka z notowaniami: proste linie, u dołu podwójna */
+:root.eink.gazeta .stats-grid {
+  border: 0;
+  border-top: 1px solid #000;
+  border-bottom: 4px double #000;
+  border-radius: 0;
+}
+
+:root.eink.gazeta .stat-label {
+  font-variant: small-caps;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: lowercase;
+}
+
+:root.eink.gazeta .goal-number {
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  padding: 0.2rem 0;
+}
+
+/* Półka: winieta osoby jak nagłówek kolumny */
+:root.eink.gazeta .shelf-hero-kicker {
+  font-family: var(--eink-serif);
+  font-style: italic;
+  letter-spacing: 0.06em;
+}
+
+:root.eink.gazeta .shelf-hero-title {
+  font-family: "UnifrakturMaguntia", var(--eink-serif);
+  font-weight: 400;
+}
+
+/* Ranking: wiersze jak tabela ligowa w gazecie */
+:root.eink.gazeta .rank-row {
+  border: 0;
+  border-bottom: 1px dotted #000;
+  border-radius: 0;
+}
+
+/* Menu jak spis działów: kapitaliki oddzielone pionowymi liniami, wybrany dział podkreślony podwójnie */
+:root.eink.gazeta .app-nav {
+  border-top: 4px double #000;
+}
+
+:root.eink.gazeta .nav-item {
+  font-family: var(--eink-serif);
+  font-size: 0.82rem;
+  font-variant: small-caps;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+
+:root.eink.gazeta .nav-item + .nav-item {
+  border-left: 1px solid #000;
+}
+
+:root.eink.gazeta .nav-item.active,
+:root.eink.gazeta .nav-item.active:hover {
+  background: #fff;
+  color: #000;
+}
+
+:root.eink.gazeta .nav-item.active span {
+  text-decoration: underline double;
+  text-underline-offset: 0.25em;
 }
