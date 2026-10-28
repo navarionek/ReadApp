@@ -386,7 +386,7 @@ export function renderShelf() {
           el('span', { class: 'shelf-now-text' }, [
             el('strong', { text: item.title }),
             ...(book.author ? [el('span', { class: 'shelf-now-author', text: book.author })] : []),
-            el('span', { class: 'shelf-now-days' }, [icon('bookmark'), el('span', { text: days ? `${days}. dzień` : 'od dziś' })]),
+            el('span', { class: 'shelf-now-days' }, [icon('bookmark'), el('span', { text: days > 1 ? `od ${days} dni` : days ? 'od wczoraj' : 'od dziś' })]),
           ]),
         ]);
         card.addEventListener('click', () => openReadingModal(item, card.querySelector('.book-cover')));

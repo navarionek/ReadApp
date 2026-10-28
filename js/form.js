@@ -69,8 +69,13 @@ export function todayInputValue() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// Dni kalendarzowe (zaczęta wczoraj = 1, nawet jeśli nie minęły pełne 24 godziny)
 export function daysSince(iso) {
-  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS));
+  const start = new Date(iso);
+  const today = new Date();
+  const a = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+  const b = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.max(0, Math.round((b - a) / DAY_MS));
 }
 
 export function myReadingNow() {
