@@ -7191,3 +7191,56 @@ body.be-lock {
 :root.eink .app-logo-swoosh {
   stroke: currentColor;
 }
+
+/* ----------------- Własny kolor w apce -----------------
+   --me ustawia js/admin.js z koloru wybranego w ustawieniach (bez wyboru zmiennej nie ma i nic się nie zmienia).
+   Kolor trafia w kilka miejsc, delikatnie: obwódka i awatar własnego wiersza w rankingu, aktywna zakładka,
+   ikony statystyk, górna kreska kart, zamach pod logo, zaznaczenie tekstu i pola formularzy. */
+:root:not(.eink) {
+  accent-color: var(--me, auto);
+}
+
+:root:not(.eink) ::selection {
+  background: color-mix(in srgb, var(--me, var(--primary)) 30%, transparent);
+}
+
+:root:not(.eink) .app-logo-swoosh {
+  stroke: var(--me, #f5a524);
+}
+
+:root:not(.eink) .nav-item.active,
+:root:not(.eink) .nav-item.active:hover {
+  color: color-mix(in srgb, var(--me, var(--primary)) 75%, var(--text-main));
+  background: color-mix(in srgb, var(--me, var(--primary)) 14%, var(--bg-card));
+}
+
+:root:not(.eink) .stat-icon {
+  color: color-mix(in srgb, var(--me, var(--primary)) 75%, var(--text-main));
+  background: color-mix(in srgb, var(--me, var(--primary)) 14%, var(--bg-card));
+}
+
+:root:not(.eink) .card {
+  box-shadow: inset 0 3px 0 color-mix(in srgb, var(--me, transparent) 45%, transparent), var(--shadow);
+}
+
+:root:not(.eink) .rank-row.me {
+  border-color: color-mix(in srgb, var(--me, var(--primary)) 65%, var(--border));
+  background: color-mix(in srgb, var(--me, var(--primary)) 9%, var(--bg-card));
+}
+
+:root:not(.eink) .rank-row.me .rank-avatar {
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--me, transparent);
+}
+
+:root:not(.eink) .rank-row.me .rank-pos {
+  color: color-mix(in srgb, var(--me, var(--text-muted)) 75%, var(--text-main));
+}
+
+:root:not(.eink) .badge-item.earned {
+  border-color: var(--me, var(--primary));
+  background: color-mix(in srgb, var(--me, var(--primary)) 10%, var(--bg-card));
+}
+
+:root:not(.eink) .badge-item.earned .badge-icon {
+  background: var(--me, var(--primary));
+}

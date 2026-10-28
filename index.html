@@ -19,6 +19,11 @@
       let eink = false;
       try { eink = localStorage.getItem('eink') === 'on'; } catch (e) {}
       if (eink) document.documentElement.classList.add('eink');
+      // Własny kolor (ustawienia): od pierwszej klatki, bez migania domyślnym
+      try {
+        const mine = localStorage.getItem('myColor');
+        if (/^#[0-9a-fA-F]{6}$/.test(mine || '')) document.documentElement.style.setProperty('--me', mine);
+      } catch (e) {}
       // Pasek statusu telefonu w kolorze tła apki (zamiast fioletowego paska)
       document.querySelector('meta[name="theme-color"]').content = dark ? '#0f172a' : '#f8fafc';
       // Intro ze ścianą okładek ruszy dopiero po wczytaniu logowania: do tego czasu apka schowana,

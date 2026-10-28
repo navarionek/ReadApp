@@ -22,6 +22,13 @@ function showMyColor(color) {
   const swatch = document.getElementById('color-swatch');
   swatch.style.background = color || '';
   swatch.dataset.color = color || '';  // od tego koloru startuje wybierak
+  // Kolor idzie też do reszty apki (--me w style.css) i do pamięci, żeby był od pierwszej klatki
+  if (color) document.documentElement.style.setProperty('--me', color);
+  else document.documentElement.style.removeProperty('--me');
+  try {
+    if (color) localStorage.setItem('myColor', color);
+    else localStorage.removeItem('myColor');
+  } catch { /* bez pamięci przeglądarki kolor pojawi się po wczytaniu profilu */ }
 }
 
 // color = null wraca do koloru automatycznego z palety
