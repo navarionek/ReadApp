@@ -6822,3 +6822,95 @@ body.be-lock {
 :root.eink .legend-item:nth-child(3n) .legend-line {
   background: repeating-linear-gradient(90deg, #000 0 2px, #fff 2px 6px) !important;
 }
+
+/* Okrągłe przyciski (X, kosz) naprawdę okrągłe: wcześniej szerokość przycisku .btn robiła z nich jajka */
+:root.eink .btn-icon,
+:root.eink .book-modal-close,
+:root.eink .be-icon-btn {
+  width: 3rem;
+  height: 3rem;
+  min-width: 0;
+  padding: 0;
+}
+
+:root.eink .book-modal-close,
+:root.eink .be-icon-btn {
+  border-radius: 50%;
+}
+
+:root.eink .be-bar {
+  grid-template-columns: 3rem 1fr 3rem;
+  background: #fff;
+}
+
+/* Edytor książki: tytuł i autor jak podpisane linie (nie ciężkie pola), wiersze ustawień zwykłymi literami */
+:root.eink .book-editor .be-title,
+:root.eink .book-editor .be-author {
+  min-height: 0;
+  padding: 0.25rem 0;
+  border: 0;
+  border-bottom: 2px solid #000;
+  border-radius: 0;
+  background: transparent;
+  color: #000;
+}
+
+:root.eink .book-editor .be-title {
+  font-size: 1.5rem;
+}
+
+:root.eink .book-editor .be-author {
+  font-size: 1.125rem;
+  font-style: italic;
+}
+
+:root.eink .be-hero-meta {
+  padding-left: 0;
+}
+
+:root.eink .book-editor .be-year {
+  width: 7.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.5rem;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #000;
+  font-size: 1rem;
+}
+
+:root.eink .be-row {
+  min-height: 4rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root.eink .be-row-label small {
+  color: #000;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+:root.eink .book-editor .be-date-wrap {
+  min-width: 12.5rem;
+  min-height: 3rem;
+  padding: 0 0.75rem;
+  justify-content: space-between;
+}
+
+:root.eink .be-date-text {
+  overflow: visible;
+  text-overflow: clip;
+  color: #000;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+:root.eink .book-editor .be-num {
+  min-width: 7.5rem;
+  min-height: 3rem;
+  font-size: 1.0625rem;
+}
