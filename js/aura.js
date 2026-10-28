@@ -82,56 +82,174 @@ function node(tag, attrs = {}, children = []) {
 
 const svg = (cls, children) => node('svg', { class: cls, viewBox: '0 0 300 300', focusable: 'false' }, children);
 
-// books: przeczytane osoby od najnowszej (jak na półce); bierzemy ostatnie MAX_RINGS i układamy od najstarszej.
-// Zwraca rdzeń (poświata w środku) i LAYERS warstw z okręgami (co trzeci okrąg w tej samej warstwie).
-function orbitParts(books, rand, uid) {
+// Docelowy wygląd okręgów dla listy książek (od najnowszej, jak na półce): bierzemy ostatnie MAX_RINGS
+// i układamy od najstarszej w środku. Pusta półka = kilka kropkowanych orbit bez łuków.
+function ringTargets(books, seed) {
+  const rand = seeded(seed);
   const list = books.slice(0, MAX_RINGS).reverse();
   const count = list.length || 5;
   const r0 = 34;
   const step = Math.min(11, (138 - r0) / Math.max(count - 1, 1));
   const maxPages = Math.max(1, ...list.map(b => b.pages || 0));
-  const layers = Array.from({ length: LAYERS }, () => []);
-
-  for (let i = 0; i < count; i++) {
-    const r = r0 + i * step;
+  return Array.from({ length: count }, (_, i) => {
     const book = list[i];
-    const tilt = node('g', { transform: `rotate(${Math.round(rand() * 360)} ${C} ${C})` });
-    tilt.appendChild(node('circle', { cx: C, cy: C, r: r.toFixed(1), class: `orb-track${book ? '' : ' empty'}` }));
-    if (book) {
-      const len = Math.round(50 + 280 * Math.min(1, (book.pages || 0) / maxPages));
-      const kind = book.unfinished || book.rating === -1 ? 'dim' : book.rating === 1 ? 'hot' : 'mid';
-      const mult = Number(book.multiplier);
-      const width = 2.2 + (mult > 1 ? 1.6 : 0) + (mult >= 2.25 ? 1 : 0);
-      tilt.appendChild(node('circle', {
-        cx: C, cy: C, r: r.toFixed(1), pathLength: 360,
-        class: `orb-arc ${kind}`,
-        'stroke-dasharray': `${len} 360`,
-        'stroke-width': width.toFixed(1),
-      }));
-      // „Planeta” na końcu łuku (łuk zaczyna się na godzinie 3 i idzie zgodnie z zegarem)
-      const a = (len * Math.PI) / 180;
-      const px = (C + r * Math.cos(a)).toFixed(1);
-      const py = (C + r * Math.sin(a)).toFixed(1);
-      tilt.appendChild(node('circle', { cx: px, cy: py, r: 5.5, class: `orb-halo ${kind}` }));
-      tilt.appendChild(node('circle', { cx: px, cy: py, r: (width / 2 + 0.9).toFixed(1), class: `orb-dot ${kind}` }));
-    }
-    layers[i % LAYERS].push(tilt);
+    const base = { r: r0 + i * step, tilt: Math.round(rand() * 360), op: 1 };
+    if (!book) return { ...base, len: 0, width: 2.2, arc: 0, kind: 'mid', empty: true };
+    const mult = Number(book.multiplier);
+    return {
+      ...base,
+      len: 50 + 280 * Math.min(1, (book.pages || 0) / maxPages),
+      width: 2.2 + (mult > 1 ? 1.6 : 0) + (mult >= 2.25 ? 1 : 0),
+      arc: 1,
+      kind: book.unfinished || book.rating === -1 ? 'dim' : book.rating === 1 ? 'hot' : 'mid',
+      empty: false,
+    };
+  });
+}
+
+const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const lerp = (a, b, t) => a + (b - a) * t;
+const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
+const MORPH_MS = 950;
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
+// (promień, długość łuku, grubość, obrót, kolor), nadmiarowe zwijają się i gasną, brakujące wyrastają.
+// Liczymy to sami w każdej klatce (atrybuty SVG działają wszędzie, także na iPhonie); całe warstwy
+// dalej obracają się na karcie graficznej.
+class Orbit {
+  constructor(slot) {
+    const uid = `orb${++orbitCount}`;
+    this.layers = Array.from({ length: LAYERS }, (_, i) => svg(`orb-layer l${i}`, []));
+    this.root = el('div', { class: 'orb' }, [
+      svg('orb-core-svg', [
+        node('defs', {}, [
+          node('radialGradient', { id: `${uid}-core` }, [
+            node('stop', { offset: 0, class: 'orb-core-0' }),
+            node('stop', { offset: 0.4, class: 'orb-core-1' }),
+            node('stop', { offset: 1, class: 'orb-core-2' }),
+          ]),
+        ]),
+        node('circle', { cx: C, cy: C, r: 70, fill: `url(#${uid}-core)` }),
+        node('circle', { cx: C, cy: C, r: 3.5, class: 'orb-center' }),
+      ]),
+      ...this.layers,
+    ]);
+    slot.appendChild(this.root);
+    this.rings = [];
+    this.color = null;      // { h, s } teraz
+    this.colorTo = null;
+    this.raf = 0;
   }
 
-  const core = svg('orb-core-svg', [
-    node('defs', {}, [
-      node('radialGradient', { id: `${uid}-core` }, [
-        node('stop', { offset: 0, class: 'orb-core-0' }),
-        node('stop', { offset: 0.4, class: 'orb-core-1' }),
-        node('stop', { offset: 1, class: 'orb-core-2' }),
-      ]),
-    ]),
-    node('circle', { cx: C, cy: C, r: 70, fill: `url(#${uid}-core)` }),
-    node('circle', { cx: C, cy: C, r: 3.5, class: 'orb-center' }),
-  ]);
-  // Opakowanie warstwy wlatuje przy wejściu, a sama warstwa (svg) obraca się bez końca: dwa osobne ruchy
-  return [core, ...layers.map((rings, i) => el('div', { class: `orb-lw w${i}` }, [svg(`orb-layer l${i}`, rings)]))];
+  addRing(i, target) {
+    const g = node('g');
+    const track = node('circle', { cx: C, cy: C, class: 'orb-track' });
+    const arc = node('circle', { cx: C, cy: C, pathLength: 360, class: 'orb-arc mid' });
+    const halo = node('circle', { r: 5.5, class: 'orb-halo mid' });
+    const dot = node('circle', { class: 'orb-dot mid' });
+    g.append(track, arc, halo, dot);
+    this.layers[i % LAYERS].appendChild(g);
+    // Nowy okrąg wyrasta: zaczyna mniejszy, bez łuku i niewidoczny
+    const now = { r: target.r * 0.7, len: 0, width: target.width, tilt: target.tilt - 60, op: 0, arc: 0 };
+    const ring = { g, track, arc, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
+    this.rings.push(ring);
+    return ring;
+  }
+
+  setColor(h, s, animate) {
+    this.colorTo = { h, s };
+    if (!this.color || !animate) this.color = { h, s };
+    this.start(animate);
+  }
+
+  // targets = null: książki nowej osoby jeszcze się wczytują (okręgi zostają, przygaszone)
+  setTargets(targets, animate) {
+    this.root.classList.toggle('pending', !targets);
+    if (!targets) return;
+    targets.forEach((target, i) => {
+      const ring = this.rings[i] || this.addRing(i, target);
+      ring.to = target;
+    });
+    // Nadmiarowe okręgi: zwijają łuk, odsuwają się i gasną, potem znikają
+    this.rings.slice(targets.length).forEach(ring => {
+      ring.to = { ...ring.now, r: ring.now.r + 14, len: 0, op: 0, arc: 0, remove: true };
+    });
+    this.start(animate);
+  }
+
+  start(animate) {
+    this.rings.forEach(ring => { ring.from = { ...ring.now }; });
+    this.colorFrom = { ...this.color };
+    this.t0 = performance.now();
+    this.duration = animate && !reducedMotion() ? MORPH_MS : 0;
+    if (!this.raf) this.raf = requestAnimationFrame(t => this.frame(t));
+  }
+
+  frame(time) {
+    const t = this.duration ? Math.min(1, (time - this.t0) / this.duration) : 1;
+    const e = ease(t);
+    if (this.colorTo) {
+      const h = this.colorFrom.h + turn(this.colorFrom.h, this.colorTo.h) * e;
+      this.color = { h: (h + 360) % 360, s: lerp(this.colorFrom.s, this.colorTo.s, e) };
+      colorVars(this.root, this.color.h.toFixed(1), this.color.s.toFixed(1));
+    }
+    this.rings.forEach(ring => this.draw(ring, e));
+    if (t < 1) {
+      this.raf = requestAnimationFrame(next => this.frame(next));
+      return;
+    }
+    this.raf = 0;
+    this.rings = this.rings.filter(ring => {
+      if (!ring.to.remove) return true;
+      ring.g.remove();
+      return false;
+    });
+  }
+
+  draw(ring, e) {
+    const { from, to, now } = ring;
+    now.r = lerp(from.r, to.r, e);
+    now.len = lerp(from.len, to.len, e);
+    now.width = lerp(from.width, to.width, e);
+    now.tilt = from.tilt + turn(from.tilt, to.tilt) * e;
+    now.op = lerp(from.op, to.op, e);
+    now.arc = lerp(from.arc, to.arc, e);
+    // Rodzaj łuku (kolor) i kropkowanie zmieniają się w połowie przejścia, gdy okrąg jest w ruchu
+    const late = e >= 0.5 || from.op === 0;
+    const kind = late ? to.kind : ring.kind ?? to.kind;
+    if (kind && kind !== ring.kind) {
+      ring.kind = kind;
+      for (const part of [ring.arc, ring.halo, ring.dot]) part.setAttribute('class', `${part.classList[0]} ${kind}`);
+    }
+    const empty = late ? !!to.empty : ring.empty ?? !!to.empty;
+    if (empty !== ring.empty) {
+      ring.empty = empty;
+      ring.track.classList.toggle('empty', empty);
+    }
+    const r = now.r.toFixed(2);
+    ring.g.setAttribute('transform', `rotate(${now.tilt.toFixed(2)} ${C} ${C})`);
+    ring.g.setAttribute('opacity', now.op.toFixed(3));
+    ring.track.setAttribute('r', r);
+    ring.arc.setAttribute('r', r);
+    ring.arc.setAttribute('stroke-dasharray', `${now.len.toFixed(2)} 360`);
+    ring.arc.setAttribute('stroke-width', now.width.toFixed(2));
+    // „Planeta” na końcu łuku (łuk zaczyna się na godzinie 3 i idzie zgodnie z zegarem)
+    const a = (now.len * Math.PI) / 180;
+    const px = (C + now.r * Math.cos(a)).toFixed(2);
+    const py = (C + now.r * Math.sin(a)).toFixed(2);
+    const arcOp = now.arc.toFixed(3);
+    ring.arc.setAttribute('opacity', arcOp);
+    for (const part of [ring.halo, ring.dot]) {
+      part.setAttribute('cx', px);
+      part.setAttribute('cy', py);
+      part.setAttribute('opacity', arcOp);
+    }
+    ring.dot.setAttribute('r', (now.width / 2 + 0.9).toFixed(2));
+  }
 }
+
+let orbitCount = 0;
 
 // Kolor osoby jako zmienne na elemencie: warstwa koloru i orbita dostają własną kopię, więc stara warstwa
 // zachowuje swoje barwy, gdy nowa przez nią przenika
@@ -151,9 +269,11 @@ function paintLayer(h, s) {
 
 // Tło karty budujemy raz; przy zmianie osoby wymieniają się w nim warstwa koloru i orbita
 export function createAura() {
+  const slot = el('div', { class: 'aura-orbit' });
+  slot._orbit = new Orbit(slot);
   return el('div', { class: 'shelf-aura', 'aria-hidden': 'true' }, [
     el('div', { class: 'aura-paints' }),
-    el('div', { class: 'aura-orbit' }),
+    slot,
     el('span', { class: 'aura-grain' }),
   ]);
 }
@@ -169,6 +289,7 @@ export function setAuraColor(hero, color, animate) {
   const prevH = parseFloat(hero.style.getPropertyValue('--aura-h'));
   const prevS = parseFloat(hero.style.getPropertyValue('--aura-s'));
   colorVars(hero, h, sat);
+  orbitOf(hero).setColor(h, sat, animate);  // okręgi zmieniają barwę razem z kartą
 
   const paints = hero.querySelector('.aura-paints');
   const old = [...paints.children];
@@ -199,22 +320,10 @@ export function setAuraColor(hero, color, animate) {
   setTimeout(cleanup, 1800);  // gdyby animacji nie było (karta w tle, ograniczony ruch)
 }
 
-let orbitCount = 0;
+const orbitOf = hero => hero.querySelector('.aura-orbit')._orbit;
 
-// books = null: stara orbita odchodzi, nowej jeszcze nie ma (książki osoby się wczytują).
-// animate = false: podmiana bez ruchu (np. zmiana oceny).
+// books = null: książki nowej osoby się wczytują (okręgi czekają przygaszone); potem przechodzą w nowe.
+// animate = false: od razu w docelowym kształcie.
 export function setOrbit(hero, books, seed, animate) {
-  const slot = hero.querySelector('.aura-orbit');
-  slot.querySelectorAll('.orb:not(.leaving)').forEach(old => {
-    if (!animate) {
-      old.remove();
-      return;
-    }
-    old.classList.add('leaving');
-    setTimeout(() => old.remove(), 750);
-  });
-  if (!books) return;
-  const orb = el('div', { class: `orb ${animate ? 'entering' : ''}` }, orbitParts(books, seeded(seed), `orb${++orbitCount}`));
-  colorVars(orb, hero.style.getPropertyValue('--aura-h'), hero.style.getPropertyValue('--aura-s'));
-  slot.appendChild(orb);
+  orbitOf(hero).setTargets(books && ringTargets(books, seed), animate);
 }

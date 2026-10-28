@@ -395,7 +395,7 @@ function renderShelfHero() {
         el('p', { class: 'shelf-hero-sub', text: '\u00a0' }),  // twarda spacja trzyma wysokość, zanim dojdą książki
       ]),
     );
-    if (!fresh) setOrbit(hero, null, '', true);  // stara orbita odchodzi
+    if (!fresh) setOrbit(hero, null, '', true);  // okręgi czekają przygaszone na książki nowej osoby
     heroDrawn.orbit = null;
   }
   hero.querySelector('.shelf-hero-kicker').textContent = isOwn ? 'Twoja półka' : 'Półka';
@@ -416,10 +416,10 @@ function renderShelfHero() {
     });
     heroDrawn.stats = values;
 
-    // Orbita: nowa osoba albo pierwsze rysowanie = wchodzi; zmiana w książkach (np. ocena) = po cichu
+    // Orbita: okręgi płynnie przechodzą w nowe (inna osoba, nowa książka, zmiana oceny)
     const orbitSig = JSON.stringify(rows.map(r => [r.id, r.pages, r.rating, r.multiplier, r.unfinished]));
     if (orbitSig !== heroDrawn.orbit) {
-      setOrbit(hero, rows, String(owner.key), heroDrawn.orbit === null);
+      setOrbit(hero, rows, String(owner.key), true);
       heroDrawn.orbit = orbitSig;
     }
   }
