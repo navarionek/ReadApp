@@ -6914,3 +6914,8 @@ body.be-lock {
   min-height: 3rem;
   font-size: 1.0625rem;
 }
+
+/* Okładki już przerobione na odcienie szarości z rozpraszaniem (js/dither.js): bez dodatkowego filtru */
+:root.eink img.book-cover[data-dithered] {
+  filter: none;
+}

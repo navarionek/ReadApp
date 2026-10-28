@@ -3,7 +3,9 @@ import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { openColorPicker } from './colorpicker.js';
 import { playStartIntro, renderStartWall, syncStartWallToggle, toggleStartWall } from './coverwall.js';
 import { loadReads } from './data.js';
+import { syncCoverDither } from './dither.js';
 import { syncEinkToggle, toggleEink } from './eink.js';
+import { initPageKeys } from './pagekeys.js';
 import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
 import { closeBookModal, loadShelf } from './shelf.js';
@@ -76,8 +78,13 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('notify-toggle').addEventListener('click', handleNotifyToggle);  // menu zostaje otwarte, widać przełącznik
   document.getElementById('cover-bg-toggle').addEventListener('click', toggleStartWall);  // jw.
   syncStartWallToggle();
-  document.getElementById('eink-toggle').addEventListener('click', () => toggleEink(renderStartWall));  // jw.
+  document.getElementById('eink-toggle').addEventListener('click', () => toggleEink(() => {  // jw.
+    renderStartWall();
+    syncCoverDither();
+  }));
   syncEinkToggle();
+  syncCoverDither();
+  initPageKeys();
   document.getElementById('view-as-btn').addEventListener('click', handleViewAs);
   document.getElementById('view-as-exit').addEventListener('click', () => setViewAs(null));
 
