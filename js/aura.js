@@ -129,7 +129,8 @@ function orbitParts(books, rand, uid) {
     node('circle', { cx: C, cy: C, r: 70, fill: `url(#${uid}-core)` }),
     node('circle', { cx: C, cy: C, r: 3.5, class: 'orb-center' }),
   ]);
-  return [core, ...layers.map((rings, i) => svg(`orb-layer l${i}`, rings))];
+  // Opakowanie warstwy wlatuje przy wejściu, a sama warstwa (svg) obraca się bez końca: dwa osobne ruchy
+  return [core, ...layers.map((rings, i) => el('div', { class: `orb-lw w${i}` }, [svg(`orb-layer l${i}`, rings)]))];
 }
 
 // Kolor osoby jako zmienne na elemencie: warstwa koloru i orbita dostają własną kopię, więc stara warstwa
@@ -139,8 +140,11 @@ function colorVars(target, h, s) {
   target.style.setProperty('--aura-s', String(s));
 }
 
+// Warstwa koloru: gradient (przenika przezroczystością) i plamy w osobnym „wirze” (obraca się przy wejściu)
 function paintLayer(h, s) {
-  const paint = el('div', { class: 'aura-paint' }, [1, 2, 3, 4].map(i => el('span', { class: `mesh-blob m${i}` })));
+  const paint = el('div', { class: 'aura-paint' }, [
+    el('div', { class: 'aura-swirl' }, [1, 2, 3, 4].map(i => el('span', { class: `mesh-blob m${i}` }))),
+  ]);
   colorVars(paint, h, s);
   return paint;
 }
@@ -154,27 +158,45 @@ export function createAura() {
   ]);
 }
 
-// animate: nowa warstwa koloru przenika przez starą (sama przezroczystość, bez malowania w każdej klatce)
+// animate: kolor przechodzi przez odcień pośredni (warstwa-pomost w połowie drogi po kole barw), a plamy
+// nowej warstwy wirują i osiadają. Każda warstwa jest malowana raz, potem tylko się obraca i przenika.
 export function setAuraColor(hero, color, animate) {
   const [h, s] = colorToHsl(color);
   // Szarości zostają szare (wychodzi srebro), reszta dostaje żywe nasycenie
   const sat = Math.round(s < 10 ? s : Math.min(92, Math.max(58, s)));
   if (hero.dataset.aura === `${h}/${sat}`) return;
   hero.dataset.aura = `${h}/${sat}`;
+  const prevH = parseFloat(hero.style.getPropertyValue('--aura-h'));
+  const prevS = parseFloat(hero.style.getPropertyValue('--aura-s'));
   colorVars(hero, h, sat);
 
   const paints = hero.querySelector('.aura-paints');
-  const fresh = paintLayer(h, sat);
   const old = [...paints.children];
-  if (animate && old.length) {
-    fresh.classList.add('entering');
-    // Stara warstwa znika dopiero, gdy nowa ją całkiem przykryje
-    fresh.addEventListener('animationend', () => old.forEach(o => o.remove()), { once: true });
-    setTimeout(() => old.forEach(o => o.remove()), 1200);  // gdyby animacji nie było (karta w tle)
-  } else {
+  const fresh = paintLayer(h, sat);
+  if (!animate || !old.length) {
     old.forEach(o => o.remove());
+    paints.appendChild(fresh);
+    return;
   }
-  paints.appendChild(fresh);
+  old.forEach(o => o.classList.add('leaving'));
+  const added = [];
+  // Krótsza droga po kole barw; przy bliskich kolorach pomost nie jest potrzebny
+  const delta = ((((h - prevH) % 360) + 540) % 360) - 180;
+  if (Number.isFinite(prevH) && Math.abs(delta) > 40 && sat >= 10 && prevS >= 10) {
+    const bridge = paintLayer(Math.round((prevH + delta / 2 + 360) % 360), Math.round((prevS + sat) / 2));
+    bridge.classList.add('bridge');
+    added.push(bridge);
+  }
+  fresh.classList.add('entering');
+  added.push(fresh);
+  paints.append(...added);
+  // Gdy nowa warstwa całkiem przykryje resztę, stare i pomost znikają
+  const cleanup = () => {
+    [...old, ...added.filter(a => a !== fresh)].forEach(o => o.remove());
+    fresh.classList.remove('entering');
+  };
+  fresh.addEventListener('animationend', e => { if (e.target === fresh) cleanup(); });
+  setTimeout(cleanup, 1800);  // gdyby animacji nie było (karta w tle, ograniczony ruch)
 }
 
 let orbitCount = 0;
@@ -189,7 +211,7 @@ export function setOrbit(hero, books, seed, animate) {
       return;
     }
     old.classList.add('leaving');
-    setTimeout(() => old.remove(), 500);
+    setTimeout(() => old.remove(), 750);
   });
   if (!books) return;
   const orb = el('div', { class: `orb ${animate ? 'entering' : ''}` }, orbitParts(books, seeded(seed), `orb${++orbitCount}`));
