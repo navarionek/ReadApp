@@ -19,8 +19,6 @@
       let eink = false;
       try { eink = localStorage.getItem('eink') === 'on'; } catch (e) {}
       if (eink) document.documentElement.classList.add('eink');
-      // Styl gazety (odmiana trybu czytnika, js/eink.js)
-      try { if (eink && localStorage.getItem('einkStyle') === 'gazeta') document.documentElement.classList.add('gazeta'); } catch (e) {}
       // Czytnik: biały manifest (biały ekran startowy). Kolor tła z manifestu Android bierze też na dolny pasek
       // systemu, więc telefon zostaje przy ciemnym. Zmiana działa po ponownym dodaniu apki do ekranu głównego.
       if (eink) document.querySelector('link[rel="manifest"]').href = 'manifest-eink.json';
@@ -157,14 +155,6 @@
                 <small class="settings-hint">Nowy Start na ekrany e-ink: czarno na białym, duży druk</small>
               </span>
               <span id="eink-switch" class="switch" aria-hidden="true"></span>
-            </button>
-            <button type="button" id="gazeta-toggle" class="settings-item" role="menuitemcheckbox" aria-checked="false">
-              <i data-lucide="newspaper"></i>
-              <span class="settings-text">
-                <span>Styl gazety</span>
-                <small class="settings-hint">Tryb czytnika jak dziennik: winieta, inicjały, ozdobniki</small>
-              </span>
-              <span id="gazeta-switch" class="switch" aria-hidden="true"></span>
             </button>
             <button type="button" id="tv-link-btn" class="settings-item" role="menuitem">
               <i data-lucide="tv"></i>
