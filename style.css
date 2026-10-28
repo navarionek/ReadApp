@@ -5730,9 +5730,7 @@ body.be-lock {
 
 /* ----- Nagłówek i typografia ----- */
 :root.eink header {
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 3px double #000;
+  margin-bottom: 1.25rem;
 }
 
 :root.eink .app-title {
@@ -5815,7 +5813,7 @@ body.be-lock {
 :root.eink textarea:focus,
 :root.eink select:focus {
   border-color: #000;
-  outline: 3px solid #000;
+  outline: 2px solid #000;
   outline-offset: 2px;
 }
 
@@ -5896,7 +5894,7 @@ body.be-lock {
 
 :root.eink .settings-item {
   min-height: 3.25rem;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   color: #000;
 }
 
@@ -5953,18 +5951,17 @@ body.be-lock {
 /* ----- Sekcje: gruba linia u góry, cienka pod nagłówkiem ----- */
 :root.eink .card,
 :root.eink .goal-card {
-  margin-bottom: 2rem;
-  padding: 0.75rem 0 0;
-  border: 0;
-  border-top: 3px solid #000;
-  border-radius: 0;
-  background: transparent;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
 }
 
 :root.eink .card-header {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
 }
 
 :root.eink .card h2,
@@ -5978,7 +5975,7 @@ body.be-lock {
 :root.eink .app-nav {
   background: #fff;
   border: 0;
-  border-top: 3px solid #000;
+  border-top: 2px solid #000;
   border-radius: 0;
 }
 
@@ -6004,8 +6001,9 @@ body.be-lock {
 :root.eink .stats-grid {
   grid-template-columns: 1fr 1fr;
   gap: 0;
-  border-top: 3px solid #000;
-  border-bottom: 3px solid #000;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  overflow: hidden;
 }
 
 :root.eink .stat-card {
@@ -6017,7 +6015,7 @@ body.be-lock {
 }
 
 :root.eink .stat-card + .stat-card {
-  border-left: 1px solid #000;
+  border-left: 2px solid #000;
 }
 
 :root.eink .stat-link:hover {
@@ -6046,11 +6044,10 @@ body.be-lock {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  margin: 1.25rem 0 2rem;
-  padding: 0.6rem 0.25rem;
-  border-top: 3px double #000;
-  border-bottom: 3px double #000;
-  border-radius: 0;
+  margin: 1rem 0 1.5rem;
+  padding: 0.75rem 1.25rem;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
   background: #fff;
 }
 
@@ -6078,7 +6075,7 @@ body.be-lock {
   gap: 1rem;
   padding: 1rem 0;
   border: 0;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   border-radius: 0;
 }
 
@@ -6128,7 +6125,7 @@ body.be-lock {
 
 :root.eink .goal-facts {
   align-self: stretch;
-  border-top: 1px solid #000;
+  border-top: 2px solid #000;
 }
 
 :root.eink .goal-facts dd {
@@ -6254,7 +6251,7 @@ body.be-lock {
 :root.eink .rank-row {
   padding: 0.875rem 0 1rem;
   border: 0;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   border-radius: 0;
   background: #fff;
 }
@@ -6344,7 +6341,7 @@ body.be-lock {
 :root.eink .book-rank-item {
   padding: 0.75rem 0;
   border: 0;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   border-radius: 0;
 }
 
@@ -6369,10 +6366,9 @@ body.be-lock {
 /* ----- Półka ----- */
 :root.eink .shelf-hero {
   margin-bottom: 1.25rem;
-  padding: 0.5rem 0 1rem;
-  border: 0;
-  border-bottom: 3px double #000;
-  border-radius: 0;
+  padding: 1rem 1.25rem;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
   background: #fff;
 }
 
@@ -6400,7 +6396,7 @@ body.be-lock {
 }
 
 :root.eink .shelf-stat + .shelf-stat {
-  border-left: 1px solid #000;
+  border-left: 2px solid #000;
 }
 
 :root.eink .shelf-stat strong {
@@ -6440,7 +6436,7 @@ body.be-lock {
 :root.eink .shelf-heading {
   margin: 0 0 1rem;
   padding-bottom: 0.4rem;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   font-size: 1.75rem;
 }
 
@@ -6551,7 +6547,7 @@ body.be-lock {
 }
 
 :root.eink .bs-fact + .bs-fact {
-  border-left: 1px solid #000;
+  border-left: 2px solid #000;
 }
 
 :root.eink .bs-fact strong {
@@ -6628,7 +6624,7 @@ body.be-lock {
 }
 
 :root.eink .be-row + .be-row {
-  border-top: 1px solid #000;
+  border-top: 2px solid #000;
 }
 
 :root.eink .book-editor .be-num,
@@ -6652,19 +6648,20 @@ body.be-lock {
 }
 
 :root.eink .be-footer {
-  border-top: 3px solid #000;
+  border-top: 2px solid #000;
   background: #fff;
 }
 
 /* ----- Statystyki ----- */
 :root.eink .stats-tiles {
   gap: 0;
-  border-top: 3px solid #000;
-  border-bottom: 3px solid #000;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  overflow: hidden;
 }
 
 :root.eink .stats-tiles .stat-card {
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
 }
 
 :root.eink .stats-tiles .stat-card:nth-last-child(-n + 2) {
@@ -6672,7 +6669,7 @@ body.be-lock {
 }
 
 :root.eink .stats-tiles .stat-card:nth-child(even) {
-  border-left: 1px solid #000;
+  border-left: 2px solid #000;
 }
 
 :root.eink .stats-tiles .stat-value {
@@ -6727,7 +6724,7 @@ body.be-lock {
 :root.eink .record {
   padding: 0.75rem 0;
   border: 0;
-  border-bottom: 1px solid #000;
+  border-bottom: 2px solid #000;
   border-radius: 0;
   background: #fff;
 }
