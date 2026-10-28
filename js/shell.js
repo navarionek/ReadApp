@@ -3,7 +3,7 @@ import { moveNavIndicator } from './navbar.js';
 import { playRankingIntro } from './ranking.js';
 import { resetForm } from './form.js';
 import { hideRaceCard, showRaceCard } from './flight.js';
-import { closeBookModal, loadShelf } from './shelf.js';
+import { closeBookModal, loadShelf, replayShelfOrbit } from './shelf.js';
 import { state } from './state.js';
 import { drawTimeline, playRace } from './stats.js';
 import { renderWrapped } from './wrapped.js';
@@ -40,6 +40,7 @@ export function showScreen(name) {
     screen.hidden = !shown;
   });
   onScreenShown(name);
+  const entered = name !== shownScreen;
   shownScreen = name;
   document.querySelectorAll('.nav-item').forEach(item => {
     const active = item.dataset.screen === name;
@@ -52,6 +53,7 @@ export function showScreen(name) {
   if (toProgress) requestAnimationFrame(() => document.getElementById('ranking-viz')?.scrollIntoView({ block: 'start' }));
 
   if (name === 'polka' && state.currentUser) loadShelf();
+  if (name === 'polka' && entered) replayShelfOrbit();  // okręgi wyrastają przy każdym wejściu
   if (name === 'ranking') playRankingIntro();
   if (name === 'wrapped') renderWrapped();
   if (name !== 'polka') closeBookModal();

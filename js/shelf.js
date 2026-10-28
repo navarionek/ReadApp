@@ -1,5 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
-import { createAura, inkFor, setAuraColor, setOrbit, holdOrbit } from './aura.js';
+import { createAura, inkFor, setAuraColor, setOrbit, holdOrbit, replayOrbit } from './aura.js';
 import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
@@ -366,17 +366,34 @@ function countTo(node, from, to) {
   node._count = requestAnimationFrame(step);
 }
 
+// Wejście na Półkę: okręgi na karcie wyrastają od nowa (gdy karta jest już narysowana)
+export function replayShelfOrbit() {
+  const hero = document.getElementById('shelf-hero');
+  if (hero?.querySelector('.shelf-aura') && heroDrawn.orbit) replayOrbit(hero);
+  // Ekran wchodzi od góry: tło z poprzedniej wizyty zaczyna od nowa, schowane pod kartą
+  backdropAt = 0;
+  scheduleBackdrop();
+}
+
 /* ----- Tło Półki z karty osoby ----- */
 // Gdy karta osoby chowa się u góry przy przewijaniu, jej gradient (warstwa #shelf-backdrop w tych samych
 // barwach) rośnie spod karty na cały ekran i zostaje tłem; przy powrocie kurczy się z powrotem pod kartę.
 // Warstwa ma rozmiar ekranu, tu tylko ją przesuwamy, skalujemy i rozjaśniamy (raz na klatkę).
+// Przewijanie wyznacza tylko cel: tło dochodzi do niego płynnie i z opóźnieniem (BACKDROP_LAG), więc
+// nawet po szybkim przewinięciu rozlewa się w swoim tempie, a nie skacze razem z palcem.
+const BACKDROP_LAG = 420;  // stała czasu dochodzenia do celu (ms); do celu ok. 1,2 s
 let backdropFrame = 0;
+let backdropAt = 0;        // bieżący stan 0 (pod kartą) .. 1 (cały ekran)
+let backdropLast = 0;
 
-function placeBackdrop() {
+function placeBackdrop(now) {
   backdropFrame = 0;
   const backdrop = document.getElementById('shelf-backdrop');
   const hero = document.getElementById('shelf-hero');
-  if (!backdrop || !hero?.offsetHeight || currentScreen() !== 'polka') return;
+  if (!backdrop || !hero?.offsetHeight || currentScreen() !== 'polka') {
+    backdropLast = 0;
+    return;
+  }
   for (const name of ['--aura-h', '--aura-s']) {
     const value = hero.style.getPropertyValue(name);
     if (value && backdrop.style.getPropertyValue(name) !== value) backdrop.style.setProperty(name, value);
@@ -385,13 +402,21 @@ function placeBackdrop() {
   const W = backdrop.offsetWidth || window.innerWidth;
   const H = backdrop.offsetHeight || window.innerHeight;
   const hidden = Math.min(1, Math.max(0, -card.top / card.height));  // jaka część karty schowała się u góry
-  const e = hidden * hidden * (3 - 2 * hidden);
+  const target = hidden * hidden * (3 - 2 * hidden);
+  const dt = backdropLast ? Math.min(64, now - backdropLast) : 16;
+  backdropLast = now;
+  backdropAt += (target - backdropAt) * (1 - Math.exp(-dt / BACKDROP_LAG));
+  if (Math.abs(target - backdropAt) < 0.002) backdropAt = target;
+  const e = backdropAt;
   const x = card.left * (1 - e);
   const y = card.top * (1 - e);
   const w = card.width + (W - card.width) * e;
   const h = card.height + (H - card.height) * e;
   backdrop.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) scale(${(w / W).toFixed(4)}, ${(h / H).toFixed(4)})`;
-  backdrop.style.opacity = Math.min(1, hidden * 2.2).toFixed(3);
+  backdrop.style.opacity = Math.min(1, e * 2.2).toFixed(3);
+  // Jeszcze nie u celu: następna klatka (także gdy przewijanie już stanęło)
+  if (backdropAt !== target) backdropFrame = requestAnimationFrame(placeBackdrop);
+  else backdropLast = 0;
 }
 
 function scheduleBackdrop() {

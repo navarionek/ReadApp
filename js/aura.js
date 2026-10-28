@@ -323,6 +323,13 @@ class Orbit {
     setTimeout(() => { if (this.launch === 'regrow') this.launch = null; }, MORPH_MS);
   }
 
+  // Wejście na Półkę: okręgi wyrastają od nowa ze środka do swoich miejsc (jak przy pierwszym rysowaniu)
+  replay() {
+    if (reducedMotion() || this.launch || !this.rings.length) return;
+    this.rings.forEach(ring => Object.assign(ring.now, { r: ring.to.r * 0.3, len: 0, op: 0, arc: 0, tilt: ring.to.tilt - 70 }));
+    this.start(true);
+  }
+
   setColor(h, s, animate) {
     this.colorTo = { h, s };
     if (!this.color || !animate) this.color = { h, s };
@@ -354,8 +361,9 @@ class Orbit {
   }
 
   frame(time) {
-    // Przerwa w klatkach (apka w tle, zacięcie): przejście czeka, zamiast od razu przeskoczyć do końca
-    if (time - this.last > 100) this.t0 += time - this.last - 16;
+    // Długa przerwa w klatkach (apka w tle): przejście czeka, zamiast od razu przeskoczyć do końca. Próg 1 s:
+    // krótsze przycięcia (np. przy wejściu na ekran) nie mogą wstrzymywać przejścia
+    if (time - this.last > 1000) this.t0 += time - this.last - 16;
     this.last = time;
     const t = this.duration ? Math.min(1, (time - this.t0) / this.duration) : 1;
     const e = ease(t);
@@ -587,6 +595,10 @@ export function setAuraColor(hero, color, animate) {
 }
 
 const orbitOf = hero => hero.querySelector('.aura-orbit')._orbit;
+
+export function replayOrbit(hero) {
+  orbitOf(hero)?.replay();
+}
 
 export function holdOrbit(hero, on) {
   orbitOf(hero)?.hold(on);
