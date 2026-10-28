@@ -1648,29 +1648,196 @@ select.plain-input {
   display: none;
 }
 
-.shelf-hero-bg {
+/* Tło nagłówka w kolorze osoby (js/aura.js ustawia --aura-h i --aura-s). Warstwy od spodu: gradient bazowy,
+   trzy powoli dryfujące poświaty w pokrewnych odcieniach, promień lampki z prawego górnego rogu, ziarno
+   papieru. Rząd książek stoi na półce obok tytułu. Jasny i ciemny motyw mają własne jasności. */
+.shelf-hero {
+  --h: var(--aura-h, 250);
+  --s: calc(var(--aura-s, 60) * 1%);
+  --s-soft: calc(var(--aura-s, 60) * 0.62%);
+  --base-a: 95%;
+  --base-b: 88%;
+  --glow-1: 76%;
+  --glow-2: 82%;
+  --glow-3: 68%;
+  --beam: 0.5;
+  --spine-l: 56%;
+  --spine-a: 0.5;
+  --plank: 36%;
+  --grain: 0.2;
+  --vignette: 0.07;
+  border-color: hsl(var(--h) var(--s-soft) 55% / 0.35);
+  box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
+:root.dark-mode .shelf-hero {
+  --base-a: 14%;
+  --base-b: 9%;
+  --glow-1: 40%;
+  --glow-2: 31%;
+  --glow-3: 46%;
+  --beam: 0.34;
+  --spine-l: 50%;
+  --spine-a: 0.55;
+  --plank: 62%;
+  --grain: 0.26;
+  --vignette: 0.28;
+  box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.shelf-aura {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  background: linear-gradient(135deg, hsl(var(--h) var(--s-soft) var(--base-a)), hsl(calc(var(--h) + 24) var(--s-soft) var(--base-b)));
+  animation: aura-in 0.7s ease both;
 }
 
-.shelf-hero-bg::before {
-  content: "";
-  position: absolute;
-  inset: -40px;
-  background-image: var(--cover, linear-gradient(135deg, #f59e0b, #b45309));
-  background-size: cover;
-  background-position: center;
-  filter: blur(32px) saturate(1.3);
-  opacity: 0.5;
-}
-
-.shelf-hero-bg::after {
+.shelf-aura::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(transparent 10%, var(--bg-card) 92%);
+  background: radial-gradient(120% 140% at 50% 40%, transparent 55%, rgb(0 0 0 / var(--vignette)));
+}
+
+.aura-glow {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.aura-glow.g1 {
+  left: -22%;
+  top: -85%;
+  width: 82%;
+  background: radial-gradient(closest-side, hsl(var(--h) var(--s) var(--glow-1) / 0.9), transparent);
+  animation: aura-drift-a 26s ease-in-out infinite alternate;
+}
+
+.aura-glow.g2 {
+  right: -26%;
+  top: -35%;
+  width: 74%;
+  background: radial-gradient(closest-side, hsl(calc(var(--h) + 42) var(--s) var(--glow-2) / 0.75), transparent);
+  animation: aura-drift-b 33s ease-in-out infinite alternate;
+}
+
+.aura-glow.g3 {
+  left: 14%;
+  bottom: -95%;
+  width: 96%;
+  background: radial-gradient(closest-side, hsl(calc(var(--h) - 38) var(--s) var(--glow-3) / 0.65), transparent);
+  animation: aura-drift-c 39s ease-in-out infinite alternate;
+}
+
+.aura-lamp {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 168deg at 86% -34%, transparent 0deg, hsl(calc(var(--h) - 8) 95% 90% / var(--beam)) 17deg, transparent 36deg);
+}
+
+.aura-grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--grain);
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes aura-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes aura-drift-a {
+  to { transform: translate3d(22%, 18%, 0) scale(1.18); }
+}
+
+@keyframes aura-drift-b {
+  to { transform: translate3d(-24%, 26%, 0) scale(0.9); }
+}
+
+@keyframes aura-drift-c {
+  to { transform: translate3d(-20%, -14%, 0) scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-glow {
+    animation: none;
+  }
+}
+
+/* Książki na półce obok tytułu: szerokości, wysokości i odcienie losowane z klucza osoby */
+.shelf-hero-books {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 46%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 2px;
+  padding-bottom: 5px;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 38%);
+  mask-image: linear-gradient(to right, transparent, #000 38%);
+  pointer-events: none;
+}
+
+.shelf-hero-books::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 5px;
+  border-radius: 2px;
+  background: linear-gradient(hsl(var(--h) var(--s-soft) var(--plank) / 0.6), hsl(var(--h) var(--s-soft) calc(var(--plank) - 14%) / 0.6));
+}
+
+@media (max-width: 480px) {
+  .shelf-hero-books {
+    width: 36%;
+    height: 78%;
+    opacity: 0.8;
+  }
+}
+
+.hb {
+  flex: none;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(90deg,
+    hsl(calc(var(--h) + var(--dh, 0)) var(--s) calc(var(--spine-l) + var(--dl, 0) * 1%) / var(--spine-a)),
+    hsl(calc(var(--h) + var(--dh, 0)) var(--s) calc(var(--spine-l) + var(--dl, 0) * 1% - 9%) / var(--spine-a)));
+  box-shadow: inset 0 5px 0 rgb(255 255 255 / 0.18), inset 1px 0 0 rgb(255 255 255 / 0.12);
+}
+
+.hb-band {
+  background-image: linear-gradient(transparent 38%, rgb(255 255 255 / 0.3) 38% 44%, transparent 44% 60%, rgb(255 255 255 / 0.22) 60% 63%, transparent 63%),
+    linear-gradient(90deg,
+      hsl(calc(var(--h) + var(--dh, 0)) var(--s) calc(var(--spine-l) + var(--dl, 0) * 1%) / var(--spine-a)),
+      hsl(calc(var(--h) + var(--dh, 0)) var(--s) calc(var(--spine-l) + var(--dl, 0) * 1% - 9%) / var(--spine-a)));
+}
+
+.hb-lean {
+  transform: rotate(9deg);
+  transform-origin: bottom left;
+  margin-right: 5px;
+}
+
+.shelf-hero .shelf-hero-avatar,
+.shelf-hero-text {
+  position: relative;
+  z-index: 1;
+}
+
+.shelf-hero .shelf-stat {
+  border-color: hsl(var(--h) var(--s-soft) 50% / 0.28);
+  background: color-mix(in srgb, var(--bg-card) 60%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 .shelf-hero-body {
@@ -5826,7 +5993,8 @@ body.be-lock {
 }
 
 :root.eink .cover-bg,
-:root.eink .shelf-hero-bg,
+:root.eink .shelf-aura,
+:root.eink .shelf-hero-books,
 :root.eink .bs-bg,
 :root.eink .be-backdrop,
 :root.eink .card-icon,

@@ -1,4 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
+import { buildAura } from './aura.js';
 import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
@@ -287,7 +288,7 @@ export async function loadShelf() {
 }
 
 /* ----------------- Półka ----------------- */
-// U góry nagłówek osoby (zdjęcie, liczby, w tle rozmyta okładka ostatniej książki) i wybór, czyją
+// U góry nagłówek osoby (zdjęcie, liczby, w tle poświata w kolorze osoby i rząd książek, js/aura.js) i wybór, czyją
 // półkę oglądamy. Niżej „Czytam teraz” jako karty, stos „Do przeczytania” i przeczytane książki
 // w siatce okładek, rok po roku. Stuknięcie otwiera okno książki.
 const firstName = name => (name || '?').split(' ')[0];
@@ -341,14 +342,13 @@ function renderShelfHero() {
   const rows = state.shelfRows.filter(r => r.user_id === owner.key);
   const pages = rows.reduce((sum, r) => sum + (r.pages || 0), 0);
   const loved = rows.filter(r => r.rating === 1).length;
-  const latest = rows.find(r => r.cover_url);
-  const backdrop = el('div', { class: 'shelf-hero-bg', 'aria-hidden': 'true' });
-  if (latest) backdrop.style.setProperty('--cover', `url("${latest.cover_url.replace(/"/g, '%22')}")`);
   const colors = seriesColors(shelfPeople.length ? shelfPeople : [owner]);
+  const [aura, books] = buildAura(hero, colors.get(owner.key), String(owner.key));
   const stat = (value, label) => el('div', { class: 'shelf-stat' }, [el('strong', { text: value }), el('span', { text: label })]);
   hero.replaceChildren(
-    backdrop,
+    aura,
     el('div', { class: 'shelf-hero-body' }, [
+      books,
       avatar(owner, colors, 'rank-avatar-lg shelf-hero-avatar'),
       el('div', { class: 'shelf-hero-text' }, [
         el('h2', { class: 'shelf-hero-title', text: isOwn ? 'Twoja półka' : `Półka: ${firstName(owner.name)}` }),
