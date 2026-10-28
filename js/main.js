@@ -5,6 +5,7 @@ import { playStartIntro, renderStartWall, syncStartWallToggle, toggleStartWall }
 import { loadReads } from './data.js';
 import { syncCoverDither } from './dither.js';
 import { syncEinkToggle, toggleEink } from './eink.js';
+import { flickerLogoSoon } from './logo.js';
 import { initNavIndicator } from './navbar.js';
 import { initPageKeys } from './pagekeys.js';
 import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
@@ -72,6 +73,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (state.finishing) resetForm();
   });
   initNavIndicator();
+  flickerLogoSoon();
   showScreen(currentScreen());
   document.getElementById('prize-form').addEventListener('submit', handlePrizeSubmit);
   document.getElementById('prize-year').addEventListener('change', loadPrizeIntoForm);

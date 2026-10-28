@@ -196,11 +196,15 @@ class Orbit {
     this.rings.forEach(ring => { ring.from = { ...ring.now }; });
     this.colorFrom = { ...this.color };
     this.t0 = performance.now();
+    this.last = this.t0;
     this.duration = animate && !reducedMotion() ? MORPH_MS : 0;
     if (!this.raf) this.raf = requestAnimationFrame(t => this.frame(t));
   }
 
   frame(time) {
+    // Przerwa w klatkach (apka w tle, zacięcie): przejście czeka, zamiast od razu przeskoczyć do końca
+    if (time - this.last > 100) this.t0 += time - this.last - 16;
+    this.last = time;
     const t = this.duration ? Math.min(1, (time - this.t0) / this.duration) : 1;
     const e = ease(t);
     if (this.colorTo) {
@@ -341,3 +345,18 @@ const orbitOf = hero => hero.querySelector('.aura-orbit')._orbit;
 export function setOrbit(hero, books, seed, animate) {
   orbitOf(hero).setTargets(books && ringTargets(books, seed), animate);
 }
+
+// Apka w tle: animacje karty (obrót okręgów, dryf plam) stoją. Inaczej ich czas leci dalej i po powrocie
+// wszystko przeskakuje w inne miejsce. Pauza przez Web Animations działa od razu, bez czekania na klatkę.
+let frozen = [];
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    frozen = [...document.querySelectorAll('.shelf-aura')]
+      .flatMap(aura => aura.getAnimations({ subtree: true }))
+      .filter(anim => anim.playState === 'running');
+    frozen.forEach(anim => anim.pause());
+  } else {
+    frozen.forEach(anim => anim.play());
+    frozen = [];
+  }
+});

@@ -19,6 +19,9 @@
       let eink = false;
       try { eink = localStorage.getItem('eink') === 'on'; } catch (e) {}
       if (eink) document.documentElement.classList.add('eink');
+      // Czytnik: biały manifest (biały ekran startowy). Kolor tła z manifestu Android bierze też na dolny pasek
+      // systemu, więc telefon zostaje przy ciemnym. Zmiana działa po ponownym dodaniu apki do ekranu głównego.
+      if (eink) document.querySelector('link[rel="manifest"]').href = 'manifest-eink.json';
       // Własny kolor (ustawienia): od pierwszej klatki, bez migania domyślnym
       try {
         const mine = localStorage.getItem('myColor');
