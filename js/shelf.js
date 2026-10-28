@@ -1,5 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
-import { buildAura, inkFor } from './aura.js';
+import { createAura, inkFor, setAuraColor, setOrbit, swirlAura } from './aura.js';
 import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
@@ -231,6 +231,8 @@ const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, pag
 
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
+let loadedOwner = null;     // czyje książki są teraz w state.shelfRows
+let shownOwner = null;      // czyja półka jest narysowana pod kartą (przy zmianie osoby wjeżdża od nowa)
 
 // Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
 function shelfSig(userId, rows, queue = []) {
@@ -249,7 +251,9 @@ export async function loadShelf() {
   const seq = ++shelfSeq;
   const shelf = document.getElementById('shelf');
   if (!state.shelfRows.length || state.shelfRows[0]?.user_id !== userId) {
-    shelf.replaceChildren(el('div', { class: 'status-box', text: 'Ładowanie półki…' }));
+    // Przy zmianie osoby stara półka przygasa, zamiast znikać pod napisem „Ładowanie”
+    if (shownOwner && shownOwner !== userId && shelf.querySelector('.shelf-section, .status-box:not(.loading)')) shelf.classList.add('switching');
+    else shelf.replaceChildren(el('div', { class: 'status-box loading', text: 'Ładowanie półki…' }));
   }
   loadShelfPeople();
 
@@ -278,10 +282,14 @@ export async function loadShelf() {
   }
   const signature = shelfSig(userId, data || [], queueRows);
   // Nic się nie zmieniło od ostatniej wizyty: zostawiamy półkę w spokoju, żeby okładki nie mrugały
-  if (signature === shelfSignature && state.shelfRows[0]?.user_id === userId) return;
+  if (signature === shelfSignature && state.shelfRows[0]?.user_id === userId) {
+    loadedOwner = userId;
+    return;
+  }
   shelfSignature = signature;
   state.shelfRows = data || [];
   state.shelfQueue = queueRows;
+  loadedOwner = userId;
   renderShelf();
   fillMissingBookInfo(userId);
   fillMissingQueueInfo(userId);
@@ -330,38 +338,99 @@ function renderShelfPeople() {
       if (active) return;
       state.shelfUserId = p.key === viewerId() ? null : p.key;
       renderShelfPeople();
+      renderShelfHero();  // kolory i imię zmieniają się od razu, książki dojdą po wczytaniu
       loadShelf();
     });
     return chip;
   }));
 }
 
+// Karta zostaje między przełączeniami osób; zmienia się to, co trzeba (płynnie, patrz js/aura.js).
+// Książki nowej osoby przychodzą chwilę później: do tego czasu liczby są przygaszone, a orbity nie ma.
+let heroDrawn = { owner: null, orbit: null, stats: [0, 0, 0] };
+
+// Liczba „przewija się” od poprzedniej wartości do nowej
+function countTo(node, from, to) {
+  const show = n => { node.textContent = Math.round(n).toLocaleString('pl-PL'); };
+  cancelAnimationFrame(node._count);
+  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    show(to);
+    return;
+  }
+  const start = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - start) / 800);
+    show(from + (to - from) * (1 - (1 - t) ** 3));
+    if (t < 1) node._count = requestAnimationFrame(step);
+  };
+  node._count = requestAnimationFrame(step);
+}
+
 function renderShelfHero() {
   const hero = document.getElementById('shelf-hero');
   const owner = shelfOwner();
   const isOwn = owner.key === viewerId();
-  const rows = state.shelfRows.filter(r => r.user_id === owner.key);
-  const pages = rows.reduce((sum, r) => sum + (r.pages || 0), 0);
-  const loved = rows.filter(r => r.rating === 1).length;
+  const loaded = loadedOwner === owner.key;
+  const rows = loaded ? state.shelfRows.filter(r => r.user_id === owner.key) : [];
   const colors = seriesColors(shelfPeople.length ? shelfPeople : [owner]);
-  const aura = buildAura(hero, colors.get(owner.key), String(owner.key), rows);
-  const stat = (value, label) => el('div', { class: 'shelf-stat' }, [el('strong', { text: value }), el('span', { text: label })]);
-  hero.replaceChildren(
-    aura,
-    el('div', { class: 'shelf-hero-body' }, [
-      avatar(owner, colors, 'rank-avatar-lg shelf-hero-avatar'),
-      el('div', { class: 'shelf-hero-text' }, [
-        el('span', { class: 'shelf-hero-kicker', text: isOwn ? 'Twoja półka' : 'Półka' }),
-        el('h2', { class: 'shelf-hero-title', text: firstName(owner.name) || 'Półka' }),
-        el('p', { class: 'shelf-hero-sub', text: rows.length ? `Od ${new Date(rows.at(-1).created_at).getFullYear()} roku w Czytanku` : 'Czeka na pierwszą książkę' }),
+
+  const fresh = !hero.querySelector('.shelf-aura');
+  if (fresh) {
+    hero.replaceChildren(
+      createAura(),
+      el('div', { class: 'shelf-hero-body' }),
+      el('div', { class: 'shelf-stats' }, [0, 1, 2].map(() => el('div', { class: 'shelf-stat' }, [el('strong', { text: '0' }), el('span')]))),
+    );
+    heroDrawn = { owner: null, orbit: null, stats: [0, 0, 0] };
+    // Pierwsze rysowanie bez przepływu kolorów (inaczej karta przechodziłaby z domyślnego fioletu)
+    hero.classList.add('instant');
+    requestAnimationFrame(() => requestAnimationFrame(() => hero.classList.remove('instant')));
+  }
+  const aura = hero.querySelector('.shelf-aura');
+  const changed = owner.key !== heroDrawn.owner;
+  setAuraColor(hero, colors.get(owner.key));
+
+  if (changed) {
+    hero.querySelector('.shelf-hero-body').replaceChildren(
+      avatar(owner, colors, 'rank-avatar-lg shelf-hero-avatar hero-enter'),
+      el('div', { class: 'shelf-hero-text hero-enter' }, [
+        el('span', { class: 'shelf-hero-kicker' }),
+        el('h2', { class: 'shelf-hero-title' }),
+        el('p', { class: 'shelf-hero-sub', text: '\u00a0' }),  // twarda spacja trzyma wysokość, zanim dojdą książki
       ]),
-    ]),
-    el('div', { class: 'shelf-stats' }, [
-      stat(String(rows.length), plural(rows.length, 'książka', 'książki', 'książek')),
-      stat(pages.toLocaleString('pl-PL'), 'stron'),
-      stat(String(loved), plural(loved, 'ulubiona', 'ulubione', 'ulubionych')),
-    ]),
-  );
+    );
+    if (!fresh) {
+      swirlAura(aura);
+      setOrbit(aura, null, '', true);  // stara orbita odlatuje
+    }
+    heroDrawn.orbit = null;
+  }
+  hero.querySelector('.shelf-hero-kicker').textContent = isOwn ? 'Twoja półka' : 'Półka';
+  hero.querySelector('.shelf-hero-title').textContent = firstName(owner.name) || 'Półka';
+
+  const stats = hero.querySelector('.shelf-stats');
+  stats.classList.toggle('pending', !loaded);
+  if (loaded) {
+    hero.querySelector('.shelf-hero-sub').textContent = rows.length
+      ? `Od ${new Date(rows.at(-1).created_at).getFullYear()} roku w Czytanku`
+      : 'Czeka na pierwszą książkę';
+    const loved = rows.filter(r => r.rating === 1).length;
+    const values = [rows.length, rows.reduce((sum, r) => sum + (r.pages || 0), 0), loved];
+    const labels = [plural(rows.length, 'książka', 'książki', 'książek'), 'stron', plural(loved, 'ulubiona', 'ulubione', 'ulubionych')];
+    [...stats.children].forEach((tile, i) => {
+      countTo(tile.firstChild, heroDrawn.stats[i], values[i]);
+      tile.lastChild.textContent = labels[i];
+    });
+    heroDrawn.stats = values;
+
+    // Orbita: nowa osoba albo pierwsze rysowanie = wlatuje i łuki się rysują; zmiana w książkach = po cichu
+    const orbitSig = JSON.stringify(rows.map(r => [r.id, r.pages, r.rating, r.multiplier, r.unfinished]));
+    if (orbitSig !== heroDrawn.orbit) {
+      setOrbit(aura, rows, String(owner.key), heroDrawn.orbit === null);
+      heroDrawn.orbit = orbitSig;
+    }
+  }
+  heroDrawn.owner = owner.key;
 }
 
 export function renderShelf() {
@@ -435,7 +504,16 @@ export function renderShelf() {
     sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
   }
 
-  document.getElementById('shelf').replaceChildren(...sections);
+  const shelf = document.getElementById('shelf');
+  shelf.replaceChildren(...sections);
+  shelf.classList.remove('switching');
+  if (shownOwner !== userId) {
+    // Półka innej osoby wjeżdża sekcja po sekcji
+    shelf.classList.remove('enter');
+    void shelf.offsetWidth;
+    shelf.classList.add('enter');
+    shownOwner = userId;
+  }
   refreshIcons();
 }
 
@@ -835,6 +913,8 @@ export function renderCoverPicker(container, row, query, save) {
 // Po wylogowaniu: następne konto na tym urządzeniu nie dostaje cudzych okładek ani wyników
 export function resetShelfCaches() {
   shelfSignature = null;
+  loadedOwner = null;
+  shownOwner = null;
   lookupCache.clear();
   enrichInFlight.clear();
   shelfSeq++;

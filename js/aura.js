@@ -129,18 +129,54 @@ function orbit(books, rand, uid) {
   ]);
 }
 
-// Ustawia kolory na karcie (to z nich liczy style.css) i zwraca tło do wstawienia pod treść
-export function buildAura(hero, color, seed, books = []) {
-  const [h, s] = colorToHsl(color);
-  // Szarości zostają szare (wychodzi srebro), reszta dostaje żywe nasycenie
-  const sat = s < 10 ? s : Math.min(92, Math.max(58, s));
-  hero.style.setProperty('--aura-h', String(h));
-  hero.style.setProperty('--aura-s', sat.toFixed(0));
-  const rand = seeded(seed);
+// Tło karty budujemy raz. Przy zmianie osoby zostaje: kolory przepływają (--aura-h i --aura-s są
+// zarejestrowane w style.css, więc przeglądarka je animuje), plamy robią zawirowanie, przez kartę przechodzi
+// błysk, a orbita odlatuje i wlatuje nowa.
+export function createAura() {
   return el('div', { class: 'shelf-aura', 'aria-hidden': 'true' }, [
     el('div', { class: 'aura-mesh' }, [1, 2, 3, 4].map(i => el('span', { class: `mesh-blob m${i}` }))),
-    el('div', { class: 'aura-orbit' }, [orbit(books, rand, `orb${hash(seed).toString(36)}`)]),
+    el('div', { class: 'aura-orbit' }),
     el('span', { class: 'aura-grain' }),
     el('span', { class: 'aura-sheen' }),
   ]);
+}
+
+export function setAuraColor(hero, color) {
+  const [h, s] = colorToHsl(color);
+  // Szarości zostają szare (wychodzi srebro), reszta dostaje żywe nasycenie
+  const sat = s < 10 ? s : Math.min(92, Math.max(58, s));
+  // Odcień idzie krótszą drogą po kole barw (z czerwieni do różu przez fiolet, a nie przez zieleń)
+  const prev = parseFloat(hero.style.getPropertyValue('--aura-h'));
+  const next = Number.isFinite(prev) ? prev + ((((h - prev) % 360) + 540) % 360) - 180 : h;
+  hero.style.setProperty('--aura-h', next.toFixed(1));
+  hero.style.setProperty('--aura-s', sat.toFixed(0));
+}
+
+// Przy zmianie osoby: zawirowanie plam i błysk przez kartę
+export function swirlAura(aura) {
+  const mesh = aura.querySelector('.aura-mesh');
+  mesh.classList.remove('swirl');
+  void mesh.offsetWidth;  // od nowa, także przy szybkim przeklikiwaniu
+  mesh.classList.add('swirl');
+  aura.querySelector('.aura-sheen').replaceWith(el('span', { class: 'aura-sheen' }));
+}
+
+let orbitCount = 0;
+
+// books = null: stara orbita odlatuje, nowej jeszcze nie ma (książki osoby się wczytują).
+// animate = false: podmiana bez ruchu (np. zmiana oceny), łuki nie rysują się od nowa.
+export function setOrbit(aura, books, seed, animate) {
+  const slot = aura.querySelector('.aura-orbit');
+  slot.querySelectorAll('.orb-svg:not(.leaving)').forEach(old => {
+    if (!animate) {
+      old.remove();
+      return;
+    }
+    old.classList.add('leaving');
+    setTimeout(() => old.remove(), 700);
+  });
+  if (!books) return;
+  const svg = orbit(books, seeded(seed), `orb${++orbitCount}`);
+  svg.classList.add(animate ? 'entering' : 'static');
+  slot.appendChild(svg);
 }
