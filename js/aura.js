@@ -135,7 +135,7 @@ const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwyk�
 const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 520;     // lot jednego okręgu
 // Prędkość po t ms trzymania: szybki zryw na starcie, potem coraz ostrzejsze przyspieszanie do SPIN_MAX
-const holdRate = t => 1 + SPIN_JUMP * (1 - Math.exp(-t / SPIN_JUMP_MS)) + (SPIN_MAX - 1 - SPIN_JUMP) * Math.min(1, t / SPIN_RAMP) ** SPIN_CURVE;
+const holdRate = t => (t = Math.max(0, t), 1 + SPIN_JUMP * (1 - Math.exp(-t / SPIN_JUMP_MS)) + (SPIN_MAX - 1 - SPIN_JUMP) * Math.min(1, t / SPIN_RAMP) ** SPIN_CURVE);
 // Odwrotnie: po ilu ms trzymania jest dana prędkość (żeby ponowne przytrzymanie dokładało od bieżącej)
 function holdTime(rate) {
   let lo = 0;
@@ -212,12 +212,14 @@ class Orbit {
       const dt = Math.min(64, now - last);
       last = now;
       if (this.holding) {
-        const held = now - this.holdStart;
+        // Znacznik czasu klatki bywa odrobinę wcześniejszy niż chwila naciśnięcia: czas trzymania nie może być ujemny
+        const held = Math.max(0, now - this.holdStart);
         this.spinRate = holdRate(held);
         if (held >= SPIN_RAMP && !this.launch) this.fire();
       } else {
         this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
       }
+      if (!Number.isFinite(this.spinRate)) this.spinRate = 1;
       const done = !this.holding && this.spinRate < 1.02;
       if (done) this.spinRate = 1;
       this.charge(now);
