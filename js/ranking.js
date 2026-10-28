@@ -1,3 +1,4 @@
+import { inkFor } from './aura.js';
 import { viewerId } from './admin.js';
 import { shownBadges } from './badges.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
@@ -24,6 +25,7 @@ export function avatar(reader, colors, extraClass = '') {
   const initial = () => {
     const node = el('span', { class: classes, 'aria-hidden': 'true', text: firstName(reader.name).charAt(0).toUpperCase() });
     node.style.background = colors.get(reader.key);
+    node.style.color = inkFor(colors.get(reader.key));  // inicjał czytelny na jasnym i ciemnym kolorze
     return node;
   };
   if (!reader.avatarUrl) return initial();

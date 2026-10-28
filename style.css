@@ -74,13 +74,23 @@ body {
 }
 
 /* Header */
+/* Logo na środku, panel osoby (imię, ustawienia) po prawej; pusta lewa kolumna trzyma logo w centrum */
 header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-bottom: 2.5rem;
+}
+
+header .app-title {
+  grid-column: 2;
+}
+
+header .user-panel {
+  grid-column: 3;
+  justify-self: end;
+  min-width: 0;
 }
 
 .app-title {
@@ -403,7 +413,7 @@ th {
   color: var(--text-main);
 }
 
-/* Telefon: tytuł w jednej linii, panel usera pod nim na całą szerokość */
+/* Telefon: logo na środku, po prawej sam przycisk ustawień */
 @media (max-width: 600px) {
   header {
     margin-bottom: 1.5rem;
@@ -419,13 +429,9 @@ th {
     min-width: 0;
   }
 
+  /* Logo stoi na środku, więc obok zostaje tylko przycisk ustawień (swoje imię widać na Półce i w Rankingu) */
   .user-panel .user-name {
-    max-width: 40vw;
-    min-width: 0;
-    font-size: 1rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
 
   .stat-card {
@@ -1648,182 +1654,286 @@ select.plain-input {
   display: none;
 }
 
-/* Tło nagłówka w kolorze osoby (js/aura.js rysuje SVG i ustawia --aura-h oraz --aura-s). Wszystkie barwy
-   liczy stąd, osobno dla jasnego i ciemnego motywu. Warstwy: gradient, plamy koloru, dwie wstęgi linii,
-   okręgi, kropki, połysk i ziarno. */
-.shelf-hero {
+/* Karta osoby na Półce (js/aura.js): ciemny plakat w kolorze osoby, w obu motywach. js/aura.js ustawia
+   --aura-h i --aura-s, stąd liczą się wszystkie barwy. Warstwy: gradient, rozmyte plamy (powoli dryfują),
+   orbita książek po prawej, ziarno, przyciemnienie pod tekstem i błysk przy wejściu. Czytnik ma własny,
+   czarno-biały wygląd, dlatego kolory są pod :root:not(.eink). */
+:root:not(.eink) .shelf-hero {
   --h: var(--aura-h, 250);
-  --s: calc(var(--aura-s, 60) * 1%);
-  --s-soft: calc(var(--aura-s, 60) * 0.7%);
-  --s-glow: calc(var(--aura-s, 60) * 0.82%);
-  --base-a: 93%;
-  --base-b: 84%;
-  --glow-1: 70%;
-  --glow-2: 78%;
-  --glow-3: 66%;
-  --glow-accent: 72%;
-  --line: hsl(var(--h) 100% 100% / 0.6);
-  --line-2: hsl(calc(var(--h) - 12) 90% 40% / 0.4);
-  --scrim-l: 97%;
-  --scrim-a: 0.55;
-  --ring: hsl(var(--h) 100% 100% / 0.7);
-  --sheen: 0.5;
-  --grain: 0.22;
-  --vignette: 0.06;
-  border-color: hsl(var(--h) var(--s-soft) 55% / 0.35);
-  box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.5);
-}
-
-:root.dark-mode .shelf-hero {
-  --base-a: 16%;
-  --base-b: 9%;
-  --glow-1: 44%;
-  --glow-2: 36%;
-  --glow-3: 48%;
-  --glow-accent: 46%;
-  --line: hsl(calc(var(--h) + 8) 100% 88% / 0.4);
-  --line-2: hsl(calc(var(--h) - 20) 100% 66% / 0.55);
-  --scrim-l: 7%;
-  --scrim-a: 0.6;
-  --ring: hsl(var(--h) 100% 92% / 0.45);
-  --sheen: 0.22;
-  --grain: 0.28;
-  --vignette: 0.3;
-  box-shadow: var(--shadow), inset 0 1px 0 rgb(255 255 255 / 0.1);
+  --s: calc(var(--aura-s, 70) * 1%);
+  --s-deep: calc(var(--aura-s, 70) * 0.55%);
+  padding: 1.5rem 1.4rem 1.3rem;
+  border: 1px solid hsl(var(--h) var(--s) 72% / 0.26);
+  background: linear-gradient(150deg, hsl(var(--h) var(--s-deep) 14%), hsl(calc(var(--h) + 28) var(--s-deep) 7%));
+  color: #fff;
+  box-shadow: 0 28px 52px -30px hsl(var(--h) var(--s) 45% / 0.95), inset 0 1px 0 rgb(255 255 255 / 0.14);
+  isolation: isolate;
 }
 
 .shelf-aura {
   position: absolute;
   inset: 0;
+  z-index: -1;
   overflow: hidden;
+  border-radius: inherit;
   pointer-events: none;
-  animation: aura-in 0.8s ease both;
 }
 
-.ar-svg {
+/* Przyciemnienie po lewej (pod imieniem) i na dole (pod liczbami) */
+.shelf-aura::after {
+  content: "";
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
+  background: linear-gradient(90deg, hsl(var(--h) var(--s-deep) 7% / 0.6), transparent 62%),
+    linear-gradient(transparent 55%, hsl(var(--h) var(--s-deep) 6% / 0.45));
 }
 
-.ar-blob {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: ar-float 24s ease-in-out infinite alternate;
+.mesh-blob {
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(32px);
+  will-change: transform;
+  animation: mesh-a 22s ease-in-out infinite alternate;
 }
 
-.ar-blob.b1 { animation-duration: 31s; animation-direction: alternate-reverse; }
-.ar-blob.b2 { animation-duration: 37s; }
-.ar-blob.b3 { animation-duration: 28s; animation-direction: alternate-reverse; }
-
-.ar-ribbon {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: ar-sway 34s ease-in-out infinite alternate;
+.mesh-blob.m1 {
+  left: -18%;
+  top: -60%;
+  width: 62%;
+  background: hsl(var(--h) var(--s) 50% / 0.75);
 }
 
-.ar-ribbon-b {
-  animation-duration: 47s;
+.mesh-blob.m2 {
+  right: -12%;
+  top: -40%;
+  width: 52%;
+  background: hsl(calc(var(--h) + 32) var(--s) 52% / 0.55);
+  animation-name: mesh-b;
+  animation-duration: 27s;
+}
+
+.mesh-blob.m3 {
+  left: 16%;
+  bottom: -80%;
+  width: 72%;
+  background: hsl(calc(var(--h) - 36) var(--s) 40% / 0.6);
+  animation-name: mesh-c;
+  animation-duration: 31s;
+}
+
+.mesh-blob.m4 {
+  right: 10%;
+  top: 14%;
+  width: 24%;
+  background: hsl(calc(var(--h) + 14) var(--s) 66% / 0.42);
+  animation-name: mesh-b;
+  animation-duration: 19s;
   animation-direction: alternate-reverse;
 }
 
-.ln {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1.1;
-  vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
+@keyframes mesh-a {
+  to { transform: translate3d(24%, 18%, 0) scale(1.15); }
 }
 
-.ln-2 {
-  stroke: var(--line-2);
-  stroke-width: 1.6;
+@keyframes mesh-b {
+  to { transform: translate3d(-22%, 26%, 0) scale(0.88); }
 }
 
-.ar-ribbon-b .ln {
-  stroke-width: 0.8;
+@keyframes mesh-c {
+  to { transform: translate3d(-16%, -20%, 0) scale(1.12); }
 }
 
-.ar-ring {
-  fill: none;
-  stroke: var(--ring);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.ar-ring-2 {
-  stroke-dasharray: 2 7;
-}
-
-.ar-orb {
-  stroke: var(--ring);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-.ar-dot {
-  fill: var(--ring);
-}
-
-.ar-dots {
-  opacity: 0.7;
-}
-
-.aura-sheen {
+/* Orbita: każdy okrąg to książka */
+.aura-orbit {
   position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 20%, rgb(255 255 255 / var(--sheen)) 38%, transparent 52%);
-  mix-blend-mode: soft-light;
+  top: 50%;
+  right: -4.75rem;
+  width: 21rem;
+  aspect-ratio: 1;
+  transform: translateY(-57%);
+  -webkit-mask-image: radial-gradient(closest-side, #000 80%, transparent);
+  mask-image: radial-gradient(closest-side, #000 80%, transparent);
+}
+
+.orb-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.orb-spin {
+  transform-box: view-box;
+  transform-origin: 150px 150px;
+  animation: orb-spin 120s linear infinite;
+}
+
+.orb-spin.rev {
+  animation-direction: reverse;
+}
+
+.orb-track {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.07);
+  stroke-width: 1;
+}
+
+.orb-track.empty {
+  stroke: rgb(255 255 255 / 0.2);
+  stroke-dasharray: 2 6;
+}
+
+.orb-arc {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: var(--len) 360;
+  animation: orb-draw 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.orb-arc.mid {
+  stroke: hsl(calc(var(--h) + 18) var(--s) 74% / 0.92);
+}
+
+.orb-arc.hot {
+  stroke: hsl(calc(var(--h) - 28) 100% 80%);
+}
+
+.orb-arc.dim {
+  stroke: rgb(255 255 255 / 0.26);
+}
+
+.orb-halo {
+  fill: hsl(calc(var(--h) + 18) 100% 76% / 0.3);
+  animation: orb-pop 0.6s ease both;
+}
+
+.orb-halo.hot {
+  fill: hsl(calc(var(--h) - 28) 100% 80% / 0.45);
+}
+
+.orb-halo.dim {
+  fill: none;
+}
+
+.orb-dot {
+  fill: #fff;
+  animation: orb-pop 0.6s ease both;
+}
+
+.orb-dot.dim {
+  fill: rgb(255 255 255 / 0.45);
+}
+
+.orb-core-0 { stop-color: hsl(calc(var(--h) + 15) 100% 90% / 0.85); }
+.orb-core-1 { stop-color: hsl(var(--h) var(--s) 62% / 0.35); }
+.orb-core-2 { stop-color: hsl(var(--h) var(--s) 50% / 0); }
+
+.orb-center {
+  fill: #fff;
+}
+
+@keyframes orb-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orb-draw {
+  from { stroke-dasharray: 0 360; }
+}
+
+@keyframes orb-pop {
+  from { opacity: 0; }
 }
 
 .aura-grain {
   position: absolute;
   inset: 0;
-  opacity: var(--grain);
+  opacity: 0.16;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-.shelf-aura::before {
-  content: "";
+/* Błysk przechodzący przez kartę raz, przy wejściu */
+.aura-sheen {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: linear-gradient(90deg, hsl(var(--h) var(--s-soft) var(--scrim-l) / var(--scrim-a)) 0%, transparent 66%);
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.16) 50%, transparent 65%);
+  transform: translateX(-110%);
+  animation: aura-sheen 1.6s 0.3s ease-out forwards;
 }
 
-.shelf-hero-sub {
-  color: color-mix(in srgb, var(--text-main) 82%, transparent);
-}
-
-.shelf-aura::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(120% 140% at 50% 40%, transparent 55%, rgb(0 0 0 / var(--vignette)));
-}
-
-@keyframes aura-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes ar-float {
-  from { transform: translate(-6%, -4%) scale(0.94); }
-  to { transform: translate(7%, 6%) scale(1.1); }
-}
-
-@keyframes ar-sway {
-  from { transform: translateX(-4%) scaleY(0.94); }
-  to { transform: translateX(4%) scaleY(1.06); }
+@keyframes aura-sheen {
+  to { transform: translateX(110%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ar-blob,
-  .ar-ribbon {
+  .mesh-blob,
+  .orb-spin,
+  .aura-sheen {
     animation: none;
+  }
+}
+
+/* Treść karty */
+.shelf-hero-kicker {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+:root:not(.eink) .shelf-hero-kicker {
+  color: hsl(calc(var(--h) + 18) var(--s) 84% / 0.9);
+}
+
+:root:not(.eink) .shelf-hero-title {
+  color: #fff;
+  font-size: 2.15rem;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 18px hsl(var(--h) var(--s) 25% / 0.6);
+}
+
+:root:not(.eink) .shelf-hero-sub {
+  color: rgb(255 255 255 / 0.72);
+}
+
+:root:not(.eink) .shelf-hero .shelf-hero-avatar {
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.92), 0 0 0 8px hsl(var(--h) var(--s) 70% / 0.22), 0 14px 30px -8px hsl(var(--h) var(--s) 35% / 0.95);
+}
+
+:root:not(.eink) .shelf-hero .shelf-stats {
+  margin-top: 1.35rem;
+}
+
+:root:not(.eink) .shelf-hero .shelf-stat {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: hsl(var(--h) var(--s-deep) 8% / 0.38);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+}
+
+:root:not(.eink) .shelf-hero .shelf-stat strong {
+  color: #fff;
+  font-size: 1.4rem;
+}
+
+:root:not(.eink) .shelf-hero .shelf-stat span {
+  color: rgb(255 255 255 / 0.66);
+}
+
+@media (max-width: 480px) {
+  .aura-orbit {
+    right: -6rem;
+    width: 17rem;
+    opacity: 0.85;
+  }
+
+  :root:not(.eink) .shelf-hero-title {
+    font-size: 1.8rem;
   }
 }
 
@@ -1831,13 +1941,6 @@ select.plain-input {
 .shelf-hero-text {
   position: relative;
   z-index: 1;
-}
-
-.shelf-hero .shelf-stat {
-  border-color: hsl(var(--h) var(--s-soft) 50% / 0.3);
-  background: color-mix(in srgb, var(--bg-card) 58%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 
 .shelf-hero-body {
@@ -6656,6 +6759,11 @@ body.be-lock {
   font-size: 2.25rem;
 }
 
+:root.eink .shelf-hero-kicker {
+  color: #000;
+  font-size: 0.8rem;
+}
+
 :root.eink .shelf-hero-sub {
   color: #000;
   font-size: 1rem;
@@ -7383,6 +7491,7 @@ body.be-lock {
 }
 
 :root:not(.eink) .shelf-person.active {
+  color: var(--person-ink, #fff);
   border-color: var(--person, var(--primary));
   background: var(--person, var(--primary));
   box-shadow: 0 6px 14px -6px var(--person, var(--primary));

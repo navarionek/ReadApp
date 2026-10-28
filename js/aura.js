@@ -1,26 +1,30 @@
 import { el } from './ui.js';
 
-/* ----------------- Tło nagłówka Półki: abstrakcja w kolorze osoby ----------------- */
-// Kolor osoby (własny albo z palety, może być zmienną CSS) zamieniamy na odcień i nasycenie; z nich style.css
-// liczy wszystkie barwy (osobno dla jasnego i ciemnego motywu). Obraz jest rysowany w SVG i losowany z klucza
-// osoby: u każdego inny układ, ale zawsze ten sam dla tej samej osoby. Warstwy od spodu: gradient,
-// płynne plamy koloru, dwie wstęgi cienkich linii (skręcają się i rozchodzą jak nitki), okręgi jak szkło,
-// siatka kropek, połysk i ziarno papieru.
+/* ----------------- Karta osoby na Półce ----------------- */
+// Ciemny „plakat” w kolorze osoby: siatka rozmytych plam w pokrewnych odcieniach, a po prawej orbita,
+// w której każdy okrąg to jedna przeczytana książka (od najstarszej w środku do najnowszej na zewnątrz).
+// Długość łuku to liczba stron, grubość to mnożnik, jasny akcent to ulubiona, przygaszony to słaba albo
+// niedokończona. Okręgi obracają się w różnym tempie, przy wejściu łuki się rysują. Kolor osoby (własny
+// albo z palety, może być zmienną CSS) zamieniamy na odcień i nasycenie; barwy liczy z nich style.css.
 const NS = 'http://www.w3.org/2000/svg';
-const W = 800;
-const H = 340;
+const C = 150;          // środek orbity w jednostkach viewBox 300×300
+const MAX_RINGS = 24;
 
-// Dowolny kolor CSS → [h 0..360, s 0..100, l 0..100]; sprawdza go przeglądarka, więc działają hex, hsl() i var()
-export function colorToHsl(css) {
+// Dowolny kolor CSS → [r, g, b] 0..255; sprawdza go przeglądarka, więc działają hex, hsl() i var()
+export function colorToRgb(css) {
   const probe = el('span');
   probe.style.cssText = `position:absolute;visibility:hidden;color:${css}`;
   document.body.appendChild(probe);
   const computed = getComputedStyle(probe).color;
   probe.remove();
   const nums = (computed.match(/-?[\d.]+/g) || []).map(Number);
-  if (nums.length < 3) return [250, 70, 50];
+  if (nums.length < 3) return [99, 102, 241];
   const scale = computed.startsWith('color(') ? 255 : 1;  // color(srgb 0.2 0.4 0.6) ma kanały 0..1
-  const [r, g, b] = nums.slice(0, 3).map(v => v * scale / 255);
+  return nums.slice(0, 3).map(v => v * scale);
+}
+
+export function colorToHsl(css) {
+  const [r, g, b] = colorToRgb(css).map(v => v / 255);
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const l = (max + min) / 2;
@@ -32,6 +36,19 @@ export function colorToHsl(css) {
   else if (max === g) h = (b - r) / d + 2;
   else h = (r - g) / d + 4;
   return [Math.round((h * 60 + 360) % 360), s * 100, l * 100];
+}
+
+// Kolor napisu na tle w danym kolorze: biały albo prawie czarny, ten z lepszym kontrastem (WCAG)
+const INK_DARK = '#0f172a';
+export function inkFor(css) {
+  const lum = colorToRgb(css).map(v => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  const L = 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2];
+  const contrastWhite = 1.05 / (L + 0.05);
+  const contrastDark = (L + 0.05) / (0.0137 + 0.05);  // luminancja #0f172a
+  return contrastDark > contrastWhite ? INK_DARK : '#ffffff';
 }
 
 function hash(text) {
@@ -52,100 +69,78 @@ function seeded(text) {
 
 function node(tag, attrs = {}, children = []) {
   const n = document.createElementNS(NS, tag);
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
   children.forEach(c => n.appendChild(c));
   return n;
 }
 
-const fmt = n => n.toFixed(1);
+// books: przeczytane osoby od najnowszej (jak na półce); bierzemy ostatnie MAX_RINGS i układamy od najstarszej
+function orbit(books, rand, uid) {
+  const list = books.slice(0, MAX_RINGS).reverse();
+  const count = list.length || 5;
+  const r0 = 34;
+  const step = Math.min(11, (138 - r0) / Math.max(count - 1, 1));
+  const maxPages = Math.max(1, ...list.map(b => b.pages || 0));
+  const rings = node('g', { class: 'orb-rings' });
 
-// Wstęga: kilkanaście linii, które w jednych miejscach zbiegają się w nitkę, w innych rozchodzą w wachlarz
-function ribbon(rand, { lines, spread, amplitude, accentEvery, cls }) {
-  const f1 = 0.55 + rand() * 1.0;
-  const f2 = 0.8 + rand() * 1.3;
-  const p1 = rand() * Math.PI * 2;
-  const p2 = rand() * Math.PI * 2;
-  const cy = H * (0.4 + rand() * 0.25);
-  const group = node('g', { class: `ar-ribbon ${cls}` });
-  for (let i = 0; i < lines; i++) {
-    const t = i / (lines - 1) - 0.5;
-    let d = '';
-    for (let k = 0; k <= 72; k++) {
-      const x = -160 + (k / 72) * (W + 320);
-      const u = x / W;
-      const wave = amplitude * Math.sin(Math.PI * 2 * f1 * u + p1);
-      const fan = t * spread * (0.5 + 0.5 * Math.sin(Math.PI * 2 * f2 * u + p2));
-      d += `${k ? 'L' : 'M'}${fmt(x)} ${fmt(cy + wave + fan)} `;
+  for (let i = 0; i < count; i++) {
+    const r = (r0 + i * step).toFixed(1);
+    const book = list[i];
+    const spin = node('g', {
+      class: `orb-spin${i % 2 ? ' rev' : ''}`,
+      style: `animation-duration:${Math.round(70 + rand() * 110)}s`,
+    });
+    const tilt = node('g', { transform: `rotate(${Math.round(rand() * 360)} ${C} ${C})` });
+    tilt.appendChild(node('circle', { cx: C, cy: C, r, class: `orb-track${book ? '' : ' empty'}` }));
+    if (book) {
+      const len = Math.round(50 + 280 * Math.min(1, (book.pages || 0) / maxPages));
+      const kind = book.unfinished || book.rating === -1 ? 'dim' : book.rating === 1 ? 'hot' : 'mid';
+      const mult = Number(book.multiplier);
+      const width = 2.2 + (mult > 1 ? 1.6 : 0) + (mult >= 2.25 ? 1 : 0);
+      const delay = 0.15 + i * 0.05;
+      tilt.appendChild(node('circle', {
+        cx: C, cy: C, r, pathLength: 360,
+        class: `orb-arc ${kind}`,
+        style: `--len:${len};stroke-width:${width.toFixed(1)};animation-delay:${delay.toFixed(2)}s`,
+      }));
+      // „Planeta” na końcu łuku (łuk zaczyna się na godzinie 3 i idzie zgodnie z zegarem)
+      const a = (len * Math.PI) / 180;
+      const px = (C + r * Math.cos(a)).toFixed(1);
+      const py = (C + r * Math.sin(a)).toFixed(1);
+      const pop = `animation-delay:${(delay + 0.55).toFixed(2)}s`;
+      tilt.appendChild(node('circle', { cx: px, cy: py, r: 5.5, class: `orb-halo ${kind}`, style: pop }));
+      tilt.appendChild(node('circle', { cx: px, cy: py, r: (width / 2 + 0.9).toFixed(1), class: `orb-dot ${kind}`, style: pop }));
     }
-    const accent = i % accentEvery === Math.floor(accentEvery / 2);
-    group.appendChild(node('path', { d, class: `ln${accent ? ' ln-2' : ''}`, style: `opacity:${(0.45 + 0.55 * (1 - Math.abs(t) * 1.4)).toFixed(2)}` }));
+    spin.appendChild(tilt);
+    rings.appendChild(spin);
   }
-  return group;
+
+  return node('svg', { class: 'orb-svg', viewBox: '0 0 300 300', focusable: 'false' }, [
+    node('defs', {}, [
+      node('radialGradient', { id: `${uid}-core` }, [
+        node('stop', { offset: 0, class: 'orb-core-0' }),
+        node('stop', { offset: 0.4, class: 'orb-core-1' }),
+        node('stop', { offset: 1, class: 'orb-core-2' }),
+      ]),
+    ]),
+    node('circle', { cx: C, cy: C, r: 70, fill: `url(#${uid}-core)` }),
+    rings,
+    node('circle', { cx: C, cy: C, r: 3.5, class: 'orb-center' }),
+  ]);
 }
 
-// Ustawia kolory na nagłówku (to z nich liczy style.css) i zwraca tło do wstawienia pod treść
-export function buildAura(hero, color, seed) {
+// Ustawia kolory na karcie (to z nich liczy style.css) i zwraca tło do wstawienia pod treść
+export function buildAura(hero, color, seed, books = []) {
   const [h, s] = colorToHsl(color);
-  // Szarości zostają szare, reszta dostaje żywe, ale niekrzykliwe nasycenie
-  const sat = s < 10 ? s : Math.min(90, Math.max(52, s));
+  // Szarości zostają szare (wychodzi srebro), reszta dostaje żywe nasycenie
+  const sat = s < 10 ? s : Math.min(92, Math.max(58, s));
   hero.style.setProperty('--aura-h', String(h));
   hero.style.setProperty('--aura-s', sat.toFixed(0));
-
   const rand = seeded(seed);
-  const uid = `ar${hash(seed).toString(36)}`;
-  const defs = node('defs');
-  const radial = (id, stops) => {
-    const g = node('radialGradient', { id: `${uid}-${id}` }, stops.map(([offset, css]) => node('stop', { offset, style: `stop-color:${css}` })));
-    defs.appendChild(g);
-    return `url(#${uid}-${id})`;
-  };
-
-  defs.appendChild(node('linearGradient', { id: `${uid}-base`, x1: 0, y1: 0, x2: 1, y2: 1 }, [
-    node('stop', { offset: 0, style: 'stop-color:hsl(var(--h) var(--s-soft) var(--base-a))' }),
-    node('stop', { offset: 1, style: 'stop-color:hsl(calc(var(--h) + 26) var(--s-soft) var(--base-b))' }),
-  ]));
-
-  // Plamy koloru: pokrewne odcienie plus jeden mały, kontrastowy akcent
-  const blobSpec = [
-    { dh: 0, l: 'var(--glow-1)', a: 0.95, r: 300 },
-    { dh: 44, l: 'var(--glow-2)', a: 0.85, r: 260 },
-    { dh: -40, l: 'var(--glow-3)', a: 0.8, r: 280 },
-    { dh: 168 + Math.round(rand() * 24), l: 'var(--glow-accent)', a: 0.4, r: 150 },
-  ];
-  const blobs = node('g', { class: 'ar-blobs' });
-  blobSpec.forEach((b, i) => {
-    const fill = radial(`b${i}`, [
-      ['0', `hsl(calc(var(--h) + ${b.dh}) var(--s-glow) ${b.l} / ${b.a})`],
-      ['1', `hsl(calc(var(--h) + ${b.dh}) var(--s-glow) ${b.l} / 0)`],
-    ]);
-    const c = node('circle', { cx: fmt(80 + rand() * 640), cy: fmt(30 + rand() * 280), r: b.r, fill, class: `ar-blob b${i}` });
-    blobs.appendChild(c);
-  });
-
-  // Dwa okręgi jak obręcze, jeden „szklany” w rogu i siatka kropek
-  const ringX = rand() < 0.5 ? 150 + rand() * 120 : 560 + rand() * 130;
-  const ringY = 40 + rand() * 120;
-  const orbFill = radial('orb', [['0', 'rgb(255 255 255 / 0.55)'], ['0.55', 'rgb(255 255 255 / 0.12)'], ['1', 'rgb(255 255 255 / 0)']]);
-  const art = node('g', { class: 'ar-art' }, [
-    node('circle', { cx: fmt(ringX), cy: fmt(ringY), r: 130 + Math.round(rand() * 50), class: 'ar-ring' }),
-    node('circle', { cx: fmt(ringX), cy: fmt(ringY), r: 86 + Math.round(rand() * 30), class: 'ar-ring ar-ring-2' }),
-    node('circle', { cx: fmt(ringX), cy: fmt(ringY), r: 42 + Math.round(rand() * 14), fill: orbFill, class: 'ar-orb' }),
-    node('rect', { x: fmt(rand() < 0.5 ? 20 : 650), y: fmt(190 + rand() * 40), width: 130, height: 70, fill: `url(#${uid}-dots)`, class: 'ar-dots' }),
-  ]);
-  defs.appendChild(node('pattern', { id: `${uid}-dots`, width: 14, height: 14, patternUnits: 'userSpaceOnUse' }, [node('circle', { cx: 2, cy: 2, r: 1.3, class: 'ar-dot' })]));
-
-  const svg = node('svg', { class: 'ar-svg', viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'xMidYMid slice', focusable: 'false' }, [
-    defs,
-    node('rect', { width: W, height: H, fill: `url(#${uid}-base)` }),
-    blobs,
-    ribbon(rand, { lines: 18 + Math.floor(rand() * 8), spread: 150 + rand() * 90, amplitude: 36 + rand() * 46, accentEvery: 5, cls: 'ar-ribbon-a' }),
-    ribbon(rand, { lines: 7 + Math.floor(rand() * 4), spread: 90 + rand() * 60, amplitude: 28 + rand() * 40, accentEvery: 3, cls: 'ar-ribbon-b' }),
-    art,
-  ]);
-
   return el('div', { class: 'shelf-aura', 'aria-hidden': 'true' }, [
-    svg,
-    el('span', { class: 'aura-sheen' }),
+    el('div', { class: 'aura-mesh' }, [1, 2, 3, 4].map(i => el('span', { class: `mesh-blob m${i}` }))),
+    el('div', { class: 'aura-orbit' }, [orbit(books, rand, `orb${hash(seed).toString(36)}`)]),
     el('span', { class: 'aura-grain' }),
+    el('span', { class: 'aura-sheen' }),
   ]);
 }
