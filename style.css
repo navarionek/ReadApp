@@ -5846,10 +5846,8 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 }
 
 /* Intro po włączeniu apki (js/coverwall.js): ściana na pierwszym planie, potem odjeżdża w tło.
-   Karty ani ich przodkowie nie dostają opacity < 1: przeglądarki wtedy nie rysują blura tła
-   (karta byłaby półprzezroczysta, a blur wskakiwałby na końcu). Zamiast tego szkło się
-   „skrapla”: rośnie blur i tło karty, a jej treść wjeżdża osobno. Strona do tego czasu jest
-   tylko visibility: hidden. */
+   Karty ani ich przodkowie nie dostają opacity < 1 (pojawia się tło karty, a treść wjeżdża osobno).
+   Strona do tego czasu jest tylko visibility: hidden. */
 .cover-bg::after {
   transition: opacity 0.6s ease;
 }
@@ -5889,9 +5887,19 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   animation: intro-fade-in 0.3s ease both;
 }
 
+/* W czasie intro karty są bez matowego szkła (rozmycie tła liczyłoby się w każdej klatce nad pędzącymi
+   okładkami i to przycinało), za to z mocniejszym tłem. Szkło włącza się na końcu, a tło karty płynnie
+   wraca do zwykłej przezroczystości, więc włączenie rozmycia prawie nie rzuca się w oczy. */
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: color-mix(in srgb, var(--bg-card) 90%, transparent) !important;
   animation: intro-glass-in 0.35s ease-out both;
   animation-delay: var(--intro-delay, 0s);
+}
+
+body:has(.cover-bg) .screen[data-screen="start"] :is(.stat-card, .card, .goal-card) {
+  transition: background-color 0.6s ease;
 }
 
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
@@ -5905,8 +5913,6 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
     background-color: transparent;
     border-color: transparent;
     box-shadow: none;
-    -webkit-backdrop-filter: blur(0px) saturate(1);
-    backdrop-filter: blur(0px) saturate(1);
   }
 }
 
