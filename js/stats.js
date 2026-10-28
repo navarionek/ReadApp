@@ -1,3 +1,4 @@
+import { einkEnabled } from './eink.js';
 import { renderInsights } from './insights.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { showRaceCard } from './flight.js';
@@ -417,12 +418,37 @@ export function setRaceProgress(p, dt = null) {
   });
 }
 
+// Czytnik e-ink odświeża ekran za wolno na płynną animację (widać było tylko wynik końcowy),
+// więc wyścig idzie tu w wyraźnych krokach co chwilę, które ekran zdąży narysować
+const EINK_RACE_STEPS = 16;
+const EINK_RACE_STEP_MS = 500;
+
+function playRaceInSteps() {
+  let i = 0;
+  const tick = () => {
+    i += 1;
+    setRaceProgress(Math.min(1, i / EINK_RACE_STEPS));
+    state.raceTimer = i < EINK_RACE_STEPS ? setTimeout(tick, EINK_RACE_STEP_MS) : null;
+    if (i >= EINK_RACE_STEPS) state.raceFrame = null;
+  };
+  state.raceFrame = -1;  // w trakcie animacji (jak requestAnimationFrame): bez dymka i bez przerysowań w tle
+  setRaceProgress(0);
+  state.raceTimer = setTimeout(tick, EINK_RACE_STEP_MS);
+}
+
 export function playRace() {
   cancelAnimationFrame(state.raceFrame);
+  clearTimeout(state.raceTimer);
+  state.raceTimer = null;
   state.raceFrame = null;
   drawRace();
   hideRaceTooltip();
   if (!state.race) return;
+
+  if (einkEnabled()) {
+    playRaceInSteps();
+    return;
+  }
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     setRaceProgress(1);
