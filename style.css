@@ -7819,53 +7819,20 @@ body.be-lock {
   color: #000;
 }
 
-/* Logo po włączeniu apki (js/logo.js): napis kilka razy skacze na prawie biały i z powrotem, jak zapalana
-   żarówka (skokowo, steps), na końcu chwilę świeci i płynnie wraca do swojego koloru. Za napisem w tym
-   czasie pojawia się i powoli gaśnie miękki gradient w kolorze logo. */
-.app-title {
-  position: relative;
-  isolation: isolate;
-}
-
-.app-title::before {
-  content: "";
-  position: absolute;
-  inset: -55% -30%;
-  z-index: -1;
-  background: radial-gradient(closest-side, color-mix(in srgb, currentColor 38%, transparent), transparent);
-  opacity: 0;
-  pointer-events: none;
-}
-
+/* Logo po włączeniu apki (js/logo.js): dwa szybkie, delikatne mrugnięcia, napis tylko lekko jaśnieje
+   (w stronę bieli) i od razu wraca do swojego koloru. */
 .app-title.flicker .app-logo {
-  animation: logo-blink 1.9s both;
-}
-
-.app-title.flicker::before {
-  animation: logo-halo 1.9s both;
+  animation: logo-blink 0.7s linear both;
 }
 
 /* currentColor na samym logo = kolor napisu (dziedziczony), czyli jego zwykła barwa */
 @keyframes logo-blink {
-  0% { color: currentColor; animation-timing-function: steps(1, end); }
-  6% { color: #f4f6ff; animation-timing-function: steps(1, end); }
-  10% { color: currentColor; animation-timing-function: steps(1, end); }
-  17% { color: #f4f6ff; animation-timing-function: steps(1, end); }
-  19% { color: currentColor; animation-timing-function: steps(1, end); }
-  26% { color: #f4f6ff; animation-timing-function: linear; }
-  44% { color: #f4f6ff; animation-timing-function: ease-in-out; }
+  0% { color: currentColor; }
+  9% { color: color-mix(in srgb, currentColor 55%, #fff); }
+  22% { color: currentColor; }
+  34% { color: color-mix(in srgb, currentColor 55%, #fff); }
+  50% { color: currentColor; }
   100% { color: currentColor; }
-}
-
-@keyframes logo-halo {
-  0% { opacity: 0; animation-timing-function: steps(1, end); }
-  6% { opacity: 0.35; animation-timing-function: steps(1, end); }
-  10% { opacity: 0; animation-timing-function: steps(1, end); }
-  17% { opacity: 0.4; animation-timing-function: steps(1, end); }
-  19% { opacity: 0; animation-timing-function: steps(1, end); }
-  26% { opacity: 0.85; animation-timing-function: linear; }
-  44% { opacity: 0.85; animation-timing-function: ease-in-out; }
-  100% { opacity: 0; }
 }
 
 /* Logo „Czytanko”: napis odręczny jako SVG (kolor z motywu albo własny) */
