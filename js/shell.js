@@ -1,3 +1,4 @@
+import { onScreenShown } from './ambient.js';
 import { moveNavIndicator } from './navbar.js';
 import { playRankingIntro } from './ranking.js';
 import { resetForm } from './form.js';
@@ -19,6 +20,8 @@ export function currentScreen() {
   return SCREENS.includes(name) ? name : 'start';
 }
 
+let shownScreen = null;
+
 export function showScreen(name) {
   if (name === 'admin' && !state.isAdmin) name = 'start';
   if (name === 'wrapped') name = 'start';  // Wrapped ukryty, dopóki nie będzie dopracowany
@@ -27,9 +30,17 @@ export function showScreen(name) {
   if (toProgress) name = 'ranking';
   // Wyjście z formularza w trakcie kończenia książki = porzucenie, żeby „Dodaj” było znowu puste
   if (name !== 'dodaj' && state.finishing) resetForm();
+  // Karty nowego ekranu wjeżdżają po kolei (style.css, .screen-enter). Nie w trakcie intro na Starcie,
+  // które samo wprowadza karty. Animacje ruszają same, gdy ekran przestaje być ukryty.
+  const intro = document.documentElement.classList.contains('intro-pending')
+    || document.body.classList.contains('wall-intro') || document.body.classList.contains('wall-intro-reveal');
   document.querySelectorAll('.screen').forEach(screen => {
-    screen.hidden = screen.dataset.screen !== name;
+    const shown = screen.dataset.screen === name;
+    if (shown && name !== shownScreen) screen.classList.toggle('screen-enter', !intro);
+    screen.hidden = !shown;
   });
+  onScreenShown(name, shownScreen);
+  shownScreen = name;
   document.querySelectorAll('.nav-item').forEach(item => {
     const active = item.dataset.screen === name;
     item.classList.toggle('active', active);

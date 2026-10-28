@@ -1,3 +1,4 @@
+import { updateAmbientColors } from './ambient.js';
 import { einkEnabled } from './eink.js';
 import { coverEl, titleHue } from './shelf.js';
 import { state } from './state.js';
@@ -140,6 +141,7 @@ function mountStartWall(books, keepWall = false) {
     speed: [tile * 0.08, tile * 0.16],
     tileEl: b => el('div', { class: 'tv-wall-tile' }, [wallCover(b)]),
   }));
+  updateAmbientColors(books);  // kolory okładek na poświatę poza Startem
 }
 
 /* ----- Intro po włączeniu apki ----- */
