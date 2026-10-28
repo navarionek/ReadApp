@@ -484,12 +484,12 @@ function drawSky(canvas) {
   const rand = seeded('czytanko-niebo');
   const star = (x, y, r, alpha) => {
     const [cr, cg, cb] = STAR_TINTS[Math.floor(rand() * STAR_TINTS.length)];
-    if (r > 0.9) {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 4.5);
-      glow.addColorStop(0, `rgb(${cr} ${cg} ${cb} / ${alpha * 0.35})`);
+    if (r > 0.8) {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, r * 3.5);
+      glow.addColorStop(0, `rgb(${cr} ${cg} ${cb} / ${alpha * 0.28})`);
       glow.addColorStop(1, `rgb(${cr} ${cg} ${cb} / 0)`);
       ctx.fillStyle = glow;
-      ctx.fillRect(x - r * 4.5, y - r * 4.5, r * 9, r * 9);
+      ctx.fillRect(x - r * 3.5, y - r * 3.5, r * 7, r * 7);
     }
     ctx.fillStyle = `rgb(${cr} ${cg} ${cb} / ${alpha})`;
     ctx.beginPath();
@@ -504,14 +504,15 @@ function drawSky(canvas) {
   haze.addColorStop(0.9, 'rgb(255 255 255 / 0)');
   ctx.fillStyle = haze;
   ctx.fillRect(0, 0, W, H);
-  const count = Math.round((W * H) / 650);
+  const count = Math.round((W * H) / 520);
   for (let i = 0; i < count; i++) {
     const x = rand() * W;
     const y = rand() * H;
     const near = Math.max(0, 1 - band(x, y) * 6);  // 1 na środku pasma, 0 z dala
     if (rand() > 0.35 + 0.65 * near && rand() < 0.5) continue;  // poza pasmem rzadziej
-    const r = 0.35 + rand() ** 3 * 1.6;
-    star(x, y, r, 0.45 + rand() * 0.55);
+    // Przeważnie drobniutkie punkciki, tylko nieliczne trochę większe
+    const r = 0.22 + rand() ** 5 * 0.95;
+    star(x, y, r, 0.35 + rand() * 0.6);
   }
 }
 
@@ -519,11 +520,11 @@ function starField() {
   const rand = seeded('czytanko-iskry');
   const canvas = el('canvas', { class: 'stars-sky' });
   // Migoczące gwiazdy: więcej po prawej (tam orbita), każda w swoim rytmie
-  const twinkles = Array.from({ length: 8 }, () => {
+  const twinkles = Array.from({ length: 6 }, () => {
     const s = el('span', { class: 'star-twinkle' });
     s.style.left = `${(25 + rand() * 72).toFixed(1)}%`;
     s.style.top = `${(6 + rand() * 80).toFixed(1)}%`;
-    s.style.setProperty('--size', `${Math.round(7 + rand() * 9)}px`);
+    s.style.setProperty('--size', `${Math.round(5 + rand() * 4)}px`);
     s.style.setProperty('--dur', `${(2.6 + rand() * 3.4).toFixed(2)}s`);
     s.style.setProperty('--delay', `${(-rand() * 6).toFixed(2)}s`);
     return s;

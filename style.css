@@ -2091,7 +2091,7 @@ select.plain-input {
   height: var(--size, 10px);
   margin: calc(var(--size, 10px) / -2) 0 0 calc(var(--size, 10px) / -2);
   opacity: 0.15;
-  background: radial-gradient(closest-side, #fff 0 12%, rgb(220 230 255 / 0.55) 25%, transparent 70%);
+  background: radial-gradient(closest-side, #fff 0 14%, rgb(220 230 255 / 0.4) 30%, transparent 72%);
   animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite;
   will-change: transform, opacity;
 }
@@ -2101,12 +2101,12 @@ select.plain-input {
 .star-twinkle::after {
   content: "";
   position: absolute;
-  left: -40%;
-  right: -40%;
+  left: -15%;
+  right: -15%;
   top: 50%;
-  height: 1px;
-  margin-top: -0.5px;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.9), transparent);
+  height: 0.5px;
+  margin-top: -0.25px;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.75), transparent);
 }
 
 .star-twinkle::after {
@@ -2114,8 +2114,8 @@ select.plain-input {
 }
 
 @keyframes star-twinkle {
-  0%, 100% { opacity: 0.12; transform: scale(0.45) rotate(0deg); }
-  50% { opacity: 1; transform: scale(1) rotate(25deg); }
+  0%, 100% { opacity: 0.1; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 0.9; transform: scale(0.9) rotate(20deg); }
 }
 
 /* Spadająca gwiazda: przez większość cyklu jej nie ma, potem krótki przelot po skosie */
@@ -2123,8 +2123,8 @@ select.plain-input {
   position: absolute;
   top: 12%;
   left: 30%;
-  width: 110px;
-  height: 1.5px;
+  width: 70px;
+  height: 1px;
   border-radius: 1px;
   background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.25) 40%, #fff);
   opacity: 0;
@@ -2136,7 +2136,7 @@ select.plain-input {
 .star-shoot.s1 {
   top: 34%;
   left: 55%;
-  width: 80px;
+  width: 55px;
   animation-duration: 19s;
   animation-delay: 11s;
 }
