@@ -731,6 +731,15 @@ async function uploadCoverPhoto(blob) {
   return supabaseClient.storage.from('covers').getPublicUrl(path).data.publicUrl;
 }
 
+// Baza przyjmuje tylko linki do Google Books i Open Library; Google podaje czasem link do Google Play
+// (z id książki), więc zamieniamy go na stronę w Google Books, a inne linki pomijamy
+function safeInfoUrl(url) {
+  if (!url) return null;
+  if (/^https:\/\/(books\.google\.[a-z.]+|openlibrary\.org)\//.test(url)) return url;
+  const id = url.match(/^https:\/\/play\.google\.com\/.*[?&]id=([^&]+)/)?.[1];
+  return id ? `https://books.google.com/books?id=${id}` : null;
+}
+
 // save(row, info) dostaje wybór (okładka i informacje z bazy książek); zapisuje go edytor książki
 export function renderCoverPicker(container, row, query, save) {
   const input = el('input', { type: 'search', class: 'plain-input', 'aria-label': 'Szukaj książki', placeholder: 'Tytuł, autor…' });
@@ -798,7 +807,7 @@ export function renderCoverPicker(container, row, query, save) {
         results.replaceChildren(el('div', { class: 'status-box', text: 'Zapisuję okładkę…' }));
         save(row, {
           cover_url: await ownCover(r.cover), author: r.author?.slice(0, 200) || null, published_year: r.year, page_count: r.pages ?? null,
-          info_url: r.infoUrl, description: r.description,
+          info_url: safeInfoUrl(r.infoUrl), description: r.description,
         });
       });
       return btn;

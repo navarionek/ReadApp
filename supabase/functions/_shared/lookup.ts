@@ -19,6 +19,12 @@ function yearOf(date: unknown): number | null {
   return Number.isFinite(y) && y > 0 && y <= 2100 ? y : null;
 }
 
+function googleInfoUrl(link: unknown, id: unknown): string | null {
+  const url = link ? String(link).replace(/^http:/, 'https:') : '';
+  if (/^https:\/\/books\.google\.[a-z.]+\//.test(url)) return url;
+  return id ? `https://books.google.com/books?id=${encodeURIComponent(String(id))}` : null;
+}
+
 // q to gotowe zapytanie Google (np. intitle:"…" albo zwykły tekst).
 // null = Google nie odpowiedział (brak klucza, 503…), [] = odpowiedział, że nic nie ma.
 // Ostatni problem z Google (do diagnozy: brak klucza, kod HTTP); trafia do odpowiedzi jako googleStatus
@@ -55,7 +61,8 @@ async function google(q: string, limit: number): Promise<Result[] | null> {
       // https + bez „zawijania” rogu strony, które Google dokleja do miniatur
       cover: thumb ? thumb.replace(/^http:/, 'https:').replace('&edge=curl', '') : null,
       description: v.description ? String(v.description).replace(/<[^>]+>/g, '').slice(0, 3000) : null,
-      infoUrl: v.infoLink ? String(v.infoLink).replace(/^http:/, 'https:') : null,
+      // infoLink bywa linkiem do Google Play, którego baza nie przyjmuje: wtedy zwykła strona w Google Books
+      infoUrl: googleInfoUrl(v.infoLink, item.id),
       pages: v.pageCount ?? null,
       source: 'google' as const,
     };
