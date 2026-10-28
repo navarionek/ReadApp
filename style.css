@@ -7059,3 +7059,135 @@ body.be-lock {
 :root.eink .badge-award-item-desc {
   color: #000;
 }
+
+/* ----------------- Komentarze pod książką ----------------- */
+.bs-comments {
+  margin-top: 0.5rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+}
+
+.bs-comments-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.bs-comments-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.bs-comments-empty {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.bs-comment {
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--bg-body);
+}
+
+.bs-comment.mine {
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-card));
+}
+
+.bs-comment-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.bs-comment-when {
+  color: var(--text-muted);
+}
+
+.bs-comment-del {
+  margin-left: auto;
+  display: inline-flex;
+  padding: 0.25rem;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.bs-comment-del svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.bs-comment-body {
+  margin: 0.2rem 0 0;
+  font-size: 0.9375rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.bs-comment-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.bs-comment-input {
+  resize: vertical;
+  min-height: 3.25rem;
+  font: inherit;
+}
+
+.bs-comment-form .btn {
+  align-self: flex-end;
+}
+
+:root.eink .bs-comment,
+:root.eink .bs-comment.mine {
+  background: #fff;
+  border: 2px solid #000;
+}
+
+:root.eink .bs-comments {
+  border-top: 2px solid #000;
+}
+
+:root.eink .bs-comment-when,
+:root.eink .bs-comments-title,
+:root.eink .bs-comments-empty,
+:root.eink .bs-comment-del {
+  color: #000;
+}
+
+/* Logo „Czytanko”: napis odręczny jako SVG (kolor z motywu, zamach pod napisem w bursztynie) */
+.app-title .app-logo {
+  display: block;
+  height: 3.25rem;
+  width: auto;
+  overflow: visible;
+}
+
+.app-logo-swoosh {
+  stroke: #f5a524;
+}
+
+@media (max-width: 640px) {
+  .app-title .app-logo {
+    height: 2.6rem;
+  }
+}
+
+:root.eink .app-title .app-logo {
+  height: 3.5rem;
+}
+
+:root.eink .app-logo-swoosh {
+  stroke: currentColor;
+}

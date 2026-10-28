@@ -1,4 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
+import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
 import { loadReads, renderReadingNow } from './data.js';
@@ -473,7 +474,7 @@ function editButton(kind, row, callbacks) {
   return btn;
 }
 
-function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = [], description, link, actions = [] }) {
+function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = [], description, link, actions = [], after = [] }) {
   const backdrop = el('div', { class: 'bs-bg', 'aria-hidden': 'true' });
   if (book.cover_url) backdrop.style.setProperty('--cover', `url("${book.cover_url.replace(/"/g, '%22')}")`);
   else {
@@ -518,6 +519,7 @@ function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = []
           ])]
         : []),
       ...(actions.length ? [el('div', { class: 'bs-actions' }, actions)] : []),
+      ...after,
     ]),
   ];
 }
@@ -706,6 +708,7 @@ export function openBookModal(row, source = null) {
           },
         })]
       : [],
+    after: [commentsSection(row)],
   }), source);
 }
 
