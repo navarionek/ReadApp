@@ -125,9 +125,13 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
-const SPIN_PEAK = 90;   // najwyższa prędkość okręgów przy przytrzymaniu karty (razy zwykła)
-const SPIN_UP = 450;    // rozpędzanie: stała czasu (ms)
+const SPIN_MAX = 220;   // prędkość okręgów w chwili wystrzału (razy zwykła)
+const SPIN_RAMP = 2400; // tyle trzeba trzymać palec, żeby okręgi wystrzeliły (ms)
+const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
+const FLY_GAP = 65;     // odstęp między kolejnymi wystrzałami okręgów (ms)
+const FLY_MS = 520;     // lot jednego okręgu
+const holdTime = rate => SPIN_RAMP * Math.max(0, (rate - 1) / (SPIN_MAX - 1)) ** (1 / SPIN_CURVE);
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
@@ -174,20 +178,28 @@ class Orbit {
     return ring;
   }
 
-  // Przytrzymanie karty: dopóki palec jest na karcie, warstwy okręgów rozpędzają się do SPIN_PEAK razy
-  // szybciej (najpierw szybko, potem coraz łagodniej); po puszczeniu płynnie zwalniają do zwykłego tempa.
-  // Krótkie stuknięcie daje krótki zryw. Prędkość zmieniamy przez playbackRate animacji CSS warstw.
+  // Przytrzymanie karty: dopóki palec jest na karcie, okręgi kręcą się coraz szybciej, i to coraz ostrzej
+  // (prędkość rośnie z potęgą czasu trzymania). Po SPIN_RAMP okręgi wystrzeliwują jeden po drugim
+  // („piu, piu”), a po puszczeniu palca wyrastają z powrotem ze środka. Puszczenie wcześniej = okręgi
+  // płynnie wyhamowują. Prędkość zmieniamy przez playbackRate animacji CSS warstw.
   hold(on) {
     if (reducedMotion()) return;
+    if (on && !this.holding) this.holdStart = performance.now() - holdTime(this.spinRate || 1);  // dokładamy od bieżącej prędkości
     this.holding = on;
+    if (!on && this.launch === 'out') this.regrow();
     if (this.spinRaf) return;
     this.spinRate = this.spinRate || 1;
     let last = performance.now();
     const step = now => {
       const dt = Math.min(64, now - last);
       last = now;
-      if (this.holding) this.spinRate += (SPIN_PEAK - this.spinRate) * (1 - Math.exp(-dt / SPIN_UP));
-      else this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
+      if (this.holding) {
+        const t = Math.min(1, (now - this.holdStart) / SPIN_RAMP);
+        this.spinRate = 1 + (SPIN_MAX - 1) * t ** SPIN_CURVE;
+        if (t >= 1 && !this.launch) this.fire();
+      } else {
+        this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
+      }
       const done = !this.holding && this.spinRate < 1.02;
       if (done) this.spinRate = 1;
       this.layers.flatMap(layer => layer.getAnimations())
@@ -195,6 +207,59 @@ class Orbit {
       this.spinRaf = done ? 0 : requestAnimationFrame(step);
     };
     this.spinRaf = requestAnimationFrame(step);
+  }
+
+  // Wystrzał: od zewnętrznego okręgu, co FLY_GAP ms jeden okrąg odlatuje na zewnątrz i gaśnie, słońce
+  // przy każdym błyska, a telefon (Android) lekko pyka
+  fire() {
+    this.launch = 'flying';
+    const order = this.rings.filter(ring => ring.now.op > 0.05).reverse();
+    const t0 = performance.now();
+    order.forEach((ring, k) => { ring.fly = { at: t0 + k * FLY_GAP, r: ring.now.r, op: ring.now.op, width: ring.now.width }; });
+    const core = this.root.querySelector('.orb-core-svg');
+    let fired = 0;
+    const step = now => {
+      let flying = false;
+      order.forEach(ring => {
+        const p = (now - ring.fly.at) / FLY_MS;
+        if (p < 0) {
+          flying = true;
+          return;
+        }
+        if (!ring.fly.shot) {
+          ring.fly.shot = true;
+          fired++;
+          core.classList.remove('pop');
+          void core.getBoundingClientRect();  // błysk od nowa przy każdym wystrzale
+          core.classList.add('pop');
+          if (fired % 2 === 1) navigator.vibrate?.(6);
+        }
+        const q = Math.min(1, p);
+        ring.now.r = ring.fly.r + 190 * q * q;
+        ring.now.op = ring.fly.op * (1 - q) ** 1.5;
+        ring.now.width = ring.fly.width * (1 + 1.5 * q);
+        this.paint(ring);
+        if (q < 1) flying = true;
+      });
+      if (flying) {
+        requestAnimationFrame(step);
+        return;
+      }
+      this.launch = 'out';
+      if (!this.holding) this.regrow();
+    };
+    requestAnimationFrame(step);
+  }
+
+  // Po wystrzale okręgi wyrastają z powrotem ze środka (zwykłe przejście do docelowego kształtu)
+  regrow() {
+    this.launch = 'regrow';
+    this.rings.forEach(ring => {
+      delete ring.fly;
+      Object.assign(ring.now, { r: ring.to.r * 0.25, len: 0, op: 0, arc: 0 });
+    });
+    this.start(true);
+    setTimeout(() => { if (this.launch === 'regrow') this.launch = null; }, MORPH_MS);
   }
 
   setColor(h, s, animate) {
@@ -271,6 +336,12 @@ class Orbit {
       ring.empty = empty;
       ring.track.classList.toggle('empty', empty);
     }
+    this.paint(ring);
+  }
+
+  // Wpisuje bieżący kształt okręgu (ring.now) w SVG
+  paint(ring) {
+    const { now } = ring;
     const r = now.r.toFixed(2);
     ring.g.setAttribute('transform', `rotate(${now.tilt.toFixed(2)} ${C} ${C})`);
     ring.g.setAttribute('opacity', now.op.toFixed(3));
