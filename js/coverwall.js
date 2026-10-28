@@ -160,12 +160,6 @@ const INTRO_FROM = 0.6;    // skala na starcie (ile razy mniejsze okładki niż 
 const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
 const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
 const INTRO_WAIT_MAX = 2500;  // najdłużej tyle czekamy na dane i okładki przed animacją
-const INTRO_RES = 1;       // rozdzielczość canvasa względem ekranu (przy 0.75 okładki wyglądały na spikselowane)
-const INTRO_SHARE = 0.5;   // test: w intro tylko połowa książek (mniej okładek do zdekodowania i narysowania na start)
-
-// Okładki zdekodowane z wyprzedzeniem (createImageBitmap dekoduje poza głównym wątkiem): pierwsze rysowanie
-// pasków nie musi wtedy dekodować obrazków w jednej klatce, co szarpało na samym starcie intro
-const decoded = new Map();
 
 const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner)')]
   .filter(card => card.offsetParent !== null);
@@ -180,11 +174,10 @@ function introScene(bg) {
   const W = window.innerWidth;
   const H = window.innerHeight;
   const canvas = el('canvas', { class: 'cover-intro' });
-  canvas.width = Math.round(W * INTRO_RES);
-  canvas.height = Math.round(H * INTRO_RES);
+  canvas.width = W;
+  canvas.height = H;
   bg.appendChild(canvas);
-  const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
-  ctx.imageSmoothingQuality = 'low';
+  const ctx = canvas.getContext('2d', { alpha: false });
   const bgColor = getComputedStyle(document.body).backgroundColor;
   const first = strips[0].children;
   const tileW = first[0].offsetWidth;
@@ -221,11 +214,8 @@ function introScene(bg) {
     g.fillRect(0, 0, col.bitmap.width, col.bitmap.height);
     col.waiting = 0;
     col.items.forEach((it, j) => {
-      const bitmap = it.src ? decoded.get(it.src) : null;
       const img = it.src ? loaded.get(it.src) || it.img : null;
-      if (bitmap) {
-        g.drawImage(bitmap, 0, j * step, tileW, tileH);
-      } else if (img?.complete && img.naturalWidth) {
+      if (img?.complete && img.naturalWidth) {
         loaded.set(it.src, img);
         g.drawImage(img, 0, j * step, tileW, tileH);
       } else {
@@ -303,7 +293,7 @@ function introScene(bg) {
       advance += dt * boost;
       // Okładki, które doczytały się w trakcie intro, dopisujemy do pasków (rzadko)
       if (++frameNo % 10 === 0) columns.forEach(col => { if (col.waiting) bake(col); });
-      ctx.setTransform(INTRO_RES, 0, 0, INTRO_RES, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, W, H);
       ctx.translate(cx, cy);
@@ -321,7 +311,7 @@ function introScene(bg) {
         drawStrip(col.src.bitmap, col.x, col.pos, half);
       });
       // Przyciemnienie jak filtr brightness(0.82) na kafelkach ściany
-      ctx.setTransform(INTRO_RES, 0, 0, INTRO_RES, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
       ctx.fillRect(0, 0, W, H);
     },
@@ -336,7 +326,7 @@ export function playStartIntro() {
     cached = JSON.parse(localStorage.getItem(CACHE_KEY)) || [];
   } catch {}
   if (!cached.length) return;  // pierwsze uruchomienie: jeszcze nie znamy okładek
-  mountStartWall(cached.slice(-Math.max(6, Math.round(cached.length * INTRO_SHARE))));
+  mountStartWall(cached);
   const bg = document.getElementById('cover-bg');
   if (!bg) return;
   intro = { pending: false, dataDone: null };
@@ -358,14 +348,10 @@ export function playStartIntro() {
       img.addEventListener('error', resolve, { once: true });
     }))));
   };
-  // Zdekodowanie po jednym egzemplarzu każdej wczytanej okładki (w tle, w czasie czekania)
-  const predecode = () => Promise.all([...new Map([...bg.querySelectorAll('.tv-wall img')].map(img => [img.src, img])).values()]
-    .filter(img => img.complete && img.naturalWidth && !decoded.has(img.src) && window.createImageBitmap)
-    .map(img => createImageBitmap(img).then(bitmap => decoded.set(img.src, bitmap)).catch(() => {})));
   const timeout = new Promise(resolve => setTimeout(resolve, INTRO_WAIT_MAX));
   // Ściana ma wymiary i obrazki dopiero, gdy Start jest widoczny (chwilę po zalogowaniu): klatka zwłoki
   requestAnimationFrame(() => {
-    Promise.race([Promise.all([dataReady, coversReady().then(predecode)]), timeout])
+    Promise.race([Promise.all([dataReady, coversReady()]), timeout])
       .then(() => requestAnimationFrame(() => requestAnimationFrame(start)));
   });
 
@@ -406,8 +392,6 @@ export function playStartIntro() {
       return;
     }
     scene?.canvas.remove();
-    decoded.forEach(bitmap => bitmap.close?.());  // bitmapy były potrzebne tylko do intro
-    decoded.clear();
     body.classList.remove('wall-intro-reveal');
     cards().forEach(card => card.style.removeProperty('--intro-delay'));
     const { pending } = intro;

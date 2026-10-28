@@ -5912,23 +5912,18 @@ input[type="date"].plain-input {
   font-variant-numeric: tabular-nums;
 }
 
-/* Tło ekranu Start: przygaszona ściana okładek (js/coverwall.js). Poza Startem płynnie gaśnie w zwykłe tło
-   (a gdy zgaśnie, przestaje się ruszać, js/wallpause.js), po powrocie się wyłania. */
+/* Tło ekranu Start: przygaszona ściana okładek (js/coverwall.js), tylko gdy widać Start */
 .cover-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
+  display: none;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.75s ease, visibility 0s linear 0.75s;
 }
 
 body:has(#app-screens:not([hidden]) > .screen[data-screen="start"]:not([hidden])) .cover-bg {
-  opacity: 1;
-  visibility: visible;
-  transition: opacity 0.75s ease;
+  display: block;
 }
 
 .cover-bg::after {
@@ -6062,14 +6057,6 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
 @keyframes intro-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-/* W czasie intro ściana okładek jest widoczna od razu: bez tego wyłaniała się (przejście do pokazywania
-   ściany tylko na Starcie) w trakcie samej animacji, co wyglądało jak glicz */
-:is(.wall-intro, .wall-intro-reveal) .cover-bg {
-  opacity: 1;
-  visibility: visible;
-  transition: none;
 }
 
 /* ----------------- Edycja książki (js/bookeditor.js) ----------------- */
