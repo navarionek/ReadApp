@@ -5663,9 +5663,9 @@ body.be-lock {
 
 /* ----------------- Tryb czytnika (e-ink) -----------------
    Eksperyment włączany w ustawieniach (klasa .eink na <html>, js/eink.js). Ekrany e-ink mają
-   wolne odświeżanie i niski kontrast, więc: czarno na białym, grube ramki zamiast cieni i szarości,
-   brak animacji, rozmycia i okładek w tle, większy druk i duże pola do stuknięcia.
-   Start dostaje własny układ: wielkie liczby, jedna kolumna, pozycje oddzielone liniami. */
+   wolne odświeżanie i niski kontrast, więc: czarno na białym, bez animacji, cieni, rozmycia
+   i przezroczystości. Wygląd jak w książce: szeryfowe nagłówki i liczby, grube linie nad sekcjami
+   i cienkie pod nagłówkami zamiast ramek wokół wszystkiego, wzory (kratka, kropki) zamiast kolorów. */
 :root.eink,
 :root.eink.dark-mode {
   color-scheme: light;
@@ -5676,7 +5676,7 @@ body.be-lock {
   --bg-body: #fff;
   --bg-card: #fff;
   --text-main: #000;
-  --text-muted: #262626;
+  --text-muted: #2b2b2b;
   --text-on-primary: #fff;
   --border: #000;
   --border-focus: #000;
@@ -5686,6 +5686,9 @@ body.be-lock {
   --radius: 0.25rem;
   --radius-lg: 0.25rem;
   --transition: none;
+  --eink-serif: var(--shelf-serif);
+  --eink-hatch: repeating-linear-gradient(135deg, #000 0 2px, #fff 2px 7px);
+  --eink-dots: radial-gradient(#000 1.2px, #fff 1.4px) 0 0 / 7px 7px;
 }
 
 :root.eink {
@@ -5704,26 +5707,65 @@ body.be-lock {
 }
 
 :root.eink body {
+  padding-top: 1.25rem;
   font-weight: 500;
   line-height: 1.5;
   -webkit-font-smoothing: auto;
 }
 
-:root.eink .cover-bg {
+:root.eink .cover-bg,
+:root.eink .shelf-hero-bg,
+:root.eink .bs-bg,
+:root.eink .be-backdrop,
+:root.eink .card-icon,
+:root.eink .stat-icon {
   display: none !important;
 }
 
-:root.eink .app-title {
-  font-size: 2.25rem;
-  color: #000;
-}
-
-:root.eink .stat-icon,
-:root.eink .screen[data-screen="start"] .card-icon {
+/* Ciężkie animacje (neonowy lot i tor 3D) nie mają tu sensu */
+:root.eink .card:has(#flight),
+:root.eink .race3d {
   display: none;
 }
 
-/* Przyciski: pełny kontur, duże pole do stuknięcia, bez unoszenia przy najechaniu */
+/* ----- Nagłówek i typografia ----- */
+:root.eink header {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 3px double #000;
+}
+
+:root.eink .app-title {
+  font-family: var(--eink-serif);
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: #000;
+}
+
+:root.eink .user-name {
+  font-family: var(--eink-serif);
+  font-style: italic;
+}
+
+:root.eink label,
+:root.eink .stat-label,
+:root.eink .record-label,
+:root.eink .be-group-title {
+  color: #000;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+:root.eink .hint,
+:root.eink .card-intro,
+:root.eink small {
+  color: #2b2b2b;
+}
+
+/* ----- Przyciski, pola, przełączniki ----- */
 :root.eink .btn {
   min-height: 3rem;
   padding: 0.5rem 1.25rem;
@@ -5755,21 +5797,45 @@ body.be-lock {
   border-style: dashed;
 }
 
-/* Okładki: odcienie szarości z mocniejszym kontrastem; zaślepki jako ramka z tytułem */
-:root.eink img.book-cover {
-  filter: grayscale(1) contrast(1.15);
-}
-
-:root.eink .book-cover.placeholder {
-  background: #fff !important;
+:root.eink input[type="text"],
+:root.eink input[type="number"],
+:root.eink input[type="date"],
+:root.eink .plain-input,
+:root.eink textarea,
+:root.eink select {
+  min-height: 3rem;
   border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
+  color: #000;
+  font-size: 1.0625rem;
 }
 
-:root.eink .book-cover.placeholder * {
-  color: #000 !important;
+:root.eink input:focus,
+:root.eink textarea:focus,
+:root.eink select:focus {
+  border-color: #000;
+  outline: 3px solid #000;
+  outline-offset: 2px;
 }
 
-/* Przełączniki: obrys i wypełnienie zamiast koloru */
+:root.eink .input-icon {
+  color: #000;
+}
+
+:root.eink .checkbox-label,
+:root.eink .multiplier-grid label {
+  min-height: 3rem;
+  border: 2px solid #000;
+  background: #fff;
+}
+
+:root.eink .checkbox-label input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: #000;
+}
+
 :root.eink .switch {
   background: #fff;
   border: 2px solid #000;
@@ -5789,16 +5855,130 @@ body.be-lock {
   background: #fff;
 }
 
+/* Przełączniki trybów (Dodaj, Wyścig): wybrany pełny czarny */
+:root.eink .mode-toggle {
+  padding: 0;
+  gap: 0;
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+:root.eink .mode-btn,
+:root.eink .race-mode-btn {
+  min-height: 3rem;
+  border-radius: 0;
+  color: #000;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+:root.eink .mode-btn + .mode-btn,
+:root.eink .race-mode-btn + .race-mode-btn {
+  border-left: 2px solid #000;
+}
+
+:root.eink .mode-btn.active,
+:root.eink .race-mode-btn.active {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .toast {
+  border: 2px solid #fff;
+  outline: 2px solid #000;
+}
+
 :root.eink .settings-menu {
   background: #fff;
   border: 2px solid #000;
 }
 
-/* Dolne menu: aktywna zakładka odwrócona (biały na czarnym) */
+:root.eink .settings-item {
+  min-height: 3.25rem;
+  border-bottom: 1px solid #000;
+  color: #000;
+}
+
+:root.eink .settings-item:last-child {
+  border-bottom: 0;
+}
+
+:root.eink .status-box {
+  border: 2px dashed #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .modal {
+  background: #fff;
+}
+
+:root.eink .modal-content {
+  border: 2px solid #000;
+}
+
+:root.eink .view-as-banner {
+  border: 2px dashed #000;
+  background: #fff;
+  color: #000;
+}
+
+/* ----- Okładki ----- */
+:root.eink img.book-cover {
+  filter: grayscale(1) contrast(1.15);
+}
+
+:root.eink .book-cover {
+  border: 2px solid #000;
+  border-radius: 0.125rem;
+}
+
+:root.eink .book-cover.placeholder {
+  background: #fff !important;
+}
+
+:root.eink .book-cover.placeholder * {
+  color: #000 !important;
+  opacity: 1 !important;
+}
+
+:root.eink .book-tile:not(:disabled):hover .book-cover,
+:root.eink .cover-option:hover .book-cover,
+:root.eink .shelf-stack-book:hover,
+:root.eink .shelf-stack-book:focus-visible {
+  transform: none;
+}
+
+/* ----- Sekcje: gruba linia u góry, cienka pod nagłówkiem ----- */
+:root.eink .card,
+:root.eink .goal-card {
+  margin-bottom: 2rem;
+  padding: 0.75rem 0 0;
+  border: 0;
+  border-top: 3px solid #000;
+  border-radius: 0;
+  background: transparent;
+}
+
+:root.eink .card-header {
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #000;
+}
+
+:root.eink .card h2,
+:root.eink .goal-card h2 {
+  font-family: var(--eink-serif);
+  font-size: 1.625rem;
+  font-weight: 700;
+}
+
+/* ----- Dolne menu ----- */
 :root.eink .app-nav {
   background: #fff;
   border: 0;
-  border-top: 2px solid #000;
+  border-top: 3px solid #000;
   border-radius: 0;
 }
 
@@ -5821,22 +6001,23 @@ body.be-lock {
 }
 
 /* ----- Start ----- */
-:root.eink .screen[data-screen="start"] .stats-grid {
+:root.eink .stats-grid {
   grid-template-columns: 1fr 1fr;
   gap: 0;
-  border: 2px solid #000;
+  border-top: 3px solid #000;
+  border-bottom: 3px solid #000;
 }
 
-:root.eink .screen[data-screen="start"] .stat-card {
+:root.eink .stat-card {
   display: block;
-  padding: 1rem 1.25rem;
+  padding: 0.75rem 1rem 0.5rem;
   border: 0;
   border-radius: 0;
   background: #fff;
 }
 
-:root.eink .screen[data-screen="start"] .stat-card + .stat-card {
-  border-left: 2px solid #000;
+:root.eink .stat-card + .stat-card {
+  border-left: 1px solid #000;
 }
 
 :root.eink .stat-link:hover {
@@ -5845,53 +6026,50 @@ body.be-lock {
 
 :root.eink .stat-label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #000;
 }
 
-:root.eink .screen[data-screen="start"] .stat-value {
+:root.eink .stat-value {
   display: block;
-  font-size: 3.25rem;
-  font-weight: 800;
+  font-family: var(--eink-serif);
+  font-size: 3.5rem;
+  font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
 
-:root.eink .screen[data-screen="start"] .prize-banner {
-  display: block;
-  padding: 0.75rem 1.25rem;
-  border: 2px solid #000;
+:root.eink .stat-value-sm {
+  font-size: 1.25rem;
+}
+
+:root.eink .prize-banner {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.25rem 0 2rem;
+  padding: 0.6rem 0.25rem;
+  border-top: 3px double #000;
+  border-bottom: 3px double #000;
   border-radius: 0;
   background: #fff;
+}
+
+:root.eink .prize-info {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 :root.eink .prize-text {
-  display: block;
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-family: var(--eink-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
   color: #000;
 }
 
-:root.eink .screen[data-screen="start"] :is(.card, .goal-card) {
-  padding: 1.25rem;
-  border: 2px solid #000;
-  border-radius: 0;
-  background: #fff;
-}
-
-:root.eink .screen[data-screen="start"] .card-header {
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 2px solid #000;
-}
-
-:root.eink .screen[data-screen="start"] :is(.card, .goal-card) h2 {
-  font-size: 1.5rem;
-  font-weight: 800;
-}
-
-/* Teraz czytasz: duży tytuł, przycisk „Skończone” pod ręką */
+/* Teraz czytasz */
 :root.eink .reading-now-list {
   gap: 0;
 }
@@ -5905,37 +6083,40 @@ body.be-lock {
 }
 
 :root.eink .reading-now-item:last-child {
-  padding-bottom: 0;
+  padding-bottom: 0.25rem;
   border-bottom: 0;
 }
 
 :root.eink .reading-now-title {
+  font-family: var(--eink-serif);
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
 }
 
 :root.eink .reading-now-meta {
   font-size: 1rem;
+  font-style: italic;
   color: #000;
 }
 
 :root.eink .book-cover.mini {
   width: 3.5rem;
-  border: 2px solid #000;
 }
 
-/* Plan na 1. miejsce: wielka liczba stron dziennie */
+/* Plan na 1. miejsce */
 :root.eink .goal-number {
-  font-size: 4.5rem;
-  font-weight: 800;
+  font-family: var(--eink-serif);
+  font-size: 5rem;
+  font-weight: 700;
   line-height: 1;
   color: #000;
 }
 
 :root.eink .goal-unit {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-family: var(--eink-serif);
+  font-size: 1.375rem;
+  font-style: italic;
   color: #000;
 }
 
@@ -5945,13 +6126,25 @@ body.be-lock {
   color: #000;
 }
 
+:root.eink .goal-facts {
+  align-self: stretch;
+  border-top: 1px solid #000;
+}
+
 :root.eink .goal-facts dd {
-  font-size: 1.375rem;
-  font-weight: 800;
+  font-family: var(--eink-serif);
+  font-size: 1.5rem;
+  font-weight: 700;
   color: #000;
 }
 
-/* Odznaki: zdobyte pełne i czarne, niezdobyte obrysowane kreską (bez przezroczystości, która na e-ink znika) */
+/* Odznaki: zdobyte pełne, niezdobyte przerywaną kreską (przezroczystość na e-ink znika) */
+:root.eink .badges-count {
+  color: #000;
+  font-family: var(--eink-serif);
+  font-size: 1.25rem;
+}
+
 :root.eink .badges-grid {
   grid-template-columns: 1fr 1fr;
 }
@@ -5966,7 +6159,6 @@ body.be-lock {
 
 :root.eink .badge-item.earned {
   border-style: solid;
-  background: #fff;
 }
 
 :root.eink .badge-icon {
@@ -5989,12 +6181,647 @@ body.be-lock {
   color: #000;
 }
 
+/* ----- Dodaj ----- */
+:root.eink .pages-hint {
+  border: 2px dashed #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .error-msg {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+}
+
+/* ----- Ranking ----- */
+:root.eink .rank-avatar {
+  background: #fff !important;
+  color: #000;
+  border: 2px solid #000;
+  box-shadow: none !important;
+}
+
+:root.eink .rank-avatar img {
+  filter: grayscale(1) contrast(1.2);
+}
+
+:root.eink .podium-step {
+  border-radius: 0;
+  border: 2px solid #000;
+  color: #fff;
+  text-shadow: none;
+}
+
+:root.eink .podium-gold .podium-step {
+  background: #000;
+}
+
+:root.eink .podium-silver .podium-step {
+  background: var(--eink-hatch);
+  color: #000;
+}
+
+:root.eink .podium-silver .podium-step,
+:root.eink .podium-bronze .podium-step {
+  font-family: var(--eink-serif);
+}
+
+:root.eink .podium-bronze .podium-step {
+  background: var(--eink-dots);
+  color: #000;
+}
+
+:root.eink .podium-gold .podium-step::after {
+  display: none;
+}
+
+:root.eink .podium-crown {
+  color: #000;
+}
+
+:root.eink .podium-name {
+  font-family: var(--eink-serif);
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+:root.eink .podium-points {
+  color: #000;
+}
+
+:root.eink .rank-row {
+  padding: 0.875rem 0 1rem;
+  border: 0;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .rank-row.me {
+  padding-left: 0.75rem;
+  border-left: 6px solid #000;
+  background: #fff;
+}
+
+:root.eink .rank-row.leader {
+  border-color: #000;
+}
+
+:root.eink .rank-pos {
+  color: #000;
+  font-family: var(--eink-serif);
+  font-size: 1.375rem;
+}
+
+:root.eink .rank-name {
+  font-family: var(--eink-serif);
+  font-size: 1.1875rem;
+  font-weight: 700;
+}
+
+:root.eink .rank-meta,
+:root.eink .rank-gap {
+  color: #000;
+  font-size: 0.875rem;
+}
+
+:root.eink .rank-total {
+  font-family: var(--eink-serif);
+  font-size: 1.375rem;
+}
+
+:root.eink .rank-more {
+  color: #000;
+}
+
+:root.eink .rank-track {
+  height: 0.75rem;
+  border: 2px solid #000;
+  background: #fff;
+}
+
+:root.eink .rank-fill {
+  gap: 2px;
+  background: #fff;
+}
+
+:root.eink .rank-seg {
+  background: #000 !important;
+}
+
+:root.eink .rank-seg.alt {
+  opacity: 1;
+  background: #6b6b6b !important;
+}
+
+:root.eink .rb-book {
+  min-height: 3.5rem;
+}
+
+:root.eink .rb-meta,
+:root.eink .rb-score small {
+  color: #000;
+}
+
+:root.eink .rb-mult {
+  color: #000;
+  text-decoration: underline;
+}
+
+:root.eink .rb-now {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .rank-badges .badge-mini {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .book-rank-item {
+  padding: 0.75rem 0;
+  border: 0;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+}
+
+:root.eink .book-rank-pos {
+  color: #000;
+  font-family: var(--eink-serif);
+  font-size: 1.25rem;
+}
+
+:root.eink .book-rank-title {
+  font-family: var(--eink-serif);
+  font-size: 1.125rem;
+}
+
+:root.eink .rating-badge,
+:root.eink .rating-badge.rating-up,
+:root.eink .rating-badge.rating-mid,
+:root.eink .rating-badge.rating-down {
+  color: #000;
+}
+
+/* ----- Półka ----- */
+:root.eink .shelf-hero {
+  margin-bottom: 1.25rem;
+  padding: 0.5rem 0 1rem;
+  border: 0;
+  border-bottom: 3px double #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .shelf-hero-title {
+  font-family: var(--eink-serif);
+  font-size: 2.25rem;
+}
+
+:root.eink .shelf-hero-sub {
+  color: #000;
+  font-size: 1rem;
+  font-style: italic;
+}
+
+:root.eink .shelf-stats {
+  gap: 0;
+  margin-top: 1rem;
+}
+
+:root.eink .shelf-stat {
+  padding: 0.25rem 0.4rem;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .shelf-stat + .shelf-stat {
+  border-left: 1px solid #000;
+}
+
+:root.eink .shelf-stat strong {
+  font-family: var(--eink-serif);
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+:root.eink .shelf-stat span {
+  color: #000;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+:root.eink .shelf-person {
+  min-height: 3rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .shelf-person.active {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .shelf-person .rank-avatar {
+  border-color: #000;
+}
+
+:root.eink .shelf-section {
+  margin-bottom: 2rem;
+}
+
+:root.eink .shelf-heading {
+  margin: 0 0 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #000;
+  font-size: 1.75rem;
+}
+
+:root.eink .shelf-heading-count {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+  font-size: 0.875rem;
+}
+
+:root.eink .shelf-empty-line {
+  color: #000;
+  font-style: italic;
+}
+
+:root.eink .shelf-now-card {
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
+}
+
+:root.eink .shelf-now-text strong {
+  font-size: 1.25rem;
+}
+
+:root.eink .shelf-now-author {
+  color: #000;
+  font-size: 1rem;
+  font-style: italic;
+}
+
+:root.eink .shelf-now-days {
+  background: #000;
+  color: #fff;
+  font-size: 0.875rem;
+}
+
+:root.eink .shelf-stack-title,
+:root.eink .book-tile-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+:root.eink .shelf-stack-book {
+  flex-basis: 5.5rem;
+}
+
+:root.eink .book-tile.reading .book-cover {
+  opacity: 1;
+}
+
+:root.eink .book-tile-author {
+  color: #000;
+  font-style: italic;
+}
+
+:root.eink .book-tile .unfinished-tag {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+/* ----- Okno książki i edytor ----- */
+:root.eink .book-modal {
+  padding: 0;
+  background: #fff;
+}
+
+:root.eink .book-modal-content {
+  max-width: none;
+  max-height: none;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .book-modal-close {
+  border: 2px solid #000;
+  background: #fff;
+}
+
+:root.eink .bs-kicker {
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .bs-title {
+  font-size: 2rem;
+}
+
+:root.eink .bs-author {
+  color: #000;
+  font-size: 1.125rem;
+  font-style: italic;
+}
+
+:root.eink .bs-cover .book-cover,
+:root.eink .bs-ghost {
+  border-radius: 0.125rem;
+}
+
+:root.eink .bs-fact {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .bs-fact + .bs-fact {
+  border-left: 1px solid #000;
+}
+
+:root.eink .bs-fact strong {
+  font-family: var(--eink-serif);
+  font-size: 1.625rem;
+}
+
+:root.eink .bs-fact span,
+:root.eink .bs-meta,
+:root.eink .bs-desc,
+:root.eink .bs-rate-label {
+  color: #000;
+}
+
+:root.eink .bs-desc {
+  font-size: 1rem;
+}
+
+:root.eink .bs-link,
+:root.eink .bs-more {
+  color: #000;
+  font-size: 1rem;
+  text-decoration: underline;
+}
+
+:root.eink .rating-big-btn,
+:root.eink .rating-big-btn.rating-up,
+:root.eink .rating-big-btn.rating-mid,
+:root.eink .rating-big-btn.rating-down {
+  height: 3.5rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .rating-big-btn svg {
+  color: #000 !important;
+}
+
+:root.eink .rating-big-btn.active {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+:root.eink .rating-big-btn.active svg {
+  color: #fff !important;
+}
+
+:root.eink .rating-btn.active {
+  background: #000 !important;
+  color: #fff !important;
+}
+
+:root.eink .book-editor {
+  background: #fff;
+}
+
+:root.eink .be-bar-title,
+:root.eink .book-editor .be-title {
+  font-family: var(--eink-serif);
+}
+
+:root.eink .be-icon-btn,
+:root.eink .be-cover-badge {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .be-card {
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
+}
+
+:root.eink .be-row + .be-row {
+  border-top: 1px solid #000;
+}
+
+:root.eink .book-editor .be-num,
+:root.eink .book-editor .be-year,
+:root.eink .book-editor .be-date-wrap {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .be-chip {
+  min-height: 3rem;
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .be-chip[aria-pressed="true"] {
+  background: #000;
+  color: #fff;
+}
+
+:root.eink .be-footer {
+  border-top: 3px solid #000;
+  background: #fff;
+}
+
+/* ----- Statystyki ----- */
+:root.eink .stats-tiles {
+  gap: 0;
+  border-top: 3px solid #000;
+  border-bottom: 3px solid #000;
+}
+
+:root.eink .stats-tiles .stat-card {
+  border-bottom: 1px solid #000;
+}
+
+:root.eink .stats-tiles .stat-card:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+:root.eink .stats-tiles .stat-card:nth-child(even) {
+  border-left: 1px solid #000;
+}
+
+:root.eink .stats-tiles .stat-value {
+  font-size: 2.5rem;
+}
+
+:root.eink .stats-tiles .stat-value-sm {
+  font-size: 1.25rem;
+}
+
+:root.eink .bar {
+  min-height: 16px;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #000 !important;
+}
+
+:root.eink .bar-value {
+  font-family: var(--eink-serif);
+  font-size: 1.0625rem;
+}
+
+:root.eink .length-fill {
+  height: 18px;
+  gap: 2px;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .length-seg {
+  background: #000 !important;
+}
+
+:root.eink .length-seg:nth-child(even) {
+  background: #6b6b6b !important;
+}
+
+:root.eink .race-svg,
+:root.eink .timeline-svg {
+  filter: grayscale(1) contrast(1.8);
+}
+
+:root.eink .race-line {
+  stroke-width: 3;
+}
+
+:root.eink .chart-legend {
+  color: #000;
+}
+
+:root.eink .record {
+  padding: 0.75rem 0;
+  border: 0;
+  border-bottom: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+}
+
+:root.eink .record-icon {
+  border: 2px solid #000;
+  background: #fff;
+  color: #000;
+}
+
+:root.eink .record-main {
+  font-family: var(--eink-serif);
+  font-size: 1.25rem;
+}
+
+:root.eink .record-sub {
+  color: #000;
+}
+
+:root.eink .wrapped-slide {
+  border: 2px solid #000;
+  border-radius: 0.25rem;
+  background: #fff;
+}
+
+:root.eink .wrapped-icon {
+  color: #000;
+}
+
+:root.eink .wrapped-value {
+  font-family: var(--eink-serif);
+}
+
+:root.eink .wrapped-label,
+:root.eink .wrapped-note {
+  color: #000;
+}
+
+/* Poprawki po przeglądzie ekranów */
 :root.eink .goal-card .card-header {
   align-self: stretch;
   width: 100%;
 }
 
-:root.eink .goal-facts {
-  align-self: stretch;
-  border-top-color: #000;
+:root.eink label .hint,
+:root.eink label .hint-inline {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+:root.eink .podium-silver .podium-step,
+:root.eink .podium-bronze .podium-step {
+  -webkit-text-stroke: 6px #fff;
+  paint-order: stroke fill;
+}
+
+:root.eink .money-badge,
+:root.eink .rank-name .money-badge {
+  color: #000;
+}
+
+/* Wykres wyścigu: wszystkie linie czarne, rozróżnione kreskami (kolory na e-ink zlewają się w szarość) */
+:root.eink .race-svg {
+  filter: none;
+}
+
+:root.eink .race-line {
+  stroke: #000 !important;
+  stroke-width: 3;
+}
+
+:root.eink .race-line:nth-of-type(3n + 2) {
+  stroke-dasharray: 12 6;
+}
+
+:root.eink .race-line:nth-of-type(3n) {
+  stroke-dasharray: 2 6;
+  stroke-linecap: round;
+  stroke-width: 4;
+}
+
+:root.eink .race-dot {
+  fill: #000 !important;
+}
+
+:root.eink .legend-item .legend-line {
+  background: #000 !important;
+}
+
+:root.eink .legend-item:nth-child(3n + 2) .legend-line {
+  background: repeating-linear-gradient(90deg, #000 0 8px, #fff 8px 12px) !important;
+}
+
+:root.eink .legend-item:nth-child(3n) .legend-line {
+  background: repeating-linear-gradient(90deg, #000 0 2px, #fff 2px 6px) !important;
 }
