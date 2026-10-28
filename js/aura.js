@@ -125,6 +125,9 @@ const ease = bezier(0.4, 0, 0.1, 1);
 const lerp = (a, b, t) => a + (b - a) * t;
 const turn = (a, b) => ((((b - a) % 360) + 540) % 360) - 180;  // najkrótsza zmiana kąta albo odcienia
 const MORPH_MS = 1600;
+const SPIN_PEAK = 90;   // najwyższa prędkość okręgów przy przytrzymaniu karty (razy zwykła)
+const SPIN_UP = 450;    // rozpędzanie: stała czasu (ms)
+const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
@@ -169,6 +172,29 @@ class Orbit {
     const ring = { g, track, arc, halo, dot, now, from: { ...now }, to: target, kind: null, empty: null };
     this.rings.push(ring);
     return ring;
+  }
+
+  // Przytrzymanie karty: dopóki palec jest na karcie, warstwy okręgów rozpędzają się do SPIN_PEAK razy
+  // szybciej (najpierw szybko, potem coraz łagodniej); po puszczeniu płynnie zwalniają do zwykłego tempa.
+  // Krótkie stuknięcie daje krótki zryw. Prędkość zmieniamy przez playbackRate animacji CSS warstw.
+  hold(on) {
+    if (reducedMotion()) return;
+    this.holding = on;
+    if (this.spinRaf) return;
+    this.spinRate = this.spinRate || 1;
+    let last = performance.now();
+    const step = now => {
+      const dt = Math.min(64, now - last);
+      last = now;
+      if (this.holding) this.spinRate += (SPIN_PEAK - this.spinRate) * (1 - Math.exp(-dt / SPIN_UP));
+      else this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
+      const done = !this.holding && this.spinRate < 1.02;
+      if (done) this.spinRate = 1;
+      this.layers.flatMap(layer => layer.getAnimations())
+        .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(this.spinRate) : (anim.playbackRate = this.spinRate)));
+      this.spinRaf = done ? 0 : requestAnimationFrame(step);
+    };
+    this.spinRaf = requestAnimationFrame(step);
   }
 
   setColor(h, s, animate) {
@@ -298,7 +324,7 @@ export function createAura() {
 }
 
 // Przejścia warstwy koloru (opis w style.css); losowane, nigdy dwa razy to samo pod rząd
-const EFFECTS = ['bloom', 'flood', 'sweep', 'swirl'];
+const EFFECTS = ['bloom', 'sweep', 'swirl'];
 let lastEffect = null;
 
 function pickEffect() {
@@ -343,14 +369,18 @@ export function setAuraColor(hero, color, animate) {
   fresh.classList.add('entering');
   added.push(fresh);
   paints.append(...added);
-  // Gdy nowa warstwa całkiem przykryje resztę (wszystkie przejścia trwają do 1,3 s), stare i pomost znikają
+  // Gdy nowa warstwa całkiem przykryje resztę (przejścia trwają do ok. 2 s, równo z okręgami), stare i pomost znikają
   setTimeout(() => {
     [...old, ...added.filter(a => a !== fresh)].forEach(o => o.remove());
     fresh.classList.remove('entering');
-  }, 1450);
+  }, 2150);
 }
 
 const orbitOf = hero => hero.querySelector('.aura-orbit')._orbit;
+
+export function holdOrbit(hero, on) {
+  orbitOf(hero)?.hold(on);
+}
 
 // books = null: książki nowej osoby się wczytują (okręgi czekają przygaszone); potem przechodzą w nowe.
 // animate = false: od razu w docelowym kształcie.

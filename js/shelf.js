@@ -1,5 +1,5 @@
 import { openBookEditor } from './bookeditor.js';
-import { createAura, inkFor, setAuraColor, setOrbit } from './aura.js';
+import { createAura, inkFor, setAuraColor, setOrbit, holdOrbit } from './aura.js';
 import { commentsSection } from './comments.js';
 import { cropImage } from './cropper.js';
 import { viewerId } from './admin.js';
@@ -382,6 +382,10 @@ function renderShelfHero() {
       el('div', { class: 'shelf-stats' }, [0, 1, 2].map(() => el('div', { class: 'shelf-stat' }, [el('strong', { text: '0' }), el('span')]))),
     );
     heroDrawn = { owner: null, orbit: null, stats: [0, 0, 0] };
+    // Przytrzymanie karty rozkręca okręgi; puszczenie (albo przewinięcie strony palcem) je wyhamowuje
+    hero.addEventListener('pointerdown', () => holdOrbit(hero, true));
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) hero.addEventListener(type, () => holdOrbit(hero, false));
+    hero.addEventListener('contextmenu', e => e.preventDefault());  // długie przytrzymanie bez menu telefonu
   }
   const changed = owner.key !== heroDrawn.owner;
   setAuraColor(hero, colors.get(owner.key), !fresh);
