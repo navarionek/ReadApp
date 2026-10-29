@@ -195,6 +195,8 @@ export function setFormStep(step) {
   const form = document.getElementById('read-form');
   const changed = form.dataset.step !== step;
   form.dataset.step = step;
+  // Krok z polami ma własny wpis w historii: Wstecz wraca do wyboru rodzaju, a nie na Start
+  if (step === 'fields' && changed && window.location.hash === '#dodaj') history.pushState({ step: 'fields' }, '');
   document.getElementById('type-step').hidden = step !== 'type';
   document.getElementById('fields-step').hidden = step !== 'fields';
   if (changed) {
@@ -204,6 +206,13 @@ export function setFormStep(step) {
     shown.classList.add('step-in');
   }
 }
+
+window.addEventListener('popstate', () => {
+  const form = document.getElementById('read-form');
+  if (form.dataset.step !== 'fields' || history.state?.step === 'fields') return;
+  if (state.finishing) resetForm();
+  else setFormStep('type');
+});
 
 export function setEntryMode(mode) {
   state.entryMode = mode;
@@ -254,8 +263,8 @@ export function startFinishing(item) {
   resetForm();
   selectFinishing(item);
   updateFormUI();
-  setFormStep('fields');
   goTo('dodaj');
+  setFormStep('fields');
   document.getElementById('pages').focus({ preventScroll: true });
 }
 

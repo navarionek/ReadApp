@@ -58,7 +58,11 @@ window.addEventListener('DOMContentLoaded', () => {
     setFormStep('fields');
     document.getElementById(document.getElementById('title-group').hidden ? 'pages' : 'title').focus({ preventScroll: true });
   }));
-  document.getElementById('type-back').addEventListener('click', () => { if (state.finishing) resetForm(); else setFormStep('type'); });
+  document.getElementById('type-back').addEventListener('click', () => {
+    if (history.state?.step === 'fields') history.back();
+    else if (state.finishing) resetForm();
+    else setFormStep('type');
+  });
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
   document.getElementById('queue-pick').addEventListener('change', handleQueuePick);
   document.getElementById('book-modal-close').addEventListener('click', closeBookModal);
