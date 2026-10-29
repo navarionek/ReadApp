@@ -2068,10 +2068,10 @@ select.plain-input {
   pointer-events: none;
 }
 
-/* Niebo krąży wokół słońca orbity (położenie i rozmiar ustawia js/aura.js): pełny obrót co 2 minuty */
+/* Niebo krąży wokół słońca orbity (położenie i rozmiar ustawia js/aura.js): pełny obrót co 40 s */
 .stars-drift {
   position: absolute;
-  animation: stars-orbit 120s linear infinite;
+  animation: stars-orbit 40s linear infinite;
   will-change: transform;
 }
 
