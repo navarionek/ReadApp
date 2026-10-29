@@ -2199,21 +2199,21 @@ select.plain-input {
   overflow: visible;
 }
 
-/* Warstwy okręgów obracają się i powoli „oddychają” (przygasają i rozjaśniają się), każda w swoim rytmie,
-   więc orbita lekko się mieni. Przytrzymanie karty przyspiesza tylko obrót (js/aura.js). */
+/* Warstwy okręgów obracają się wszystkie w tę samą stronę co niebo z gwiazdami (zgodnie z ruchem wskazówek
+   zegara), każda w odrobinę innym tempie, i powoli „oddychają” (przygasają i rozjaśniają się), więc orbita
+   lekko się mieni. Przytrzymanie karty przyspiesza tylko obrót (js/aura.js). */
 .orb-layer {
   will-change: transform, opacity;
   animation: orb-spin 50s linear infinite, orb-breathe 9s ease-in-out infinite alternate;
 }
 
 .orb-layer.l1 {
-  animation-duration: 65s, 11s;
-  animation-direction: reverse, alternate;
+  animation-duration: 58s, 11s;
   animation-delay: 0s, -4s;
 }
 
 .orb-layer.l2 {
-  animation-duration: 85s, 13s;
+  animation-duration: 67s, 13s;
   animation-delay: 0s, -7s;
 }
 

@@ -1,4 +1,4 @@
-// Nazwy i opisy odznak: wspólne dla aplikacji (js/badges.js) i powiadomień push (notify-badge).
+// Nazwy i opisy odznak (js/badges.js; osobny plik, bo kiedyś korzystała z nich też funkcja powiadomień).
 // Warunki zdobycia i ikony są tylko w aplikacji.
 export const BADGE_INFO = [
   { id: 'first', name: 'Pierwsza książka', desc: 'Pierwszy wpis w tym roku' },
