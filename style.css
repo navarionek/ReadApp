@@ -8183,37 +8183,3 @@ body:has(#app-screens:not([hidden]) > .screen[data-screen="polka"]:not([hidden])
 :root.eink .shelf-backdrop {
   display: none !important;
 }
-
-/* Tymczasowy przełącznik testowy (js/aura.js): wyłącza wszystkie animacje i przejścia karty osoby na Półce
-   (te z JS, jak przejście okręgów i obrót, wyłącza reducedMotion w aura.js) */
-.hero-anim-toggle {
-  position: fixed;
-  right: 0.75rem;
-  bottom: calc(5.6rem + env(safe-area-inset-bottom));
-  z-index: 950;
-  padding: 0.4rem 0.7rem;
-  border: 1px solid rgb(255 255 255 / 0.25);
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.6);
-  color: #fff;
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.hero-static .hero-anim-toggle {
-  background: #c026d3;
-}
-
-.hero-static .screen > .shelf-hero,
-.hero-static .shelf-hero *,
-.hero-static .shelf-hero *::before,
-.hero-static .shelf-hero *::after,
-.hero-static .shelf-hero-shadow {
-  animation: none !important;
-  transition: none !important;
-}
-
-.hero-static .screen > .shelf-hero {
-  transition: none !important;
-}

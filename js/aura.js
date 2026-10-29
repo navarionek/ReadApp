@@ -154,23 +154,8 @@ function holdTime(rate) {
   }
   return lo;
 }
-// Animacje karty wyłączone: systemowe „mniej ruchu” albo tymczasowy przełącznik testowy (klasa hero-static)
-const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('hero-static');
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// Tymczasowy przełącznik do testów (przycisk na Półce): wyłącza wszystkie animacje karty osoby, także te z JS
-const heroToggle = document.getElementById('hero-anim-toggle');
-if (heroToggle) {
-  const apply = off => {
-    document.documentElement.classList.toggle('hero-static', off);
-    heroToggle.setAttribute('aria-pressed', String(off));
-    heroToggle.textContent = off ? 'Animacje karty: wył.' : 'Animacje karty: wł.';
-    try { localStorage.setItem('hero-static', off ? '1' : '0'); } catch { /* bez zapisu też działa */ }
-  };
-  let saved = false;
-  try { saved = localStorage.getItem('hero-static') === '1'; } catch { /* j.w. */ }
-  apply(saved);
-  heroToggle.addEventListener('click', () => apply(!document.documentElement.classList.contains('hero-static')));
-}
 
 // Orbita żyje tak długo jak karta. Przy zmianie osoby każdy okrąg płynnie przechodzi w okrąg nowej osoby
 // (promień, długość łuku, grubość, obrót, kolor), nadmiarowe zwijają się i gasną, brakujące wyrastają.
@@ -695,7 +680,7 @@ export function setAuraColor(hero, color, animate) {
   const paints = hero.querySelector('.aura-paints');
   const old = [...paints.children];
   const fresh = paintLayer(h, sat);
-  if (!animate || !old.length || reducedMotion()) {
+  if (!animate || !old.length) {
     old.forEach(o => o.remove());
     paints.appendChild(fresh);
     return;

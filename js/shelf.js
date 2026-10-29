@@ -369,7 +369,7 @@ let heroDrawn = { owner: null, orbit: null, stats: [0, 0, 0] };
 function countTo(node, from, to) {
   const show = n => { node.textContent = Math.round(n).toLocaleString('pl-PL'); };
   cancelAnimationFrame(node._count);
-  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('hero-static')) {
+  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     show(to);
     return;
   }
