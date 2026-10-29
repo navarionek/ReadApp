@@ -461,7 +461,8 @@ class Orbit {
     now.r = lerp(from.r, to.r, e);
     now.len = lerp(from.len, to.len, e);
     now.width = lerp(from.width, to.width, e);
-    now.tilt = from.tilt + turn(from.tilt, to.tilt) * e;
+    // Obrót zawsze w tę samą stronę co warstwy orbity (zgodnie z zegarem), nigdy wstecz, nawet jeśli bliżej jest w drugą
+    now.tilt = from.tilt + ((((to.tilt - from.tilt) % 360) + 360) % 360) * e;
     now.op = lerp(from.op, to.op, e);
     now.arc = lerp(from.arc, to.arc, e);
     // Rodzaj łuku (kolor) i kropkowanie zmieniają się w połowie przejścia, gdy okrąg jest w ruchu
