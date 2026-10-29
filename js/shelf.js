@@ -471,6 +471,7 @@ function renderShelfHero() {
     hero.addEventListener('contextmenu', e => e.preventDefault());  // długie przytrzymanie bez menu telefonu
   }
   const changed = owner.key !== heroDrawn.owner;
+  const avatarSig = `${owner.name}|${owner.avatarUrl || ''}|${colors.get(owner.key)}`;
   setAuraColor(hero, colors.get(owner.key), !fresh);
   scheduleBackdrop();  // tło ekranu w barwach karty
 
@@ -485,7 +486,12 @@ function renderShelfHero() {
     );
     if (!fresh) setOrbit(hero, null, '', true);  // okręgi czekają przygaszone na książki nowej osoby
     heroDrawn.orbit = null;
+  } else if (avatarSig !== heroDrawn.avatar) {
+    // Ta sama osoba, ale doszły jej dane: karta bywa rysowana, zanim wczytają się profile (bez imienia
+    // i zdjęcia awatar był inicjałem „?”), a sam awatar odświeżał się dotąd tylko przy zmianie osoby
+    hero.querySelector('.shelf-hero-avatar')?.replaceWith(avatar(owner, colors, 'rank-avatar-lg shelf-hero-avatar'));
   }
+  heroDrawn.avatar = avatarSig;
   hero.querySelector('.shelf-hero-kicker').textContent = isOwn ? 'Twoja półka' : 'Półka';
   hero.querySelector('.shelf-hero-title').textContent = firstName(owner.name) || 'Półka';
 
