@@ -381,9 +381,9 @@ export function replayShelfOrbit() {
 // Warstwa ma rozmiar ekranu, tu tylko ją przesuwamy, skalujemy i rozjaśniamy (raz na klatkę).
 // Przewijanie wyznacza tylko cel: tło dochodzi do niego płynnie i z opóźnieniem (BACKDROP_LAG), więc
 // nawet po szybkim przewinięciu rozlewa się w swoim tempie, a nie skacze razem z palcem.
-const BACKDROP_LAG = 420;  // stała czasu dochodzenia do celu (ms); do celu ok. 1,2 s
-const BACKDROP_LAG_BACK = 110;  // to samo przy chowaniu (przewijanie w górę): kilka razy szybciej
-const BACKDROP_REACH = 0.6;    // jak nisko sięga tło po rozlaniu (część wysokości ekranu)
+const BACKDROP_LAG = 200;  // stała czasu dochodzenia do celu (ms); do celu ok. 0,6 s
+const BACKDROP_LAG_BACK = 70;  // to samo przy chowaniu (przewijanie w górę): kilka razy szybciej
+const BACKDROP_REACH = 0.9;    // jak nisko sięga tło po rozlaniu (część wysokości ekranu)
 const BACKDROP_OPACITY = 1;    // pełna przezroczystość warstwy; subtelność daje sam gradient
 let backdropFrame = 0;
 let backdropAt = 0;        // bieżący stan 0 (pod kartą) .. 1 (cały ekran)
