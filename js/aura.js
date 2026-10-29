@@ -226,16 +226,18 @@ class Orbit {
     const step = now => {
       const dt = Math.min(64, now - last);
       last = now;
-      if (this.holding) {
+      if (this.holding && this.launch !== 'out') {
         // Znacznik czasu klatki bywa odrobinę wcześniejszy niż chwila naciśnięcia: czas trzymania nie może być ujemny
         const held = Math.max(0, now - this.holdStart);
         this.spinRate = holdRate(held);
         if (held >= SPIN_RAMP && !this.launch) this.fire();
       } else {
+        // Puszczenie palca albo okręgi już wystrzelone (trzymanie dalej, ale nie ma czego kręcić): hamowanie.
+        // Wcześniej prędkość 300x i poświata zostawały do puszczenia palca.
         this.spinRate = 1 + (this.spinRate - 1) * Math.exp(-dt / SPIN_DOWN);
       }
       if (!Number.isFinite(this.spinRate)) this.spinRate = 1;
-      const done = !this.holding && this.spinRate < 1.02;
+      const done = (!this.holding || this.launch === 'out') && this.spinRate < 1.02;
       if (done) this.spinRate = 1;
       this.charge(now);
       // Tylko obrót (warstwy jeszcze „oddychają”, tego nie przyspieszamy, bo przy rozkręceniu migałoby)
