@@ -699,12 +699,13 @@ a.btn {
   text-decoration: none;
 }
 
-/* Pasek menu. Pod aktywną zakładką jest kolorowa pigułka (js/navbar.js), która przeskakuje do nowej
-   zakładki i płynnie zmienia kolor; każda zakładka ma swój. Ruch to tylko transformacje (lekkie dla telefonu). */
+/* Pasek menu. Pod aktywną zakładką jest stonowana, półprzezroczysta pigułka (js/navbar.js), która przeskakuje do
+   nowej zakładki, a barwa zakładki to tylko mały świecący pasek na jej górze i kolor ikony. Ruch to tylko
+   transformacje (lekkie dla telefonu). */
 .app-nav {
   --ind-c: #6366f1;
   --ind-c2: #a855f7;
-  --ind-ink: #fff;
+  --ind-ink: var(--text-main);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -736,45 +737,41 @@ a.btn {
   transition: transform 0.55s cubic-bezier(0.34, 1.32, 0.5, 1);
 }
 
-/* Poświata: dwie miękkie plamy bez krawędzi (kolor + maska z rozmytym brzegiem, więc kolor może się płynnie
-   zmieniać, czego gradient nie umie). Druga plama, w drugiej barwie, powoli „oddycha” obok pierwszej. */
-.nav-indicator::before,
+/* Pigułka pod aktywną zakładką: matowa, w kolorze tekstu (bez barw), z cienką ramką */
+.nav-indicator::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--text-main) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-main) 9%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+/* Barwa zakładki: krótki, lekko świecący pasek na górze pigułki */
 .nav-indicator::after {
   content: "";
   position: absolute;
-  inset: -12% -14%;
-  -webkit-mask-image: radial-gradient(closest-side, #000 22%, rgb(0 0 0 / 0.55) 58%, transparent 100%);
-  mask-image: radial-gradient(closest-side, #000 22%, rgb(0 0 0 / 0.55) 58%, transparent 100%);
+  top: 0.2rem;
+  left: 50%;
+  width: 1.1rem;
+  height: 3px;
+  margin-left: -0.55rem;
+  border-radius: 3px;
+  background: var(--ind-c);
+  box-shadow: 0 0 9px 1px color-mix(in srgb, var(--ind-c) 70%, transparent);
 }
 
-.nav-indicator::before {
-  background-color: var(--ind-c);
-}
-
-.nav-indicator::after {
-  inset: -2% -26% -24% 6%;
-  background-color: var(--ind-c2);
-  opacity: 0.75;
-  animation: nav-breathe 5s ease-in-out infinite alternate;
-}
-
-.app-nav.ready .nav-indicator::before,
 .app-nav.ready .nav-indicator::after {
-  transition: background-color 0.6s ease;
-}
-
-@keyframes nav-breathe {
-  from { transform: translate(-10%, -6%) scale(0.92); }
-  to { transform: translate(8%, 4%) scale(1.08); }
+  transition: background-color 0.6s ease, box-shadow 0.6s ease;
 }
 
 .nav-indicator.stretch::before {
-  animation: nav-stretch 0.55s cubic-bezier(0.3, 0.7, 0.4, 1);
+  animation: nav-stretch 0.5s cubic-bezier(0.3, 0.7, 0.4, 1);
 }
 
 @keyframes nav-stretch {
-  35% { transform: scale(1.22, 0.86); }
-  70% { transform: scale(0.96, 1.04); }
+  35% { transform: scale(1.08, 0.94); }
+  70% { transform: scale(0.99, 1.02); }
 }
 
 .nav-item {
@@ -935,20 +932,19 @@ a.btn {
   font-weight: 700;
 }
 
-.nav-item.active svg,
-.nav-item.active span {
-  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+/* Ikona aktywnej zakładki w jej barwie (lekko rozjaśnionej tekstem), podpis w kolorze tekstu */
+.nav-item.active svg {
+  color: color-mix(in srgb, var(--ind-c) 72%, var(--text-main));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .app-nav.ready .nav-indicator,
-  .app-nav.ready .nav-indicator::before {
+  .app-nav.ready .nav-indicator::after {
     transition: none;
   }
 
   .nav-indicator.stretch::before,
-  .nav-indicator::after,
-  .app-nav.ready .nav-item.active svg {
+  .app-nav.ready .nav-item.pop svg {
     animation: none;
   }
 }
