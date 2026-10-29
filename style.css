@@ -1679,6 +1679,124 @@ select.plain-input {
   box-shadow: 0 4px 12px -4px var(--primary);
 }
 
+/* Dodaj postęp: krok 1 (wybór rodzaju) i krok 2 (pola) */
+.type-step,
+.fields-step {
+  --tc: var(--primary);
+}
+
+.step-in {
+  animation: step-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.step-lead {
+  margin: 0 0 0.9rem;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.type-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1rem;
+  margin-bottom: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 1rem);
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--tc) 14%, transparent), transparent 65%),
+    var(--bg-card);
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.type-card:hover,
+.type-card:focus-visible {
+  border-color: color-mix(in srgb, var(--tc) 60%, var(--border));
+  box-shadow: 0 8px 22px -12px var(--tc);
+}
+
+.type-card:active {
+  transform: scale(0.98);
+}
+
+.type-card-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--tc) 18%, transparent);
+  color: var(--tc);
+}
+
+.type-card-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.type-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.type-card-text strong {
+  font-size: 1.05rem;
+}
+
+.type-card-text small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.type-card-go {
+  margin-left: auto;
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--text-muted);
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  margin-bottom: 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--tc) 45%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tc) 14%, transparent);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.type-chip svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--tc);
+}
+
+.type-chip-change {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
 /* Karta wyścigu: przełącznik neonowy / książkowy 3D */
 .race-mode {
   grid-template-columns: repeat(2, 1fr);

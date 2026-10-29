@@ -299,12 +299,32 @@
             <i data-lucide="circle-plus" class="card-icon"></i>
             <h2 id="form-title">Dodaj postęp</h2>
           </div>
-          <!-- Tryb: skończona książka albo dopiero zaczęta -->
-          <div id="mode-toggle" class="mode-toggle" role="group" aria-label="Rodzaj wpisu">
-            <button type="button" class="mode-btn active" data-mode="finished" aria-pressed="true">Skończona książka</button>
-            <button type="button" class="mode-btn" data-mode="started" aria-pressed="false">Zaczynam czytać</button>
-            <button type="button" class="mode-btn" data-mode="queue" aria-pressed="false">Do przeczytania</button>
+          <!-- Krok 1: rodzaj wpisu -->
+          <div id="type-step" class="type-step" role="group" aria-label="Rodzaj wpisu">
+            <p class="step-lead">Co chcesz zrobić?</p>
+            <button type="button" class="type-card" data-mode="finished" style="--tc: #22c55e">
+              <span class="type-card-icon"><i data-lucide="book-check"></i></span>
+              <span class="type-card-text"><strong>Skończona książka</strong><small>Dodaj przeczytaną i zgarnij punkty</small></span>
+              <i data-lucide="chevron-right" class="type-card-go"></i>
+            </button>
+            <button type="button" class="type-card" data-mode="started" style="--tc: #3b82f6">
+              <span class="type-card-icon"><i data-lucide="book-open"></i></span>
+              <span class="type-card-text"><strong>Zaczynam czytać</strong><small>Ląduje w „Teraz czytam”</small></span>
+              <i data-lucide="chevron-right" class="type-card-go"></i>
+            </button>
+            <button type="button" class="type-card" data-mode="queue" style="--tc: #a855f7">
+              <span class="type-card-icon"><i data-lucide="bookmark-plus"></i></span>
+              <span class="type-card-text"><strong>Do przeczytania</strong><small>Zapisz na później</small></span>
+              <i data-lucide="chevron-right" class="type-card-go"></i>
+            </button>
           </div>
+          <!-- Krok 2: pola wpisu -->
+          <div id="fields-step" class="fields-step" hidden>
+            <button type="button" id="type-back" class="type-chip">
+              <i data-lucide="arrow-left"></i>
+              <span id="type-chip-label">Skończona książka</span>
+              <span class="type-chip-change">zmień</span>
+            </button>
           <!-- Skończona książka: wybór z zaczętych („Teraz czytam”) albo nowy tytuł -->
           <div id="finish-pick-group" class="form-group" hidden>
             <label for="finish-pick">Którą książkę kończysz?</label>
@@ -357,6 +377,7 @@
             <span id="submit-label">Dodaj wpis</span>
           </button>
           <div id="error-message" class="error-msg" hidden></div>
+          </div>
         </form>
       </section>
 

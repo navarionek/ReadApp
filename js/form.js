@@ -113,16 +113,13 @@ export function updateFormUI() {
   const slim = started || queueing;  // bez stron, mnożników i „niedokończona”
   const canPick = !slim && myReadingNow().length > 0;
 
-  document.getElementById('form-title').textContent =
-    started ? 'Zaczynam czytać' : queueing ? 'Do przeczytania' : 'Dodaj postęp';
+  document.getElementById('form-title').textContent = 'Dodaj postęp';
   document.getElementById('submit-label').textContent =
     started ? 'Zacznij czytać' : queueing ? 'Dodaj do kolejki' : state.finishing ? 'Dodaj skończoną książkę' : 'Dodaj wpis';
 
-  document.querySelectorAll('.mode-btn').forEach(btn => {
-    const active = btn.dataset.mode === state.entryMode;
-    btn.classList.toggle('active', active);
-    btn.setAttribute('aria-pressed', String(active));
-  });
+  const typeLabel = { finished: 'Skończona książka', started: 'Zaczynam czytać', queue: 'Do przeczytania' }[state.entryMode];
+  document.getElementById('type-chip-label').textContent = typeLabel;
+  document.getElementById('read-form').style.setProperty('--tc', { finished: '#22c55e', started: '#3b82f6', queue: '#a855f7' }[state.entryMode]);
 
   const canPickQueue = started && state.myQueue.length > 0;
   document.getElementById('queue-pick-group').hidden = !canPickQueue;
@@ -193,6 +190,21 @@ document.getElementById('title').addEventListener('input', () => {
   pagesHintTimer = setTimeout(suggestPages, 700);
 });
 
+// Krok formularza: 'type' (wybór rodzaju wpisu) albo 'fields' (pola)
+export function setFormStep(step) {
+  const form = document.getElementById('read-form');
+  const changed = form.dataset.step !== step;
+  form.dataset.step = step;
+  document.getElementById('type-step').hidden = step !== 'type';
+  document.getElementById('fields-step').hidden = step !== 'fields';
+  if (changed) {
+    const shown = document.getElementById(step === 'type' ? 'type-step' : 'fields-step');
+    shown.classList.remove('step-in');
+    void shown.offsetWidth;
+    shown.classList.add('step-in');
+  }
+}
+
 export function setEntryMode(mode) {
   state.entryMode = mode;
   if (mode !== 'started') state.startingFromQueue = null;
@@ -242,6 +254,7 @@ export function startFinishing(item) {
   resetForm();
   selectFinishing(item);
   updateFormUI();
+  setFormStep('fields');
   goTo('dodaj');
   document.getElementById('pages').focus({ preventScroll: true });
 }
@@ -254,6 +267,7 @@ export function resetForm() {
   state.finishPickedNew = false;
   state.entryMode = 'finished';
   document.getElementById('read-form').reset();
+  setFormStep('type');
   document.getElementById('started-date').value = todayInputValue();
   applyFinishDefault();
   hideError();

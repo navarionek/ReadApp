@@ -8,7 +8,7 @@ import { syncEinkToggle, toggleEink } from './eink.js';
 import { flickerLogoSoon } from './logo.js';
 import { initNavIndicator } from './navbar.js';
 import { initPageKeys } from './pagekeys.js';
-import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, todayInputValue } from './form.js';
+import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, setFormStep, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
 import { closeBookModal, loadShelf } from './shelf.js';
 import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme } from './shell.js';
@@ -53,7 +53,12 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', e => {
     if (!e.target.closest('.settings-wrap')) closeSettings();
   });
-  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => setEntryMode(btn.dataset.mode)));
+  document.querySelectorAll('.type-card').forEach(btn => btn.addEventListener('click', () => {
+    setEntryMode(btn.dataset.mode);
+    setFormStep('fields');
+    document.getElementById(document.getElementById('title-group').hidden ? 'pages' : 'title').focus({ preventScroll: true });
+  }));
+  document.getElementById('type-back').addEventListener('click', () => { if (state.finishing) resetForm(); else setFormStep('type'); });
   document.getElementById('finish-pick').addEventListener('change', handleFinishPick);
   document.getElementById('queue-pick').addEventListener('change', handleQueuePick);
   document.getElementById('book-modal-close').addEventListener('click', closeBookModal);
