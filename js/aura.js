@@ -135,7 +135,9 @@ const SPIN_JUMP_MS = 180; // jak szybko przychodzi zryw (stała czasu, ms)
 const SPIN_CURVE = 2.4; // im większa, tym bardziej przyspieszanie narasta pod koniec
 const GLOW_FROM = 37;  // od tej prędkości (razy zwykła) wokół okręgów narasta poświata przed wybuchem
 const SPIN_DOWN = 650;  // zwalnianie po puszczeniu: stała czasu (ms), do zwykłego tempa ok. 3 s
-const FLY_GAP = 32;     // odstęp między kolejnymi wystrzałami okręgów (ms)
+const SWAP_SPIN = 14;    // prędkość okręgów na starcie zmiany osoby (razy zwykła)
+const SWAP_SPIN_MS = 2200; // tyle trwa wyhamowanie do zwykłego tempa (ms)
+const FLY_GAP = 32;    // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 380;     // lot jednego okręgu
 const FLY_DIST = 300;   // jak daleko odlatuje okrąg (jednostki rysunku orbity)
 const SPARKS = 30;      // iskry przy eksplozji
@@ -237,11 +239,33 @@ class Orbit {
       if (done) this.spinRate = 1;
       this.charge(now);
       // Tylko obrót (warstwy jeszcze „oddychają”, tego nie przyspieszamy, bo przy rozkręceniu migałoby)
-      this.layers.flatMap(layer => layer.getAnimations().filter(anim => anim.animationName === 'orb-spin'))
-        .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(this.spinRate) : (anim.playbackRate = this.spinRate)));
+      this.applySpin();
       this.spinRaf = done ? 0 : requestAnimationFrame(step);
     };
     this.spinRaf = requestAnimationFrame(step);
+  }
+
+  applySpin() {
+    const rate = Math.max(this.spinRate || 1, this.swapRate || 1);
+    this.layers.flatMap(layer => layer.getAnimations().filter(anim => anim.animationName === 'orb-spin'))
+      .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(rate) : (anim.playbackRate = rate)));
+  }
+
+  // Zmiana osoby: okręgi na chwilę kręcą się szybciej, potem płynnie wracają do zwykłego tempa
+  swapSpin() {
+    if (reducedMotion()) return;
+    const t0 = performance.now();
+    const had = !!this.swapRaf;
+    this.swapT0 = t0;
+    if (had) return;
+    const step = now => {
+      const p = Math.min(1, (now - this.swapT0) / SWAP_SPIN_MS);
+      this.swapRate = 1 + (SWAP_SPIN - 1) * (1 - p) ** 2;
+      if (p >= 1) this.swapRate = 1;
+      this.applySpin();
+      this.swapRaf = p >= 1 ? 0 : requestAnimationFrame(step);
+    };
+    this.swapRaf = requestAnimationFrame(step);
   }
 
   // Naładowanie przed wybuchem: od GLOW_FROM razy zwykłej prędkości wokół okręgów narasta poświata, a orbita
@@ -394,6 +418,7 @@ class Orbit {
     this.rings.slice(targets.length).forEach(ring => {
       ring.to = { ...ring.now, r: ring.now.r + 14, len: 0, op: 0, arc: 0, remove: true };
     });
+    if (animate) this.swapSpin();
     this.start(animate);
   }
 
