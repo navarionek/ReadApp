@@ -1,3 +1,4 @@
+import { openCosmos, preloadCosmos } from './cosmos.js';
 import { el } from './ui.js';
 
 /* ----------------- Karta osoby na Półce ----------------- */
@@ -141,6 +142,8 @@ const FLY_GAP = 32;    // odstęp między kolejnymi wystrzałami okręgów (ms)
 const FLY_MS = 380;     // lot jednego okręgu
 const FLY_DIST = 300;   // jak daleko odlatuje okrąg (jednostki rysunku orbity)
 const SPARKS = 30;      // iskry przy eksplozji
+const COSMOS_AFTER = 380;   // tyle po wybuchu otwiera się kosmos 3D (js/cosmos.js)
+const COSMOS_PRELOAD = 3000; // od tylu ms trzymania silnik 3D ściąga się w tle
 // Prędkość po t ms trzymania: szybki zryw na starcie, potem coraz ostrzejsze przyspieszanie do SPIN_MAX
 const holdRate = t => (t = Math.max(0, t), 1 + SPIN_JUMP * (1 - Math.exp(-t / SPIN_JUMP_MS)) + (SPIN_MAX - 1 - SPIN_JUMP) * Math.min(1, t / SPIN_RAMP) ** SPIN_CURVE);
 // Odwrotnie: po ilu ms trzymania jest dana prędkość (żeby ponowne przytrzymanie dokładało od bieżącej)
@@ -231,6 +234,7 @@ class Orbit {
         // Znacznik czasu klatki bywa odrobinę wcześniejszy niż chwila naciśnięcia: czas trzymania nie może być ujemny
         const held = Math.max(0, now - this.holdStart);
         this.spinRate = holdRate(held);
+        if (held >= COSMOS_PRELOAD) preloadCosmos();
         if (held >= SPIN_RAMP && !this.launch) this.fire();
       } else {
         // Puszczenie palca albo okręgi już wystrzelone (trzymanie dalej, ale nie ma czego kręcić): hamowanie.
@@ -319,6 +323,7 @@ class Orbit {
     this.launch = 'flying';
     this.burstAt = performance.now();
     this.explode();
+    setTimeout(() => this.openCosmos(), COSMOS_AFTER);
     const order = this.rings.filter(ring => ring.now.op > 0.05).reverse();
     const t0 = performance.now();
     order.forEach((ring, k) => { ring.fly = { at: t0 + k * FLY_GAP, r: ring.now.r, op: ring.now.op, width: ring.now.width }; });
@@ -395,6 +400,22 @@ class Orbit {
       { duration: 500, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' },
     );
     navigator.vibrate?.([35, 40, 70]);
+  }
+
+  // Easter egg: po wybuchu ten sam układ w 3D na cały ekran, otwierany ze słońca karty
+  openCosmos() {
+    const hero = this.root.closest('.shelf-hero');
+    if (!hero?.isConnected) return;
+    const sun = this.root.querySelector('.orb-core-svg').getBoundingClientRect();
+    openCosmos({
+      books: this.books || [],
+      seed: this.seed || '',
+      h: this.color?.h ?? 250,
+      s: this.color?.s ?? 70,
+      name: hero.querySelector('.shelf-hero-title')?.textContent || '',
+      kicker: hero.querySelector('.shelf-hero-kicker')?.textContent || '',
+      origin: { x: sun.left + sun.width / 2, y: sun.top + sun.height / 2 },
+    });
   }
 
   // Po wystrzale okręgi wyrastają z powrotem ze środka (zwykłe przejście do docelowego kształtu)
@@ -719,7 +740,9 @@ export function holdOrbit(hero, on) {
 // books = null: książki nowej osoby się wczytują (okręgi czekają przygaszone); potem przechodzą w nowe.
 // animate = false: od razu w docelowym kształcie.
 export function setOrbit(hero, books, seed, animate) {
-  orbitOf(hero).setTargets(books && ringTargets(books, seed), animate);
+  const orbit = orbitOf(hero);
+  if (books) Object.assign(orbit, { books: books.slice(0, MAX_RINGS), seed });  // te same książki dla kosmosu 3D
+  orbit.setTargets(books && ringTargets(books, seed), animate);
 }
 
 // Apka w tle: animacje karty (obrót okręgów, dryf plam) stoją. Inaczej ich czas leci dalej i po powrocie
