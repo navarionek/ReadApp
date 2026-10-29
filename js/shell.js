@@ -47,6 +47,12 @@ export function showScreen(name) {
     item.classList.toggle('active', active);
     if (active) item.setAttribute('aria-current', 'page');
     else item.removeAttribute('aria-current');
+    // Podskok ikony tylko przy zmianie zakładki (klasa, a nie sama .active): lucide.createIcons przy każdym
+    // rysowaniu Półki odtwarza ikony paska, a animacja przypięta do .active svg odpalała się za każdym razem
+    if (active && entered) {
+      item.classList.add('pop');
+      setTimeout(() => item.classList.remove('pop'), 700);
+    } else if (!active) item.classList.remove('pop');
   });
   moveNavIndicator();
   window.scrollTo(0, 0);
