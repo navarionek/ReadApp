@@ -2520,6 +2520,12 @@ select.plain-input {
   pointer-events: none;
 }
 
+/* Gaśnie tylko to, co widać na ekranie (dwie pierwsze sekcje). Reszta (setki okładek) znika od razu bez
+   rysowania, więc przygaszanie nie musi składać całej siatki w jedną półprzezroczystą warstwę */
+.shelf.switching > :nth-child(n + 3) {
+  visibility: hidden;
+}
+
 .shelf.enter > * {
   animation: shelf-enter 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
