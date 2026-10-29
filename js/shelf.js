@@ -233,6 +233,7 @@ let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
 let loadedOwner = null;     // czyje książki są teraz w state.shelfRows
 let shelfRenderId = 0;
+const shelfCache = new Map();  // userId -> { rows, queue, signature }: ostatnio pobrana półka każdej osoby (tylko w tej sesji)
 let shownOwner = null;     // czyja półka jest narysowana pod kartą (przy zmianie osoby wjeżdża od nowa)
 
 // Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
@@ -251,7 +252,20 @@ export async function loadShelf() {
   if (!userId) return;
   const seq = ++shelfSeq;
   const shelf = document.getElementById('shelf');
-  if (!state.shelfRows.length || state.shelfRows[0]?.user_id !== userId) {
+  const cached = shelfCache.get(userId);
+  if (cached && loadedOwner !== userId) {
+    // Osobę znamy już z tej sesji: jej półka pojawia się od razu z pamięci (bez czekania na sieć, kiedy stara
+    // półka stała przygaszona), a świeże dane dochodzą w tle i rysują ją od nowa tylko, jeśli się zmieniły.
+    // Rysujemy w następnej klatce, żeby stuknięcie zdążyło się pokazać
+    requestAnimationFrame(() => {
+      if (seq !== shelfSeq || loadedOwner === userId) return;
+      state.shelfRows = cached.rows;
+      state.shelfQueue = cached.queue;
+      shelfSignature = cached.signature;
+      loadedOwner = userId;
+      renderShelf();
+    });
+  } else if (!state.shelfRows.length || state.shelfRows[0]?.user_id !== userId) {
     // Przy zmianie osoby stara półka przygasa, zamiast znikać pod napisem „Ładowanie”
     if (shownOwner && shownOwner !== userId && shelf.querySelector('.shelf-section, .status-box:not(.loading)')) shelf.classList.add('switching');
     else shelf.replaceChildren(el('div', { class: 'status-box loading', text: 'Ładowanie półki…' }));
@@ -291,6 +305,7 @@ export async function loadShelf() {
   state.shelfRows = data || [];
   state.shelfQueue = queueRows;
   loadedOwner = userId;
+  shelfCache.set(userId, { rows: state.shelfRows, queue: state.shelfQueue, signature });
   renderShelf();
   fillMissingBookInfo(userId);
   fillMissingQueueInfo(userId);
