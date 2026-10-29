@@ -383,6 +383,7 @@ export function replayShelfOrbit() {
 // nawet po szybkim przewinięciu rozlewa się w swoim tempie, a nie skacze razem z palcem.
 const BACKDROP_LAG = 200;  // stała czasu dochodzenia do celu (ms); do celu ok. 0,6 s
 const BACKDROP_LAG_BACK = 70;  // to samo przy chowaniu (przewijanie w górę): kilka razy szybciej
+const BACKDROP_EARLY = 0.4;    // tło ma pełny rozmiar, gdy schowała się taka część karty (mniej = pojawia się wcześniej)
 const BACKDROP_REACH = 0.9;    // jak nisko sięga tło po rozlaniu (część wysokości ekranu)
 const BACKDROP_OPACITY = 1;    // pełna przezroczystość warstwy; subtelność daje sam gradient
 let backdropFrame = 0;
@@ -404,7 +405,7 @@ function placeBackdrop(now) {
   const card = hero.getBoundingClientRect();
   const W = backdrop.offsetWidth || window.innerWidth;
   const H = backdrop.offsetHeight || window.innerHeight;
-  const hidden = Math.min(1, Math.max(0, -card.top / card.height));  // jaka część karty schowała się u góry
+  const hidden = Math.min(1, Math.max(0, -card.top / (card.height * BACKDROP_EARLY)));  // jak daleko karta uciekła w górę (1 = po schowaniu BACKDROP_EARLY jej wysokości)
   const target = hidden * hidden * (3 - 2 * hidden);
   const dt = backdropLast ? Math.min(64, now - backdropLast) : 16;
   backdropLast = now;
