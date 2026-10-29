@@ -168,7 +168,7 @@ export function coverEl(book, extraClass = '') {
     return ph;
   };
   if (!book.cover_url) return placeholder();
-  const img = el('img', { class: `book-cover ${extraClass}`, src: book.cover_url, alt: `Okładka: ${book.title}`, loading: 'lazy', referrerpolicy: 'no-referrer' });
+  const img = el('img', { class: `book-cover ${extraClass}`, src: book.cover_url, alt: `Okładka: ${book.title}`, loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer' });
   img.addEventListener('error', () => img.replaceWith(placeholder()));
   return img;
 }

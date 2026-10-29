@@ -245,10 +245,13 @@ class Orbit {
     this.spinRaf = requestAnimationFrame(step);
   }
 
-  applySpin() {
+  spinAnimations() {
+    return this.layers.flatMap(layer => layer.getAnimations().filter(anim => anim.animationName === 'orb-spin'));
+  }
+
+  applySpin(anims = this.spinAnimations()) {
     const rate = Math.max(this.spinRate || 1, this.swapRate || 1);
-    this.layers.flatMap(layer => layer.getAnimations().filter(anim => anim.animationName === 'orb-spin'))
-      .forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(rate) : (anim.playbackRate = rate)));
+    anims.forEach(anim => (anim.updatePlaybackRate ? anim.updatePlaybackRate(rate) : (anim.playbackRate = rate)));
   }
 
   // Zmiana osoby: okręgi na chwilę kręcą się szybciej, potem płynnie wracają do zwykłego tempa
@@ -258,11 +261,12 @@ class Orbit {
     const had = !!this.swapRaf;
     this.swapT0 = t0;
     if (had) return;
+    const anims = this.spinAnimations();  // raz na całe przejście, a nie w każdej klatce (przy zmianie osoby karta ma dość pracy)
     const step = now => {
       const p = Math.min(1, (now - this.swapT0) / SWAP_SPIN_MS);
       this.swapRate = 1 + (SWAP_SPIN - 1) * (1 - p) ** 2;
       if (p >= 1) this.swapRate = 1;
-      this.applySpin();
+      this.applySpin(anims);
       this.swapRaf = p >= 1 ? 0 : requestAnimationFrame(step);
     };
     this.swapRaf = requestAnimationFrame(step);

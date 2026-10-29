@@ -2666,6 +2666,13 @@ select.plain-input {
   margin-bottom: 1.6rem;
 }
 
+/* Dół Półki (setki okładek) nie rysuje i nie układa tego, co poza ekranem: przy zmianie osoby, gdy karta u góry
+   się animuje, przeglądarka nie musi malować całej siatki naraz */
+.shelf-section:nth-child(n + 3) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 26rem;
+}
+
 .shelf-heading {
   display: flex;
   align-items: center;
