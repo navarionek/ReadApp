@@ -232,7 +232,8 @@ const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, pag
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
 let loadedOwner = null;     // czyje książki są teraz w state.shelfRows
-let shownOwner = null;      // czyja półka jest narysowana pod kartą (przy zmianie osoby wjeżdża od nowa)
+let shelfRenderId = 0;
+let shownOwner = null;     // czyja półka jest narysowana pod kartą (przy zmianie osoby wjeżdża od nowa)
 
 // Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
 function shelfSig(userId, rows, queue = []) {
@@ -570,9 +571,27 @@ export function renderShelf() {
   }
 
   const shelf = document.getElementById('shelf');
-  shelf.replaceChildren(...sections);
+  const switched = shownOwner !== userId;
+  const renderId = ++shelfRenderId;
+  // Przy zmianie osoby najpierw dwie pierwsze sekcje (to widać), reszta dochodzi chwilę później: setki okładek
+  // naraz zacinały animację karty i wjazd półki
+  if (switched && sections.length > 2) {
+    shelf.replaceChildren(...sections.slice(0, 2));
+    const rest = sections.slice(2);
+    setTimeout(() => {
+      if (renderId !== shelfRenderId) return;
+      shelf.append(...rest);
+      refreshIcons();
+    }, 180);
+  } else {
+    shelf.replaceChildren(...sections);
+  }
+  // Przygaszenie znika od razu (bez 0,25 s przejścia): nowa półka wjeżdża własną animacją, dwie naraz zacinały
+  shelf.style.transition = 'none';
   shelf.classList.remove('switching');
-  if (shownOwner !== userId) {
+  void shelf.offsetWidth;
+  shelf.style.transition = '';
+  if (switched) {
     // Półka innej osoby wjeżdża sekcja po sekcji
     shelf.classList.remove('enter');
     void shelf.offsetWidth;
