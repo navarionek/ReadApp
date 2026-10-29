@@ -2092,8 +2092,8 @@ select.plain-input {
   margin: calc(var(--size, 10px) / -2) 0 0 calc(var(--size, 10px) / -2);
   opacity: 0.15;
   background: radial-gradient(closest-side, #fff 0 14%, rgb(220 230 255 / 0.4) 30%, transparent 72%);
-  /* Migotanie (transform) i powolne przepływanie (osobna właściwość translate, żeby się nie gryzły) */
-  animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite, star-float 14s ease-in-out var(--delay, 0s) infinite alternate;
+  /* Tylko migotanie: ruch (krążenie wokół słońca) daje warstwa nieba, więc wszystkie gwiazdy płyną w jedną stronę */
+  animation: star-twinkle var(--dur, 4s) ease-in-out var(--delay, 0s) infinite;
   will-change: transform, opacity;
 }
 
@@ -2112,11 +2112,6 @@ select.plain-input {
 
 .star-twinkle::after {
   transform: rotate(90deg);
-}
-
-@keyframes star-float {
-  from { translate: -10px 4px; }
-  to { translate: 10px -4px; }
 }
 
 @keyframes star-twinkle {

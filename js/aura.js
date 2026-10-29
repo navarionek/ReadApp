@@ -602,16 +602,16 @@ function starField() {
   // Migoczące gwiazdy: więcej po prawej (tam orbita), każda w swoim rytmie
   const twinkles = Array.from({ length: 6 }, () => {
     const s = el('span', { class: 'star-twinkle' });
-    s.style.left = `${(25 + rand() * 72).toFixed(1)}%`;
-    s.style.top = `${(6 + rand() * 80).toFixed(1)}%`;
+    s.fx = 0.25 + rand() * 0.72;  // położenie na karcie (części szer. i wys.), przeliczane na warstwę nieba
+    s.fy = 0.06 + rand() * 0.8;
     s.style.setProperty('--size', `${Math.round(5 + rand() * 4)}px`);
     s.style.setProperty('--dur', `${(2.6 + rand() * 3.4).toFixed(2)}s`);
     s.style.setProperty('--delay', `${(-rand() * 6).toFixed(2)}s`);
     return s;
   });
   const shooting = [0, 1].map(i => el('span', { class: `star-shoot s${i}` }));
-  const drift = el('div', { class: 'stars-drift' }, [canvas]);
-  const field = el('div', { class: 'aura-stars' }, [drift, ...twinkles, ...shooting]);
+  const drift = el('div', { class: 'stars-drift' }, [canvas, ...twinkles]);  // migoczące gwiazdy krążą razem z niebem
+  const field = el('div', { class: 'aura-stars' }, [drift, ...shooting]);
   // Niebo krąży wokół słońca orbity (prawa strona karty): to kwadratowa warstwa ze środkiem w słońcu,
   // na tyle duża, żeby przy każdym kącie obrotu zakrywała całą kartę. Rysujemy je, gdy karta ma wymiary,
   // i od nowa przy zmianie rozmiaru (obrót telefonu).
@@ -626,6 +626,10 @@ function starField() {
     const sunY = H * SKY_PIVOT[1];
     const reach = Math.ceil(Math.max(Math.hypot(sunX, sunY), Math.hypot(W - sunX, sunY), Math.hypot(sunX, H - sunY), Math.hypot(W - sunX, H - sunY)) + 8);
     Object.assign(drift.style, { left: `${sunX - reach}px`, top: `${sunY - reach}px`, width: `${reach * 2}px`, height: `${reach * 2}px` });
+    twinkles.forEach(tw => {
+      tw.style.left = `${(W * tw.fx - (sunX - reach)).toFixed(1)}px`;
+      tw.style.top = `${(H * tw.fy - (sunY - reach)).toFixed(1)}px`;
+    });
     drawSky(canvas);
   }).observe(field);
   return field;
