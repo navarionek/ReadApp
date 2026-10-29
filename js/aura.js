@@ -379,12 +379,20 @@ class Orbit {
     slot.appendChild(fx);
     setTimeout(() => fx.remove(), 1300);
     const hero = this.root.closest('.shelf-hero');
-    if (hero) {
-      hero.classList.remove('boom');
-      void hero.offsetWidth;  // wstrząs od nowa przy kolejnej eksplozji
-      hero.classList.add('boom');
-      setTimeout(() => hero.classList.remove('boom'), 600);
-    }
+    // Wstrząs przez Web Animations, nie klasę z własnym `animation`: ta nadpisywała wejście karty na ekran
+    // (.screen-enter, screen-in), więc po zdjęciu klasy karta znikała i wjeżdżała od nowa
+    hero?.animate(
+      [
+        { transform: 'translate(0, 0)' },
+        { transform: 'translate(-5px, 3px)', offset: 0.12 },
+        { transform: 'translate(5px, -3px)', offset: 0.26 },
+        { transform: 'translate(-3px, -2px)', offset: 0.4 },
+        { transform: 'translate(3px, 2px)', offset: 0.56 },
+        { transform: 'translate(-1px, 1px)', offset: 0.72 },
+        { transform: 'translate(0, 0)' },
+      ],
+      { duration: 500, easing: 'cubic-bezier(0.3, 0.6, 0.4, 1)' },
+    );
     navigator.vibrate?.([35, 40, 70]);
   }
 

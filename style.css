@@ -2377,21 +2377,6 @@ select.plain-input {
   100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--dist)) scaleX(1); }
 }
 
-/* Wstrząs karty */
-.shelf-hero.boom {
-  animation: card-boom 0.5s cubic-bezier(0.3, 0.6, 0.4, 1);
-}
-
-@keyframes card-boom {
-  0% { transform: translate(0, 0); }
-  12% { transform: translate(-5px, 3px); }
-  26% { transform: translate(5px, -3px); }
-  40% { transform: translate(-3px, -2px); }
-  56% { transform: translate(3px, 2px); }
-  72% { transform: translate(-1px, 1px); }
-  100% { transform: translate(0, 0); }
-}
-
 .orb-core-svg.pop > circle {
   transform-box: fill-box;
   transform-origin: center;
