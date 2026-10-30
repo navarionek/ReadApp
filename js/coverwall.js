@@ -1,5 +1,5 @@
 import { einkEnabled } from './eink.js';
-import { coverEl, titleHue } from './shelf.js';
+import { coverEl } from './shelf.js';
 import { state } from './state.js';
 import { el } from './ui.js';
 
@@ -143,180 +143,21 @@ function mountStartWall(books, keepWall = false) {
 }
 
 /* ----- Intro po włączeniu apki ----- */
-// Najpierw mnóstwo drobnych, pędzących okładek (ściana z daleka), kamera przybliża się do
-// zwykłego rozmiaru tła, a kolumny w tym czasie hamują do zwykłego tempa. W połowie drogi
-// karty już wjeżdżają, a na końcu ściana gaśnie w tło.
-// Oddalona ściana to jeden canvas, ale rysuje dokładnie zwykłą ścianę spod spodu: te same
-// kolumny, okładki i pozycje (czytane raz z DOM i z postępu animacji CSS). Zwykła ściana na
-// czas intro stoi, a pozycje jej kolumn liczymy sami; na końcu przestawiamy ją jednym ruchem
-// tam, gdzie był canvas, i puszczamy dalej, więc pod znikającym canvasem są te same okładki.
-// Żeby telefon nadążał: każda kolumna jest raz rysowana do gotowego paska (potem tylko go
-// przesuwamy), canvas ma rozdzielczość CSS (okładki są małe i pędzą, ostrość nie ma znaczenia),
-// a zwykłej ściany nie ruszamy co klatkę (to wymuszało przeliczanie kilkuset okładek w DOM).
-const INTRO_ZOOM = 1150;   // przybliżanie
-const INTRO_CARDS = 500;   // od tej chwili wjeżdżają karty (jeszcze w trakcie przybliżania)
-const INTRO_FADE = 450;    // na końcu przybliżania canvas znika, zostaje zwykła ściana
-const INTRO_FROM = 0.6;    // skala na starcie (ile razy mniejsze okładki niż w tle)
-const INTRO_TO = 1.08;     // skala zwykłej ściany (.tv-wall)
-const INTRO_PEAK = 30;     // ile razy szybciej niż zwykle jadą kolumny na samym początku
+// Ściana okładek z bliska i rozpędzona odjeżdża do zwykłego tła, a karty wjeżdżają na jej tle.
+// Cały ruch to transform i opacity na już istniejących elementach, czyli sama kompozycja na
+// GPU: zero rysowania, zero przeliczania układu w trakcie. Wcześniej ścianę rysował od nowa
+// canvas co klatkę, a karty animowały backdrop-filter, i to przycinało telefon.
+const INTRO_ZOOM = 1100;      // czas odjeżdżania ściany do zwykłego rozmiaru
+const INTRO_CARDS = 450;      // od tej chwili wjeżdżają karty (jeszcze w trakcie ruchu ściany)
+const INTRO_SETTLE = 350;     // po zoomie: czas na dokończenie animacji kart
+const INTRO_FROM = 1.9;       // skala ściany na starcie (zwykła to 1.08, patrz .tv-wall)
+const INTRO_TO = 1.08;
 const INTRO_WAIT_MAX = 2500;  // najdłużej tyle czekamy na dane i okładki przed animacją
+// Tempo kolumn na początku i jego hamowanie do zwykłego, w kilku skokach (nie co klatkę)
+const INTRO_RATES = [[0, 12], [250, 6], [500, 3], [800, 1.6], [INTRO_ZOOM, 1]];
 
 const cards = () => [...document.querySelectorAll('.screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner)')]
   .filter(card => card.offsetParent !== null);
-
-const easeInOut = x => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
-
-// Odczyt zwykłej ściany (musi już być widoczna, inaczej nie ma animacji ani wymiarów)
-function introScene(bg) {
-  const wall = bg.querySelector('.tv-wall');
-  const strips = [...wall.querySelectorAll('.tv-wall-strip')];
-  if (!strips.length || !strips[0].children.length || !wall.offsetWidth) return null;
-  const W = window.innerWidth;
-  const H = window.innerHeight;
-  const canvas = el('canvas', { class: 'cover-intro' });
-  canvas.width = W;
-  canvas.height = H;
-  bg.appendChild(canvas);
-  const ctx = canvas.getContext('2d', { alpha: false });
-  const bgColor = getComputedStyle(document.body).backgroundColor;
-  const first = strips[0].children;
-  const tileW = first[0].offsetWidth;
-  const tileH = first[0].offsetHeight;
-  const step = first.length > 1 ? first[1].offsetTop - first[0].offsetTop : tileH * 1.07;
-  const pitch = strips.length > 1 ? strips[1].offsetLeft - strips[0].offsetLeft : tileW * 1.1;
-  // Środek ściany na ekranie (obrót i skala CSS idą od środka)
-  const cx = wall.offsetLeft + wall.offsetWidth / 2;
-  const cy = wall.offsetTop + wall.offsetHeight / 2;
-
-  // Ta sama okładka jest w ścianie wiele razy; bierzemy ten egzemplarz, który już się wczytał
-  const loaded = new Map();
-  wall.querySelectorAll('img').forEach(img => {
-    if (img.complete && img.naturalWidth && !loaded.has(img.src)) loaded.set(img.src, img);
-  });
-  // Zastępcza okładka narysowana tak jak w ścianie (ten sam gradient z tytułu i tytuł),
-  // żeby przy przejściu na zwykłą ścianę nic się nie podmieniało
-  const drawPlaceholder = (g, it, y) => {
-    const h = titleHue(it.title);
-    const grad = g.createLinearGradient(0, y, tileW, y + tileH);
-    grad.addColorStop(0, `hsl(${h} 45% 42%)`);
-    grad.addColorStop(1, `hsl(${(h + 40) % 360} 50% 24%)`);
-    g.fillStyle = grad;
-    g.fillRect(0, y, tileW, tileH);
-    g.fillStyle = '#fff';
-    g.font = `700 ${Math.round(tileW * 0.12)}px system-ui, sans-serif`;
-    g.textBaseline = 'top';
-    g.fillText(it.title || 'bez tytułu', tileW * 0.1, y + tileH * 0.08, tileW * 0.8);
-  };
-  // Gotowy pasek kolumny: okładki narysowane raz, jedna pod drugą (okres powtarzania)
-  const bake = col => {
-    const g = col.bitmap.getContext('2d');
-    g.fillStyle = bgColor;
-    g.fillRect(0, 0, col.bitmap.width, col.bitmap.height);
-    col.waiting = 0;
-    col.items.forEach((it, j) => {
-      const img = it.src ? loaded.get(it.src) || it.img : null;
-      if (img?.complete && img.naturalWidth) {
-        loaded.set(it.src, img);
-        g.drawImage(img, 0, j * step, tileW, tileH);
-      } else {
-        if (it.src) col.waiting++;
-        drawPlaceholder(g, it, j * step);
-      }
-    });
-  };
-  const columns = strips.map(strip => {
-    const tiles = [...strip.children];
-    const items = tiles.slice(0, tiles.length / 2).map(tile => {
-      const img = tile.querySelector('img');
-      const title = img ? img.alt.replace(/^Okładka: /, '') : tile.querySelector('.ph-title')?.textContent;
-      return { img, src: img?.src || null, title };
-    });
-    const anim = strip.getAnimations()[0] || null;
-    anim?.pause();
-    const timing = anim?.effect.getComputedTiming();
-    const bitmap = document.createElement('canvas');
-    bitmap.width = Math.ceil(tileW);
-    bitmap.height = Math.ceil(items.length * step);
-    const col = {
-      x: strip.offsetLeft - wall.offsetWidth / 2,
-      top: strip.offsetTop - wall.offsetHeight / 2,
-      items, anim, bitmap,
-      p0: timing?.progress || 0,
-      duration: Number(timing?.duration) || 1,
-      down: strip.parentElement.classList.contains('down'),
-      height: strip.offsetHeight,
-    };
-    bake(col);
-    return col;
-  });
-  // Dodatkowe kolumny po bokach (widoczne tylko z daleka): paski pożyczone ze zwykłych kolumn
-  const reach = Math.hypot(W, H) / 2 / INTRO_FROM;
-  const extra = Math.max(0, Math.ceil((reach - (columns.length * pitch) / 2) / pitch) + 1);
-  const extras = [];
-  for (let k = 1; k <= extra; k++) {
-    [-1, 1].forEach(dir => {
-      const src = columns[Math.floor(Math.random() * columns.length)];
-      const edge = dir < 0 ? columns[0] : columns[columns.length - 1];
-      const idx = dir < 0 ? -k : columns.length - 1 + k;
-      extras.push({
-        x: edge.x + dir * k * pitch,
-        src,
-        sign: ((idx % 2) + 2) % 2 ? 1 : -1,  // na zmianę w dół i w górę, jak w ścianie
-        speed: tileW * (0.08 + Math.random() * 0.08),
-        pos: Math.random() * src.bitmap.height,
-      });
-    });
-  }
-
-  // Pasek powtarzany w pionie, tyle kopii, ile trzeba do zakrycia widoku
-  const drawStrip = (bitmap, x, offset, half) => {
-    if (x + tileW < -half || x > half) return;
-    const period = bitmap.height;
-    for (let y = offset - Math.ceil((offset + half) / period) * period; y < half; y += period) {
-      ctx.drawImage(bitmap, x, y);
-    }
-  };
-
-  let advance = 0;  // o ile czasu animacji (ms) przesunęła się zwykła ściana
-  let frameNo = 0;
-  return {
-    canvas,
-    // Ustawia zwykłą ścianę tam, gdzie jest canvas, i puszcza ją dalej w zwykłym tempie
-    release() {
-      columns.forEach(col => {
-        if (!col.anim || col.anim.playState !== 'paused') return;
-        col.anim.currentTime = (Number(col.anim.currentTime) || 0) + advance;
-        col.anim.play();
-      });
-    },
-    draw(scale, boost, dt) {
-      advance += dt * boost;
-      // Okładki, które doczytały się w trakcie intro, dopisujemy do pasków (rzadko)
-      if (++frameNo % 10 === 0) columns.forEach(col => { if (col.waiting) bake(col); });
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, W, H);
-      ctx.translate(cx, cy);
-      ctx.rotate((-7 * Math.PI) / 180);
-      ctx.scale(scale, scale);
-      const half = Math.hypot(W, H) / 2 / scale + tileH;
-      columns.forEach(col => {
-        // Pozycja paska dokładnie jak w CSS: translateY(0 → -50%) w górę, odwrotnie w dół
-        const p = (((col.p0 + advance / col.duration) % 1) + 1) % 1;
-        const shift = -0.5 * col.height * (col.down ? 1 - p : p);
-        drawStrip(col.bitmap, col.x, col.top + shift, half);
-      });
-      extras.forEach(col => {
-        col.pos += (col.sign * col.speed * boost * dt) / 1000;
-        drawStrip(col.src.bitmap, col.x, col.pos, half);
-      });
-      // Przyciemnienie jak filtr brightness(0.82) na kafelkach ściany
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-      ctx.fillRect(0, 0, W, H);
-    },
-  };
-}
 
 export function playStartIntro() {
   if (introPlayed || !startWallEnabled() || calm.matches) return;
@@ -338,7 +179,6 @@ export function playStartIntro() {
   // w tle (inaczej przycinała), najpóźniej po INTRO_WAIT_MAX.
   bg.classList.add('intro-waiting');
   const dataReady = new Promise(resolve => { intro.dataDone = resolve; });
-  // Po jednym egzemplarzu każdej okładki (canvas i tak rysuje ten, który już się wczytał)
   const coversReady = () => {
     const urls = new Map();
     bg.querySelectorAll('.tv-wall img').forEach(img => { if (!urls.has(img.src)) urls.set(img.src, img); });
@@ -355,49 +195,41 @@ export function playStartIntro() {
       .then(() => requestAnimationFrame(() => requestAnimationFrame(start)));
   });
 
-  let scene = null;
-  let t0 = null;
-  let prev = 0;
-  let revealed = false;
-  let faded = false;
-  // Zwykła ściana zostaje schowana pod canvasem aż do końca przybliżania: canvas pojawia się
-  // płynnie, a gdyby ściana była już widoczna, prześwitywałyby przez niego inne (duże) okładki
-  const start = now => {
-    scene = introScene(bg);
-    if (!scene) bg.classList.remove('intro-waiting');  // bez canvasa od razu zwykła ściana
-    step(now);
-  };
-  const step = now => {
-    t0 ??= now;
-    const t = now - t0;
-    const dt = Math.min(50, now - (prev || now));
-    prev = now;
-    const z = Math.min(1, t / INTRO_ZOOM);
-    // Kolumny pędzą od pierwszej klatki i hamują do zwykłego tempa
-    // Także w trakcie gaśnięcia canvasa: zastygły obraz rozjeżdżał się z jadącą już pod nim ścianą (przeskok okładek)
-    scene?.draw(INTRO_FROM + (INTRO_TO - INTRO_FROM) * easeInOut(z), 1 + (INTRO_PEAK - 1) * (1 - z) ** 1.6, dt);
-    if (t >= INTRO_CARDS && !revealed) {
-      revealed = true;
-      // Karty wjeżdżają po kolei, od góry, na tle jeszcze przybliżającej się ściany
-      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.03}s`));
-      body.classList.replace('wall-intro', 'wall-intro-reveal');
-    }
-    if (t >= INTRO_ZOOM && !faded) {
-      faded = true;
-      scene?.release();
-      bg.classList.remove('intro-waiting');
-      scene?.canvas.classList.add('gone');  // znika nad zwykłą ścianą (te same okładki w tym samym miejscu)
-    }
-    if (t < INTRO_ZOOM + INTRO_FADE) {
-      requestAnimationFrame(step);
-      return;
-    }
-    scene?.canvas.remove();
-    body.classList.remove('wall-intro-reveal');
+  const finish = () => {
+    body.classList.remove('wall-intro', 'wall-intro-reveal');
     cards().forEach(card => card.style.removeProperty('--intro-delay'));
     const { pending } = intro;
     intro = null;
     if (pending) renderStartWall({ keepWall: true });
+  };
+
+  const start = () => {
+    const wall = bg.querySelector('.tv-wall');
+    bg.classList.remove('intro-waiting');
+    if (!wall?.animate) {
+      finish();
+      return;
+    }
+    // Skala od INTRO_FROM do zwykłej, ściana wyłania się z przezroczystości na początku ruchu
+    wall.animate([
+      { transform: `rotate(-7deg) scale(${INTRO_FROM})`, opacity: 0 },
+      { opacity: 1, offset: 0.3 },
+      { transform: `rotate(-7deg) scale(${INTRO_TO})`, opacity: 1 },
+    ], { duration: INTRO_ZOOM, easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)' });
+
+    // Kolumny pędzą i hamują do zwykłego tempa (updatePlaybackRate zachowuje ich położenie)
+    const columns = [...wall.querySelectorAll('.tv-wall-strip')].flatMap(strip => strip.getAnimations());
+    INTRO_RATES.forEach(([at, rate]) => {
+      if (!at) columns.forEach(anim => anim.updatePlaybackRate(rate));
+      else setTimeout(() => columns.forEach(anim => anim.updatePlaybackRate(rate)), at);
+    });
+
+    // Karty wjeżdżają po kolei, od góry, na tle jeszcze odjeżdżającej ściany
+    setTimeout(() => {
+      cards().forEach((card, i) => card.style.setProperty('--intro-delay', `${i * 0.03}s`));
+      body.classList.replace('wall-intro', 'wall-intro-reveal');
+    }, INTRO_CARDS);
+    setTimeout(finish, INTRO_ZOOM + INTRO_SETTLE);
   };
 }
 

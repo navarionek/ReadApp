@@ -6153,8 +6153,12 @@ body:has(#app-screens:not([hidden]) > .screen[data-screen="start"]:not([hidden])
     color-mix(in srgb, var(--bg-body) 68%, transparent);
 }
 
+/* Bez filter na okładkach: kilkaset przefiltrowanych kafelków to kilkaset osobnych warstw.
+   Przygaszenie robi ::after poniżej. */
 .cover-bg .tv-wall-tile {
   border-radius: 3px 5px 5px 3px;
+  filter: none;
+  transition: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6216,26 +6220,9 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   opacity: 0;
 }
 
-/* Oddalona ściana z intro (canvas nad zwykłą ścianą, pod przygaszeniem) */
-.cover-intro {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  transition: opacity 0.45s ease;
-}
-
-.cover-intro.gone {
-  opacity: 0;
-}
-
 /* Zanim ruszy intro (czekamy na dane i okładki): samo tło, ściana schowana */
 .cover-bg.intro-waiting .tv-wall {
   visibility: hidden;
-}
-
-.cover-intro {
-  animation: intro-fade-in 0.3s ease backwards;
 }
 
 .wall-intro main.container,
@@ -6247,29 +6234,15 @@ body:has(.cover-bg) .screen[data-screen="start"] .prize-banner {
   animation: intro-fade-in 0.3s ease both;
 }
 
+/* Karta wjeżdża jedną animacją transform + opacity (kompozytor). Blur tła (backdrop-filter)
+   celowo nie jest animowany: przeliczanie go co klatkę nad jadącą ścianą mocno zacinało. */
 .wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) {
-  animation: intro-glass-in 0.35s ease-out both;
+  animation: intro-card-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   animation-delay: var(--intro-delay, 0s);
 }
 
-.wall-intro-reveal .screen[data-screen="start"] :is(.stat-card, .card, .goal-card, .prize-banner) > * {
-  animation: intro-content-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: var(--intro-delay, 0s);
-}
-
-/* Tylko „from”: kończy się na zwykłym wyglądzie karty (szkło albo baner nagrody) */
-@keyframes intro-glass-in {
-  from {
-    background-color: transparent;
-    border-color: transparent;
-    box-shadow: none;
-    -webkit-backdrop-filter: blur(0px) saturate(1);
-    backdrop-filter: blur(0px) saturate(1);
-  }
-}
-
-@keyframes intro-content-in {
-  from { opacity: 0; transform: translateY(12px); }
+@keyframes intro-card-in {
+  from { opacity: 0; transform: translateY(14px); }
 }
 
 @keyframes intro-fade-in {
