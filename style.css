@@ -917,6 +917,11 @@ a.btn {
     font-size: 0.6875rem;
   }
 
+  /* Pigułka współśrodkowa z rogami paska (1,5rem minus 0,35rem odstępu) */
+  .nav-indicator::before {
+    border-radius: 1.15rem;
+  }
+
   .toast {
     bottom: calc(6.5rem + env(safe-area-inset-bottom));
   }

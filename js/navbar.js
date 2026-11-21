@@ -10,12 +10,20 @@ function place(animate) {
   const active = nav?.querySelector('.nav-item.active');
   if (!indicator || !active || !nav.offsetWidth) return;
   nav.dataset.active = active.dataset.screen;
-  const x = `${active.offsetLeft}px`;
+  // Dokładne (ułamkowe) położenie zamiast offsetLeft/offsetWidth: te zaokrąglają do pikseli, a zakładki mają
+  // szerokości typu 72,8 px, więc pigułka wychodziła o pół piksela w bok i na telefonie było widać krzywiznę.
+  // Dzielimy przez skalę paska, gdyby akurat był w trakcie animacji z transform.
+  const navRect = nav.getBoundingClientRect();
+  const rect = active.getBoundingClientRect();
+  const scale = navRect.width / nav.offsetWidth || 1;
+  // Ramka paska bywa ułamkowa (1px na ekranie o gęstości 1,5 to 0,67 px), clientLeft by ją zaokrąglił
+  const style = getComputedStyle(nav);
+  const x = `${((rect.left - navRect.left) / scale - parseFloat(style.borderLeftWidth)).toFixed(2)}px`;
   const moved = indicator.style.getPropertyValue('--x') !== x;
   indicator.style.setProperty('--x', x);
-  indicator.style.setProperty('--y', `${active.offsetTop}px`);
-  indicator.style.width = `${active.offsetWidth}px`;
-  indicator.style.height = `${active.offsetHeight}px`;
+  indicator.style.setProperty('--y', `${((rect.top - navRect.top) / scale - parseFloat(style.borderTopWidth)).toFixed(2)}px`);
+  indicator.style.width = `${(rect.width / scale).toFixed(2)}px`;
+  indicator.style.height = `${(rect.height / scale).toFixed(2)}px`;
   if (!ready) {
     // Pierwsze ustawienie bez przejazdu; przejścia włączamy klatkę później
     requestAnimationFrame(() => requestAnimationFrame(() => { nav.classList.add('ready'); ready = true; }));
