@@ -3,7 +3,7 @@ import { loadPrize, viewerId } from './admin.js';
 import { loadStoredBadges, renderBadgesCard, syncMyBadges } from './badges.js';
 import { renderStartWall } from './coverwall.js';
 import { avatar, renderRankingViz } from './ranking.js';
-import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFinishing, startFinishing, updateFormUI } from './form.js';
+import { applyFinishDefault, daysSince, formatMultiplier, myReadingNow, selectFinishing, updateFormUI } from './form.js';
 import { bookPoints } from '../supabase/functions/_shared/logic.js';
 import { ratingControl, renderBookRanking } from './ratings.js';
 import { renderWrapped } from './wrapped.js';
@@ -129,41 +129,21 @@ export function renderReadingNow() {
   const mine = state.readingNow.filter(item => item.user_id === viewerId());
   const card = document.getElementById('reading-now-card');
   card.hidden = !mine.length;
-  // W podglądzie jako ktoś inny bez przycisków: to nie nasze książki
-  const canAct = viewerId() === state.currentUser?.id;
-
+  // Cała karta otwiera okno książki (okładka przelatuje do niego); tam są „Skończone” i edycja z usuwaniem
   document.getElementById('reading-now-list').replaceChildren(...mine.map(item => {
-    const actions = canAct
-      ? [
-          (() => {
-            const done = el('button', { type: 'button', class: 'btn btn-primary btn-sm' }, [icon('check'), el('span', { text: 'Skończone' })]);
-            done.addEventListener('click', () => startFinishing(item));
-            return done;
-          })(),
-          actionButton('x', 'Usuń z „Teraz czytam”', () => handleDropReading(item)),
-        ]
-      : [];
     const info = readingCoverOf(item);
-    // Okładka i tytuł otwierają okno książki (okładka przelatuje do niego). Okładka jest osobnym
-    // przyciskiem (poza kolejnością Tab), żeby przyciski akcji mogły stanąć pod tytułem obok niej.
-    const cover = info?.cover_url
-      ? el('button', { type: 'button', class: 'reading-now-cover', tabindex: '-1', 'aria-hidden': 'true' }, [
-          coverEl({ title: item.title, cover_url: info.cover_url }, 'mini'),
-        ])
-      : null;
-    const open = el('button', { type: 'button', class: 'reading-now-open', 'aria-label': `${item.title}: szczegóły` }, [
-      el('span', { class: 'reading-now-title', text: item.title }),
-      el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
+    const open = el('button', { type: 'button', class: 'reading-now-item', 'aria-label': `${item.title}: szczegóły` }, [
+      ...(info?.cover_url ? [coverEl({ title: item.title, cover_url: info.cover_url }, 'mini')] : []),
+      el('div', { class: 'reading-now-info' }, [
+        el('span', { class: 'reading-now-title', text: item.title }),
+        el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
+      ]),
+      el('span', { class: 'reading-now-chevron', 'aria-hidden': 'true' }, [icon('chevron-right')]),
     ]);
-    const openModal = () => openReadingModal(item, cover?.querySelector('.book-cover') ?? null);
-    open.addEventListener('click', openModal);
-    cover?.addEventListener('click', openModal);
-    return el('div', { class: `reading-now-item${cover ? '' : ' no-cover'}` }, [
-      ...(cover ? [cover] : []),
-      open,
-      el('div', { class: 'reading-now-actions' }, actions),
-    ]);
+    open.addEventListener('click', () => openReadingModal(item, open.querySelector('.book-cover')));
+    return open;
   }));
+  refreshIcons();  // strzałki (wołane też samo, po dojściu okładki)
 }
 
 export async function handleDropReading(item) {
