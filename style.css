@@ -3015,11 +3015,6 @@ select.plain-input {
   transform: translateY(-3px);
 }
 
-/* Historyczna półka: przycisk dodawania na końcu półki */
-.shelf-past-add .shelf-empty-line {
-  margin-top: 0.5rem;
-  text-align: center;
-}
 
 .book-tile:focus-visible .book-cover,
 .cover-option:focus-visible .book-cover {

@@ -609,18 +609,6 @@ export function renderShelf() {
       el('div', { class: 'shelf-grid' }, undated),
     ]));
   }
-  if (isOwn) {
-    const addPast = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [
-      icon('history'),
-      el('span', { text: 'Dodaj książkę z przeszłości' }),
-    ]);
-    addPast.addEventListener('click', () => openPastEditor());
-    sections.push(el('section', { class: 'shelf-section shelf-past-add' }, [
-      addPast,
-      el('p', { class: 'shelf-empty-line', text: 'Przeczytane przed Czytankiem. Widać je na półce, ale nie liczą się do punktów, odznak ani statystyk.' }),
-    ]));
-  }
-
   if (!current.length && !byYear.size && !undated.length) {
     sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
   }
