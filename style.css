@@ -2989,6 +2989,43 @@ select.plain-input {
   box-shadow: 0 12px 24px -8px rgb(0 0 0 / 0.45);
 }
 
+/* Okładka kafelka z rokiem wydania w rogu (widać po włączeniu w ustawieniach, js/pubyear.js) */
+.book-tile-cover {
+  position: relative;
+  display: block;
+}
+
+.pub-year {
+  display: none;
+  position: absolute;
+  left: 0.3rem;
+  bottom: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.72);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  pointer-events: none;
+  transition: var(--transition);
+}
+
+:root.show-pub-year .pub-year {
+  display: block;
+}
+
+.book-tile:not(:disabled):hover .pub-year {
+  transform: translateY(-3px);
+}
+
+/* Historyczna półka: przycisk dodawania na końcu półki */
+.shelf-past-add .shelf-empty-line {
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
 .book-tile:focus-visible .book-cover,
 .cover-option:focus-visible .book-cover {
   outline: 3px solid var(--primary);
@@ -6725,6 +6762,22 @@ body.be-lock {
   margin: 0 auto;
   padding: 0.6rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
   background: linear-gradient(transparent, var(--bg-body) 30%);
+}
+
+/* „Dodaj i wpisz następną” pod głównym przyciskiem przy dodawaniu książek z przeszłości */
+.be-footer .be-next {
+  margin-top: 0.5rem;
+}
+
+/* Lista lat w edytorze: wartość do prawej, jak w pozostałych polach */
+.book-editor select.be-num {
+  text-align-last: right;
+  cursor: pointer;
+}
+
+.book-editor select.be-num option {
+  background: var(--bg-card);
+  color: var(--text-main);
 }
 
 .be-picker-body {

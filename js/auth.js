@@ -47,6 +47,7 @@ export function updateUI(user) {
     state.shelfUserId = null;
     state.shelfRows = [];
     state.shelfQueue = [];
+    state.shelfPast = [];
     state.myQueue = [];
     state.startingFromQueue = null;
     state.readingNow = [];

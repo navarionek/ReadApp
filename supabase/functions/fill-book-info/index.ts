@@ -29,7 +29,7 @@ function jwtRole(header: string | null): string | null {
   }
 }
 
-const TABLES = ['reads', 'reading_now', 'reading_queue'];
+const TABLES = ['reads', 'reading_now', 'reading_queue', 'past_reads'];
 const FIELDS = 'id, cover_url, author, published_year, info_url, description, info_checked_at';
 // Liczba stron (podpowiedź przy kończeniu książki) jest tylko w reading_now i reading_queue
 const fieldsFor = (table: string) => (table === 'reads' ? FIELDS : `${FIELDS}, page_count`);

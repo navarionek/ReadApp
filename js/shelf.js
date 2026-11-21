@@ -228,20 +228,22 @@ export function openQueueModal(item, source = null) {
 }
 
 const QUEUE_FIELDS = 'id, user_id, title, author, cover_url, published_year, page_count, info_url, description, info_checked_at, created_at';
+const PAST_FIELDS = 'id, user_id, title, author, read_year, unfinished, cover_url, published_year, page_count, info_url, description, info_checked_at, created_at';
 
 let shelfSeq = 0;  // numer ostatniego żądania półki: starsze odpowiedzi są ignorowane
 let shelfSignature = null;  // odcisk ostatnio pobranych danych: bez zmian = nie rysujemy półki od nowa
 let loadedOwner = null;     // czyje książki są teraz w state.shelfRows
 let shelfRenderId = 0;
-const shelfCache = new Map();  // userId -> { rows, queue, signature }: ostatnio pobrana półka każdej osoby (tylko w tej sesji)
+const shelfCache = new Map();  // userId -> { rows, queue, past, signature }: ostatnio pobrana półka każdej osoby (tylko w tej sesji)
 let shownOwner = null;     // czyja półka jest narysowana pod kartą (przy zmianie osoby wjeżdża od nowa)
 
 // Odcisk tego, co widać na półce (wpisy z bazy + „Czyta teraz”), liczony z danych sprzed lokalnych uzupełnień
-function shelfSig(userId, rows, queue = []) {
+function shelfSig(userId, rows, queue = [], past = []) {
   const current = state.readingNow.filter(item => item.user_id === userId);
   return JSON.stringify([
     userId,
     queue.map(q => [q.id, q.title, q.author, q.cover_url, q.info_checked_at]),
+    past.map(r => [r.id, r.title, r.author, r.read_year, r.unfinished, r.cover_url, r.published_year, r.info_checked_at]),
     rows.map(r => [r.id, r.title, r.pages, r.multiplier, r.unfinished, r.rating, r.created_at, r.cover_url, r.author, r.published_year, r.info_checked_at]),
     current.map(i => [i.id, i.title, i.cover_url, i.info_checked_at]),
   ]);
@@ -261,6 +263,7 @@ export async function loadShelf() {
       if (seq !== shelfSeq || loadedOwner === userId) return;
       state.shelfRows = cached.rows;
       state.shelfQueue = cached.queue;
+      state.shelfPast = cached.past;
       shelfSignature = cached.signature;
       loadedOwner = userId;
       renderShelf();
@@ -272,7 +275,7 @@ export async function loadShelf() {
   }
   loadShelfPeople();
 
-  const [readsResult, queueResult] = await Promise.all([
+  const [readsResult, queueResult, pastResult] = await Promise.all([
     supabaseClient
       .from('reads')
       .select('id, user_id, title, pages, multiplier, multiplier_labels, unfinished, rating, created_at, started_at, cover_url, author, published_year, info_url, description, info_checked_at')
@@ -285,17 +288,25 @@ export async function loadShelf() {
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
       .order('id', { ascending: true }),
+    supabaseClient
+      .from('past_reads')
+      .select(PAST_FIELDS)
+      .eq('user_id', userId)
+      .order('read_year', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: false }),
   ]);
   const { data, error } = readsResult;
   if (queueResult.error) console.error('Error loading reading queue:', queueResult.error);
   const queueRows = queueResult.data || [];
+  if (pastResult.error) console.error('Error loading past reads:', pastResult.error);
+  const pastRows = pastResult.data || [];
 
   if (seq !== shelfSeq) return;  // w międzyczasie ktoś przełączył półkę albo odświeżył ją ponownie
   if (error) {
     shelf.replaceChildren(el('div', { class: 'status-box', text: 'Nie udało się wczytać półki. ' + friendlyError(error) }));
     return;
   }
-  const signature = shelfSig(userId, data || [], queueRows);
+  const signature = shelfSig(userId, data || [], queueRows, pastRows);
   // Nic się nie zmieniło od ostatniej wizyty: zostawiamy półkę w spokoju, żeby okładki nie mrugały
   if (signature === shelfSignature && state.shelfRows[0]?.user_id === userId) {
     loadedOwner = userId;
@@ -304,11 +315,13 @@ export async function loadShelf() {
   shelfSignature = signature;
   state.shelfRows = data || [];
   state.shelfQueue = queueRows;
+  state.shelfPast = pastRows;
   loadedOwner = userId;
-  shelfCache.set(userId, { rows: state.shelfRows, queue: state.shelfQueue, signature });
+  shelfCache.set(userId, { rows: state.shelfRows, queue: state.shelfQueue, past: state.shelfPast, signature });
   renderShelf();
   fillMissingBookInfo(userId);
   fillMissingQueueInfo(userId);
+  fillMissingPastInfo(userId);
 }
 
 /* ----------------- Półka ----------------- */
@@ -573,21 +586,42 @@ export function renderShelf() {
     ]));
   }
 
-  // Przeczytane: rok po roku, siatka okładek z tytułami
+  // Przeczytane: rok po roku, siatka okładek z tytułami. Historia (past_reads) dochodzi do swojego roku
+  // za wpisami z Czytanka, a książki bez roku lądują w „Dawniej” na końcu.
   const byYear = new Map();
-  state.shelfRows.forEach(r => {
-    const y = new Date(r.created_at).getFullYear();
+  const add = (y, tile) => {
     if (!byYear.has(y)) byYear.set(y, []);
-    byYear.get(y).push(r);
-  });
-  byYear.forEach((rows, year) => {
+    byYear.get(y).push(tile);
+  };
+  state.shelfRows.forEach(r => add(new Date(r.created_at).getFullYear(), bookTile(r)));
+  const undated = [];
+  state.shelfPast.forEach(r => (r.read_year ? add(r.read_year, pastTile(r)) : undated.push(pastTile(r))));
+  [...byYear.keys()].sort((a, b) => b - a).forEach(year => {
+    const tiles = byYear.get(year);
     sections.push(el('section', { class: 'shelf-section' }, [
-      heading(String(year), rows.length),
-      el('div', { class: 'shelf-grid' }, rows.map(bookTile)),
+      heading(String(year), tiles.length),
+      el('div', { class: 'shelf-grid' }, tiles),
     ]));
   });
+  if (undated.length) {
+    sections.push(el('section', { class: 'shelf-section' }, [
+      heading('Dawniej', undated.length),
+      el('div', { class: 'shelf-grid' }, undated),
+    ]));
+  }
+  if (isOwn) {
+    const addPast = el('button', { type: 'button', class: 'btn btn-outline btn-block' }, [
+      icon('history'),
+      el('span', { text: 'Dodaj książkę z przeszłości' }),
+    ]);
+    addPast.addEventListener('click', () => openPastEditor());
+    sections.push(el('section', { class: 'shelf-section shelf-past-add' }, [
+      addPast,
+      el('p', { class: 'shelf-empty-line', text: 'Przeczytane przed Czytankiem. Widać je na półce, ale nie liczą się do punktów, odznak ani statystyk.' }),
+    ]));
+  }
 
-  if (!current.length && !byYear.size) {
+  if (!current.length && !byYear.size && !undated.length) {
     sections.push(el('div', { class: 'status-box', text: isOwn ? 'Pusto na półce. Dodaj pierwszą przeczytaną książkę!' : 'Ta osoba nie ma jeszcze książek na półce.' }));
   }
 
@@ -623,15 +657,84 @@ export function renderShelf() {
 }
 
 // Przeczytana książka w siatce: okładka, tytuł, autor
+// Okładka kafelka z rokiem wydania na wierzchu (widać go po włączeniu w ustawieniach, js/pubyear.js)
+function tileCover(row) {
+  return el('span', { class: 'book-tile-cover' }, [
+    coverEl(row),
+    ...(row.published_year != null ? [el('span', { class: 'pub-year', text: String(row.published_year) })] : []),
+  ]);
+}
+
 function bookTile(row) {
   const tile = el('button', { type: 'button', class: 'book-tile', title: row.title || '' }, [
-    coverEl(row),
+    tileCover(row),
     el('span', { class: 'book-tile-title', text: row.title || 'bez tytułu' }),
     ...(row.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
     ...(row.author ? [el('span', { class: 'book-tile-author', text: row.author })] : []),
   ]);
   tile.addEventListener('click', () => openBookModal(row, tile.querySelector('.book-cover')));
   return tile;
+}
+
+// Książka z historycznej półki: tak samo, ale otwiera własne okno (bez punktów, oceny i komentarzy)
+function pastTile(row) {
+  const tile = el('button', { type: 'button', class: 'book-tile', title: row.title || '' }, [
+    tileCover(row),
+    el('span', { class: 'book-tile-title', text: row.title || 'bez tytułu' }),
+    ...(row.unfinished ? [el('span', { class: 'unfinished-tag', text: 'niedokończona' })] : []),
+    ...(row.author ? [el('span', { class: 'book-tile-author', text: row.author })] : []),
+  ]);
+  tile.addEventListener('click', () => openPastModal(row, tile.querySelector('.book-cover')));
+  return tile;
+}
+
+async function fillMissingPastInfo(userId) {
+  await enrichBooks('past_reads', state.shelfPast, items => {
+    if ((state.shelfUserId || viewerId()) !== userId) return;  // ktoś przełączył półkę
+    items.forEach(it => applyInfo(state.shelfPast, it));
+    if (currentScreen() === 'polka') renderShelf();
+  });
+}
+
+// Dodawanie do historii: pusty edytor; „Zapisz i dodaj następną” otwiera kolejny z tym samym rokiem
+let lastPastYear = null;
+function openPastEditor() {
+  openBookEditor('past_reads', { title: '', author: null, read_year: lastPastYear, unfinished: false }, {
+    create: true,
+    onSaved: saved => {
+      lastPastYear = saved.read_year ?? null;
+      shelfSignature = null;
+      loadShelf();
+    },
+    onNext: () => openPastEditor(),
+  });
+}
+
+function openPastModal(row, source = null) {
+  openReadingId = null;
+  const own = row.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
+  const when = row.read_year ? `w ${row.read_year}` : 'dawno';
+  showSheet(bookSheet({
+    book: row,
+    year: row.published_year,
+    kicker: row.unfinished ? `Niedokończona, ${when}` : `Przeczytana ${when}`,
+    facts: row.page_count ? [[String(row.page_count), 'stron']] : [],
+    meta: 'Z historii czytania, nie liczy się do punktów',
+    description: row.description,
+    link: row.info_url,
+    actions: own
+      ? [editButton('past_reads', row, {
+          onSaved: () => {
+            renderShelf();
+            openPastModal(row);
+          },
+          onRemoved: () => {
+            shelfSignature = null;
+            loadShelf();
+          },
+        })]
+      : [],
+  }), source);
 }
 
 // Okładki wpisów na półce, których jeszcze nie ma w bazie (patrz enrichBooks)

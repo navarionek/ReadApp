@@ -21,6 +21,7 @@ export const state = {
   shelfUserId: null,       // czyja półka; null = moja (albo podglądanej osoby)
   shelfRows: [],
   shelfQueue: [],          // „Do przeczytania” osoby, której półkę oglądamy
+  shelfPast: [],           // historyczna półka (past_reads) osoby, której półkę oglądamy
 
   // Statystyki i wyścig
   statsReaders: [],

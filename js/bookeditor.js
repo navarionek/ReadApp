@@ -10,7 +10,8 @@ import { el, friendlyError, icon, refreshIcons, showToast } from './ui.js';
 /* ----------------- Edycja książki (jeden ekran dla wszystkiego) ----------------- */
 // Ten sam ekran edytuje przeczytaną książkę (reads), zaczętą („Teraz czytam”, reading_now)
 // i czekającą w kolejce (reading_queue): okładka, tytuł, autor, rok, a dla przeczytanych także
-// strony, mnożniki, „niedokończona” i data skończenia. Zmiany zapisują się dopiero przyciskiem
+// strony, mnożniki, „niedokończona” i data skończenia. Książki z przeszłości (past_reads) mają rok
+// przeczytania i „niedokończona”; ten sam ekran je też dodaje (create). Zmiany zapisują się dopiero przyciskiem
 // „Zapisz”, a usuwanie też jest tutaj, więc nigdzie indziej nie trzeba tego szukać.
 // Ekran ma własny wpis w historii: „Wstecz” na telefonie go zamyka.
 
@@ -18,6 +19,7 @@ const KINDS = {
   reads: { heading: 'Edytuj książkę', remove: 'Usuń z przeczytanych' },
   reading_now: { heading: 'Edytuj czytaną książkę', remove: 'Usuń z „Teraz czytam”' },
   reading_queue: { heading: 'Edytuj książkę z kolejki', remove: 'Usuń z kolejki' },
+  past_reads: { heading: 'Edytuj książkę z przeszłości', create: 'Książka z przeszłości', remove: 'Usuń z historii' },
 };
 const MAX_PAGES = 5000;
 
@@ -69,11 +71,14 @@ export function closeBookEditor() {
 
 window.addEventListener('popstate', () => editor?.close());
 
-// kind: 'reads' | 'reading_now' | 'reading_queue'; onSaved / onRemoved: odświeżenie miejsca, z którego otwarto
-export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
+// kind: 'reads' | 'reading_now' | 'reading_queue' | 'past_reads'; onSaved / onRemoved: odświeżenie miejsca,
+// z którego otwarto. create: nowy wpis (tylko past_reads), onNext: „Zapisz i dodaj następną”.
+export function openBookEditor(kind, row, { onSaved, onRemoved, create = false, onNext } = {}) {
   editor?.close();
   const cfg = KINDS[kind];
   const isRead = kind === 'reads';
+  const isPast = kind === 'past_reads';
+  const heading = create ? cfg.create : cfg.heading;
   const maxYear = new Date().getFullYear() + 1;
 
   // Okładka i informacje z baz książek: zmienione w wyszukiwarce, zapisane razem z resztą
@@ -160,6 +165,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   let finishedDate = null;
   let startedDate = null;
   let pageCount = null;
+  let readYear = null;
 
   if (isRead) {
     pages = el('input', { type: 'number', class: 'be-num', inputmode: 'numeric', min: '1', max: String(MAX_PAGES), step: '1', 'aria-label': 'Liczba stron' });
@@ -210,6 +216,23 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
         note,
       ]),
     ]);
+  } else if (isPast) {
+    // Rok przeczytania: lista lat od bieżącego wstecz, a na górze „dawno” (bez roku)
+    readYear = el('select', { class: 'be-num be-select', 'aria-label': 'Rok przeczytania' }, [
+      el('option', { value: '', text: 'dawno' }),
+      ...Array.from({ length: new Date().getFullYear() - 1949 }, (_, i) => {
+        const y = String(new Date().getFullYear() - i);
+        return el('option', { value: y, text: y });
+      }),
+    ]);
+    readYear.value = row.read_year ? String(row.read_year) : '';
+    rows.push(listRow('Przeczytana', readYear, 'Rok albo „dawno”, jeśli nie pamiętasz'));
+
+    const sw = el('span', { class: `switch${row.unfinished ? ' on' : ''}`, 'aria-hidden': 'true' });
+    unfinished = el('input', { type: 'checkbox', class: 'be-check', role: 'switch', 'aria-label': 'Niedokończona' });
+    unfinished.checked = !!row.unfinished;
+    unfinished.addEventListener('change', () => sw.classList.toggle('on', unfinished.checked));
+    rows.push(listRow('Niedokończona', el('span', { class: 'be-switch' }, [unfinished, sw])));
   } else {
     if (kind === 'reading_now') {
       startedDate = el('input', { type: 'date', class: 'be-num be-date', max: todayInputValue(), 'aria-label': 'Data rozpoczęcia' });
@@ -223,12 +246,19 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   }
 
   /* --- Usuwanie (kosz w górnym pasku) --- */
-  const removeBtn = el('button', { type: 'button', class: 'be-icon-btn be-danger', 'aria-label': cfg.remove, title: cfg.remove }, [icon('trash-2')]);
+  const removeBtn = create
+    ? el('span')  // nowy wpis: nie ma czego usuwać (pusty element trzyma tytuł na środku paska)
+    : el('button', { type: 'button', class: 'be-icon-btn be-danger', 'aria-label': cfg.remove, title: cfg.remove }, [icon('trash-2')]);
   removeBtn.addEventListener('click', async () => {
     let removed = false;
     if (kind === 'reads') removed = await handleDelete(row);
     else if (kind === 'reading_now') removed = await handleDropReading(row);
-    else {
+    else if (isPast) {
+      if (!confirm(`Usunąć „${row.title}” z historii?`)) return;
+      const { data, error } = await supabaseClient.from('past_reads').delete().eq('id', row.id).select('id');
+      if (error || !data?.length) showToast('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
+      else removed = true;
+    } else {
       if (!confirm(`Usunąć „${row.title}” z kolejki?`)) return;
       const { data, error } = await supabaseClient.from('reading_queue').delete().eq('id', row.id).select('id');
       if (error || !data?.length) showToast('Nie udało się usunąć: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
@@ -243,13 +273,16 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   });
 
   /* --- Zapis --- */
-  const saveLabel = el('span', { text: 'Zapisz' });
+  const saveLabel = el('span', { text: create ? 'Dodaj' : 'Zapisz' });
   const saveBtn = el('button', { type: 'button', class: 'btn btn-primary btn-block btn-lg be-save' }, [icon('check'), saveLabel]);
+  const nextBtn = create && onNext
+    ? el('button', { type: 'button', class: 'btn btn-outline btn-block be-next' }, [icon('plus'), el('span', { text: 'Dodaj i wpisz następną' })])
+    : null;
   const fail = (text, field) => {
     showToast(text);
     field?.focus();
   };
-  saveBtn.addEventListener('click', async () => {
+  const save = async ({ next = false } = {}) => {
     const titleText = title.value.replace(/\s+/g, ' ').trim();
     if (!titleText) return fail('Podaj tytuł książki.', title);
     const yearText = year.value.trim();
@@ -277,6 +310,9 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
         if (row.started_at && iso < row.started_at) iso = row.started_at;
         values.created_at = iso;
       }
+    } else if (isPast) {
+      values.read_year = readYear.value ? Number(readYear.value) : null;
+      values.unfinished = unfinished.checked;
     } else {
       const pc = pageCount.value.trim();
       const count = pc === '' ? null : Number(pc);
@@ -292,22 +328,33 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     }
 
     saveBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
     saveLabel.textContent = 'Zapisuję…';
     let data = null;
     let error = null;
     try {
-      if (coverChanged) {
+      if (create) {
+        // Nowy wpis: okładkę i dane z bazy książek dociągnie serwer (fill-book-info), chyba że wybrano ją ręcznie.
+        // Serwer nadpisałby wpisany rok wydania, więc wtedy uzupełniamy od razu i przywracamy rok.
+        if (coverChanged) Object.assign(values, cover, { info_checked_at: new Date().toISOString() });
+        ({ data, error } = await supabaseClient.from(kind).insert(values).select('id'));
+        if (!error && data?.length && !coverChanged && publishedYear !== null) {
+          const fixed = await settleBookInfo(kind, { id: data[0].id, info_checked_at: null });
+          await supabaseClient.from(kind).update({ ...fixed, published_year: publishedYear }).eq('id', data[0].id);
+        }
+      } else if (coverChanged) {
         Object.assign(values, cover, { info_checked_at: new Date().toISOString() });
       } else {
         // Serwer uzupełnia dane tylko nowym wpisom i nadpisałby wtedy autora i rok: niech zrobi to najpierw
         Object.assign(values, await settleBookInfo(kind, row));
       }
-      ({ data, error } = await supabaseClient.from(kind).update(values).eq('id', row.id).select('id'));
+      if (!create) ({ data, error } = await supabaseClient.from(kind).update(values).eq('id', row.id).select('id'));
     } catch (err) {
       error = err;
     }
     saveBtn.disabled = false;
-    saveLabel.textContent = 'Zapisz';
+    if (nextBtn) nextBtn.disabled = false;
+    saveLabel.textContent = create ? 'Dodaj' : 'Zapisz';
     if (error || !data?.length) {
       console.error('Book save failed:', error, values);
       showToast('Nie udało się zapisać: ' + (error ? friendlyError(error) : 'brak uprawnień.'));
@@ -315,10 +362,13 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
     }
     Object.assign(row, values);
     await closeBookEditor();
-    showToast('Zapisano.');
-    await loadReads();
-    onSaved?.();
-  });
+    showToast(create ? `Dodano „${titleText}”.` : 'Zapisano.');
+    if (!isPast) await loadReads();
+    onSaved?.(values);
+    if (next) onNext();
+  };
+  saveBtn.addEventListener('click', () => save());
+  nextBtn?.addEventListener('click', () => save({ next: true }));
 
   /* --- Wybór okładki: osobny widok w tym samym ekranie --- */
   const pickerBody = el('div', { class: 'cover-picker' });
@@ -356,7 +406,7 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   closeBtn.addEventListener('click', closeBookEditor);
   const main = el('div', { class: 'be-main' }, [
     backdrop,
-    el('header', { class: 'be-bar' }, [closeBtn, el('h2', { class: 'be-bar-title', text: cfg.heading }), removeBtn]),
+    el('header', { class: 'be-bar' }, [closeBtn, el('h2', { class: 'be-bar-title', text: heading }), removeBtn]),
     el('div', { class: 'be-hero' }, [
       coverBtn,
       el('div', { class: 'be-hero-text' }, [
@@ -372,9 +422,9 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
       el('section', { class: 'be-group' }, [el('div', { class: 'be-card be-list' }, rows)]),
       ...(chipsCard ? [chipsCard] : []),
     ]),
-    el('footer', { class: 'be-footer' }, [saveBtn]),
+    el('footer', { class: 'be-footer' }, [saveBtn, ...(nextBtn ? [nextBtn] : [])]),
   ]);
-  const root = el('div', { class: 'book-editor', role: 'dialog', 'aria-modal': 'true', 'aria-label': cfg.heading }, [main, picker]);
+  const root = el('div', { class: 'book-editor', role: 'dialog', 'aria-modal': 'true', 'aria-label': heading }, [main, picker]);
   title.addEventListener('change', drawCover);
 
   const onKey = e => {
@@ -399,4 +449,5 @@ export function openBookEditor(kind, row, { onSaved, onRemoved } = {}) {
   updatePoints();
   fitTitle();
   refreshIcons();
+  if (create) title.focus();
 }
