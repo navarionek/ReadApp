@@ -10,7 +10,7 @@ import { initNavIndicator } from './navbar.js';
 import { initPageKeys } from './pagekeys.js';
 import { handleFinishPick, handleQueuePick, loadMultipliers, resetForm, setEntryMode, setFormStep, todayInputValue } from './form.js';
 import { handleNotifyToggle, syncPushSubscription } from './push.js';
-import { closeBookModal, loadShelf } from './shelf.js';
+import { closeBookModal, loadShelf, openPastEditor } from './shelf.js';
 import { closeSettings, currentScreen, goTo, setTheme, showScreen, toggleSettings, toggleTheme } from './shell.js';
 import { state } from './state.js';
 import { playRace } from './stats.js';
@@ -54,6 +54,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (!e.target.closest('.settings-wrap')) closeSettings();
   });
   document.querySelectorAll('.type-card').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.mode === 'past') {
+      openPastEditor();  // własny ekran edytora, formularz zostaje na wyborze rodzaju
+      return;
+    }
     setEntryMode(btn.dataset.mode);
     setFormStep('fields');
     document.getElementById(document.getElementById('title-group').hidden ? 'pages' : 'title').focus({ preventScroll: true });

@@ -698,7 +698,7 @@ async function fillMissingPastInfo(userId) {
 
 // Dodawanie do historii: pusty edytor; „Zapisz i dodaj następną” otwiera kolejny z tym samym rokiem
 let lastPastYear = null;
-function openPastEditor() {
+export function openPastEditor() {
   openBookEditor('past_reads', { title: '', author: null, read_year: lastPastYear, unfinished: false }, {
     create: true,
     onSaved: saved => {
