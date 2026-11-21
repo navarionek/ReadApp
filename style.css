@@ -2989,14 +2989,13 @@ select.plain-input {
   box-shadow: 0 12px 24px -8px rgb(0 0 0 / 0.45);
 }
 
-/* Okładka kafelka z rokiem wydania w rogu (widać po włączeniu w ustawieniach, js/pubyear.js) */
+/* Okładka kafelka z rokiem wydania w rogu */
 .book-tile-cover {
   position: relative;
   display: block;
 }
 
 .pub-year {
-  display: none;
   position: absolute;
   left: 0.3rem;
   bottom: 0.3rem;
@@ -3010,10 +3009,6 @@ select.plain-input {
   line-height: 1.5;
   pointer-events: none;
   transition: var(--transition);
-}
-
-:root.show-pub-year .pub-year {
-  display: block;
 }
 
 .book-tile:not(:disabled):hover .pub-year {

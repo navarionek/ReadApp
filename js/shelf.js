@@ -657,7 +657,7 @@ export function renderShelf() {
 }
 
 // Przeczytana książka w siatce: okładka, tytuł, autor
-// Okładka kafelka z rokiem wydania na wierzchu (widać go po włączeniu w ustawieniach, js/pubyear.js)
+// Okładka kafelka z rokiem wydania na wierzchu, w rogu
 function tileCover(row) {
   return el('span', { class: 'book-tile-cover' }, [
     coverEl(row),

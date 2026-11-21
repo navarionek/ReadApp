@@ -2,7 +2,6 @@ import { handleMultiplierAdd, handlePrizeSubmit, handleRename, handleViewAs, loa
 import { handleGoogleLogin, handleLogout, updateUI } from './auth.js';
 import { openColorPicker } from './colorpicker.js';
 import { playStartIntro, renderStartWall, syncStartWallToggle, toggleStartWall } from './coverwall.js';
-import { syncPubYear, togglePubYear } from './pubyear.js';
 import { loadReads } from './data.js';
 import { syncCoverDither } from './dither.js';
 import { syncEinkToggle, toggleEink } from './eink.js';
@@ -92,8 +91,6 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('notify-toggle').addEventListener('click', handleNotifyToggle);  // menu zostaje otwarte, widać przełącznik
   document.getElementById('cover-bg-toggle').addEventListener('click', toggleStartWall);  // jw.
   syncStartWallToggle();
-  document.getElementById('pub-year-toggle').addEventListener('click', togglePubYear);  // jw.
-  syncPubYear();
   document.getElementById('eink-toggle').addEventListener('click', () => toggleEink(() => {  // jw.
     renderStartWall();
     syncCoverDither();
