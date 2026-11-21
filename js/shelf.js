@@ -494,7 +494,6 @@ function renderShelfHero() {
       el('div', { class: 'shelf-hero-text hero-enter' }, [
         el('span', { class: 'shelf-hero-kicker' }),
         el('h2', { class: 'shelf-hero-title' }),
-        el('p', { class: 'shelf-hero-sub', text: '\u00a0' }),  // twarda spacja trzyma wysokość, zanim dojdą książki
       ]),
     );
     if (!fresh) setOrbit(hero, null, '', true);  // okręgi czekają przygaszone na książki nowej osoby
@@ -511,9 +510,6 @@ function renderShelfHero() {
   const stats = hero.querySelector('.shelf-stats');
   stats.classList.toggle('pending', !loaded);
   if (loaded) {
-    hero.querySelector('.shelf-hero-sub').textContent = rows.length
-      ? `Od ${new Date(rows.at(-1).created_at).getFullYear()} roku w Czytanku`
-      : 'Czeka na pierwszą książkę';
     const loved = rows.filter(r => r.rating === 1).length;
     const values = [rows.length, rows.reduce((sum, r) => sum + (r.pages || 0), 0), loved];
     const labels = [plural(rows.length, 'książka', 'książki', 'książek'), 'stron', plural(loved, 'ulubiona', 'ulubione', 'ulubionych')];

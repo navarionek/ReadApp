@@ -2600,9 +2600,6 @@ select.plain-input {
   text-shadow: 0 2px 18px rgb(0 0 0 / 0.35);
 }
 
-:root:not(.eink) .shelf-hero-sub {
-  color: rgb(255 255 255 / 0.72);
-}
 
 :root:not(.eink) .shelf-hero .shelf-hero-avatar {
   box-shadow: 0 0 0 3px rgb(255 255 255 / 0.92), 0 0 0 8px rgb(255 255 255 / 0.12), 0 14px 30px -8px rgb(0 0 0 / 0.6);
@@ -2706,11 +2703,6 @@ select.plain-input {
   line-height: 1.15;
 }
 
-.shelf-hero-sub {
-  margin: 0.2rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
 
 .shelf-stats {
   position: relative;
@@ -7520,11 +7512,6 @@ body.be-lock {
   font-size: 0.8rem;
 }
 
-:root.eink .shelf-hero-sub {
-  color: #000;
-  font-size: 1rem;
-  font-style: italic;
-}
 
 :root.eink .shelf-stats {
   gap: 0;
