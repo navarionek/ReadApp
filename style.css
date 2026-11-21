@@ -395,7 +395,8 @@ th {
   margin-bottom: 0.5rem;
 }
 
-.modal-content p {
+/* Okno książki ma własne odstępy (.bs-*): ta reguła dokładała 1,5rem pod autorem, datą i opisem */
+.modal-content:not(.book-modal-content) p {
   margin-bottom: 1.5rem;
   color: var(--text-muted);
 }
@@ -3184,7 +3185,10 @@ select.plain-input {
 }
 
 .bs-kicker {
-  margin-bottom: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
   padding: 0.15rem 0.65rem;
   border-radius: 999px;
   background: var(--primary);
@@ -3193,6 +3197,12 @@ select.plain-input {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.bs-kicker svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-left: -0.15rem;
 }
 
 .bs-title {
@@ -3291,20 +3301,19 @@ select.plain-input {
   cursor: pointer;
 }
 
+/* Link do Google Books / Open Library: okrągła ikonka w lewym górnym rogu, para dla przycisku zamykania */
 .bs-link {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 0.25rem;
-  color: var(--primary);
-  font-size: 0.875rem;
-  font-weight: 600;
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 2;
+  margin: 0;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--bg-card) 70%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   text-decoration: none;
-}
-
-.bs-link svg {
-  width: 0.9rem;
-  height: 0.9rem;
 }
 
 .bs-actions {
@@ -7644,7 +7653,8 @@ body.be-lock {
   background: #fff;
 }
 
-:root.eink .book-modal-close {
+:root.eink .book-modal-close,
+:root.eink .bs-link {
   border: 2px solid #000;
   background: #fff;
 }
@@ -7696,7 +7706,6 @@ body.be-lock {
   font-size: 1rem;
 }
 
-:root.eink .bs-link,
 :root.eink .bs-more {
   color: #000;
   font-size: 1rem;
@@ -7956,6 +7965,7 @@ body.be-lock {
 /* Okrągłe przyciski (X, kosz) naprawdę okrągłe: wcześniej szerokość przycisku .btn robiła z nich jajka */
 :root.eink .btn-icon,
 :root.eink .book-modal-close,
+:root.eink .bs-link,
 :root.eink .be-icon-btn {
   width: 3rem;
   height: 3rem;
@@ -7964,6 +7974,7 @@ body.be-lock {
 }
 
 :root.eink .book-modal-close,
+:root.eink .bs-link,
 :root.eink .be-icon-btn {
   border-radius: 50%;
 }

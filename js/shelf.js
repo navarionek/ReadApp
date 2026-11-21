@@ -694,16 +694,19 @@ export function openPastEditor() {
   });
 }
 
-function openPastModal(row, source = null) {
+export function openPastModal(row, source = null) {
   openReadingId = null;
   const own = row.user_id === state.currentUser?.id && viewerId() === state.currentUser?.id;
-  const when = row.read_year ? `w ${row.read_year}` : 'dawno';
+  const facts = [
+    [row.read_year ? String(row.read_year) : 'dawno', 'czytana'],
+    ...(row.published_year != null ? [[String(row.published_year), 'wydana']] : []),
+    ...(row.page_count ? [[String(row.page_count), 'stron']] : []),
+  ];
   showSheet(bookSheet({
     book: row,
-    year: row.published_year,
-    kicker: row.unfinished ? `Niedokończona, ${when}` : `Przeczytana ${when}`,
-    facts: row.page_count ? [[String(row.page_count), 'stron']] : [],
-    meta: 'Z historii czytania, nie liczy się do punktów',
+    kicker: row.unfinished ? 'Niedokończona' : 'Przeczytana',
+    kickerIcon: 'history',
+    facts,
     description: row.description,
     link: row.info_url,
     actions: own
@@ -746,7 +749,8 @@ function editButton(kind, row, callbacks) {
   return btn;
 }
 
-function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = [], description, link, actions = [], after = [] }) {
+// kickerIcon: ikonka w plakietce nad tytułem (np. historia dla książek z przeszłości)
+function bookSheet({ book, year, kicker, kickerIcon, lead = [], facts = [], meta, extra = [], description, link, actions = [], after = [] }) {
   const backdrop = el('div', { class: 'bs-bg', 'aria-hidden': 'true' });
   if (book.cover_url) backdrop.style.setProperty('--cover', `url("${book.cover_url.replace(/"/g, '%22')}")`);
   else {
@@ -768,11 +772,16 @@ function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = []
       desc.push(more);
     }
   }
+  // Link do bazy książek jako okrągła ikonka w lewym górnym rogu (naprzeciw zamykania)
+  const source = link?.includes('google') ? 'Google Books' : 'Open Library';
   return [
     backdrop,
+    ...(link
+      ? [el('a', { class: 'btn btn-outline btn-icon bs-link', href: link, target: '_blank', rel: 'noopener noreferrer', 'aria-label': `Więcej w ${source}`, title: source }, [icon('external-link')])]
+      : []),
     el('div', { class: 'bs-hero' }, [
       el('div', { class: 'bs-cover' }, [coverEl(book, 'large')]),
-      el('span', { class: 'bs-kicker', text: kicker }),
+      el('span', { class: 'bs-kicker' }, [...(kickerIcon ? [icon(kickerIcon)] : []), el('span', { text: kicker })]),
       el('h2', { id: 'book-modal-title', class: 'bs-title', text: book.title || 'bez tytułu' }),
       ...(book.author || year ? [el('p', { class: 'bs-author', text: [book.author, year].filter(Boolean).join(' · ') })] : []),
     ]),
@@ -784,12 +793,6 @@ function bookSheet({ book, year, kicker, lead = [], facts = [], meta, extra = []
       ...(meta ? [el('p', { class: 'bs-meta' }, [icon('calendar'), el('span', { text: meta })])] : []),
       ...extra,
       ...desc,
-      ...(link
-        ? [el('a', { class: 'bs-link', href: link, target: '_blank', rel: 'noopener noreferrer' }, [
-            el('span', { text: link.includes('google') ? 'Więcej w Google Books' : 'Więcej w Open Library' }),
-            icon('arrow-up-right'),
-          ])]
-        : []),
       ...(actions.length ? [el('div', { class: 'bs-actions' }, actions)] : []),
       ...after,
     ]),
