@@ -144,16 +144,22 @@ export function renderReadingNow() {
         ]
       : [];
     const info = readingCoverOf(item);
-    // Okładka i tytuł otwierają okno książki (okładka przelatuje do niego)
+    // Okładka i tytuł otwierają okno książki (okładka przelatuje do niego). Okładka jest osobnym
+    // przyciskiem (poza kolejnością Tab), żeby przyciski akcji mogły stanąć pod tytułem obok niej.
+    const cover = info?.cover_url
+      ? el('button', { type: 'button', class: 'reading-now-cover', tabindex: '-1', 'aria-hidden': 'true' }, [
+          coverEl({ title: item.title, cover_url: info.cover_url }, 'mini'),
+        ])
+      : null;
     const open = el('button', { type: 'button', class: 'reading-now-open', 'aria-label': `${item.title}: szczegóły` }, [
-      ...(info?.cover_url ? [coverEl({ title: item.title, cover_url: info.cover_url }, 'mini')] : []),
-      el('div', { class: 'reading-now-info' }, [
-        el('span', { class: 'reading-now-title', text: item.title }),
-        el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
-      ]),
+      el('span', { class: 'reading-now-title', text: item.title }),
+      el('span', { class: 'reading-now-meta', text: readingNowLabel(item) }),
     ]);
-    open.addEventListener('click', () => openReadingModal(item, open.querySelector('.book-cover')));
-    return el('div', { class: 'reading-now-item' }, [
+    const openModal = () => openReadingModal(item, cover?.querySelector('.book-cover') ?? null);
+    open.addEventListener('click', openModal);
+    cover?.addEventListener('click', openModal);
+    return el('div', { class: `reading-now-item${cover ? '' : ' no-cover'}` }, [
+      ...(cover ? [cover] : []),
       open,
       el('div', { class: 'reading-now-actions' }, actions),
     ]);
