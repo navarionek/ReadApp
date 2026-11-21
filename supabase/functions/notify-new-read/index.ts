@@ -90,7 +90,11 @@ Deno.serve(async req => {
           tag: `read-${read.id}`,
         };
     try {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload), { TTL: 60 * 60 * 24 });
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, JSON.stringify(payload), {
+        TTL: 60 * 60 * 24,
+        // Wysoki priorytet: przy domyślnym Android w trybie Doze przetrzymuje push, aż ktoś otworzy apkę
+        urgency: 'high',
+      });
       sent++;
     } catch (err) {
       const status = (err as { statusCode?: number }).statusCode;
